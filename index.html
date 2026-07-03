@@ -201,7 +201,8 @@
     animation:popIn .3s ease; margin-bottom:16px;
   }
   [data-theme="light"] .list-card{ border:1px solid var(--border); box-shadow:var(--shadow-sm); }
-  .category-section{ padding:16px 16px 8px; list-style:none; }
+  .list-card .category-section{ padding:14px 16px 6px; }
+  .list-card .category-section + .category-section{ border-top:1px solid var(--card-divider); padding-top:16px; }
   .category-section:first-child{ padding-top:18px; }
   .category-title{
     font-size:15px; font-weight:600; color:var(--card-fg);
@@ -337,7 +338,7 @@
 
   .quick-bar{
     position:relative; left:0; right:0; z-index:25;
-    margin:0 16px 8px;
+    margin:0;
     display:flex; gap:10px; align-items:center;
   }
   .quick-input-wrap{
@@ -583,12 +584,38 @@
   .menu-popover button:active{ background:var(--surface-hover); }
   .menu-popover button.danger{ color:var(--danger); }
   .menu-popover button svg{ width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; }
+
+  .quick-bar-wrap{ position:relative; margin:0 16px 8px; }
+  .autocomplete-dropdown{
+    position:absolute; left:0; right:calc(var(--quickbar-height) + 10px); bottom:100%;
+    margin-bottom:8px; background:var(--bg-elevated);
+    border-radius:var(--radius-md); border:1px solid var(--border);
+    box-shadow:var(--shadow-md); max-height:240px; overflow-y:auto;
+    display:none; z-index:40; -webkit-overflow-scrolling:touch;
+  }
+  .autocomplete-dropdown.open{ display:block; animation:popIn .15s ease; }
+  .autocomplete-item{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:12px 14px; border:none; background:none;
+    color:var(--text); font-size:15px; font-weight:500;
+    cursor:pointer; text-align:left; border-bottom:1px solid var(--border);
+  }
+  .autocomplete-item:last-child{ border-bottom:none; }
+  .autocomplete-item:active{ background:var(--surface-hover); }
+  .autocomplete-item .food-icon svg{ width:20px; height:20px; stroke:var(--text-secondary); }
+  .autocomplete-item .ac-cat{ font-size:12px; color:var(--text-muted); margin-left:auto; flex-shrink:0; }
+  .row-action-btn.delete{ width:80px; }
+  .row-action-btn.edit{ display:none; }
+  .row-menu-btn{ display:none; }
+  .drag-handle{ display:none; }
+  .chip-row, .toolbar{ display:none; }
 </style>
 </head>
 <body data-theme="dark">
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 
+<script src="products.js"></script>
 <script>
 (function(){
   "use strict";
@@ -616,67 +643,67 @@
     haptic: '<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
   };
 
-  const FOOD_SVGS = {
-    tomate: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 6c-1.5 0-2.5-1-3-2"/><path d="M12 6c1.5 0 2.5-1 3-2"/><path d="M9 6c0-2 1.5-3 3-3s3 1 3 3"/></svg>',
-    gurke: '<svg viewBox="0 0 24 24"><path d="M14 4c3 2 5 5 5 9a7 7 0 0 1-14 0c0-4 2-7 5-9"/><path d="M12 4v3"/></svg>',
-    apfel: '<svg viewBox="0 0 24 24"><path d="M12 20c-4-2-6-5-6-9a6 6 0 0 1 11-3"/><path d="M12 4c0-2 1-3 2-3"/></svg>',
-    banane: '<svg viewBox="0 0 24 24"><path d="M4 16c2-6 6-10 12-12 0 6-2 11-6 15-2 2-4 3-6 3z"/></svg>',
-    karotte: '<svg viewBox="0 0 24 24"><path d="M12 20l-1-8 7-5-6 13z"/><path d="M11 12l-5-3"/><path d="M10 10l-4-5"/></svg>',
-    zwiebel: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="6"/><path d="M8 8c1-2 2.5-3 4-3s3 1 4 3"/></svg>',
-    salat: '<svg viewBox="0 0 24 24"><path d="M6 14c0-4 3-7 6-7s6 3 6 7"/><path d="M8 14c1-2 2.5-3 4-3s3 1 4 3"/><path d="M10 17h4"/></svg>',
-    fleisch: '<svg viewBox="0 0 24 24"><path d="M6 12c0-4 3-7 7-7 2 0 4 1 5 3"/><path d="M8 16c2 2 4 3 6 3 3 0 5-2 5-5"/><circle cx="16" cy="9" r="1"/></svg>',
-    fisch: '<svg viewBox="0 0 24 24"><path d="M4 12c3-4 7-6 12-6 2 4 2 8 0 12-5 0-9-2-12-6z"/><circle cx="14" cy="11" r="1"/><path d="M6 10l-2-2"/></svg>',
-    milch: '<svg viewBox="0 0 24 24"><path d="M9 3h6l1 4v12a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V7l1-4z"/><path d="M9 8h6"/></svg>',
-    kaese: '<svg viewBox="0 0 24 24"><path d="M4 14l4-8h8l4 8H4z"/><circle cx="10" cy="12" r="1"/><circle cx="14" cy="14" r="1"/></svg>',
-    ei: '<svg viewBox="0 0 24 24"><path d="M12 21c-3-3-5-7-5-10a5 5 0 0 1 10 0c0 3-2 7-5 10z"/></svg>',
-    brot: '<svg viewBox="0 0 24 24"><path d="M4 14c0-4 2-7 5-8 3-1 6 0 8 3 2 3 1 7-2 9-4 2-9 1-11-4z"/><path d="M8 12h8"/></svg>',
-    nudeln: '<svg viewBox="0 0 24 24"><path d="M4 10c2-2 4-3 6-3"/><path d="M6 14c2-2 4-3 6-3"/><path d="M8 18c2-2 4-3 6-3"/><path d="M16 8c2 0 4 1 4 3"/></svg>',
-    reis: '<svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="M8 9h8"/><path d="M8 15h8"/><ellipse cx="12" cy="12" rx="7" ry="3"/></svg>',
-    linsen: '<svg viewBox="0 0 24 24"><ellipse cx="8" cy="12" rx="2" ry="3"/><ellipse cx="12" cy="11" rx="2" ry="3"/><ellipse cx="16" cy="12" rx="2" ry="3"/><ellipse cx="10" cy="15" rx="2" ry="3"/><ellipse cx="14" cy="15" rx="2" ry="3"/></svg>',
-    bohne: '<svg viewBox="0 0 24 24"><path d="M8 12c-2-4 0-8 4-8s6 4 4 8-4 8-4 8"/><path d="M14 8c2 2 2 5 0 7"/></svg>',
-    tiefkuehl: '<svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19"/></svg>',
-    gewuerz: '<svg viewBox="0 0 24 24"><path d="M12 3c-2 3-3 6-3 9a3 3 0 0 0 6 0c0-3-1-6-3-9z"/><path d="M9 18h6"/></svg>',
-    default: '<svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
-    obst: '<svg viewBox="0 0 24 24"><path d="M12 20c-3-2-5-5-5-8a5 5 0 0 1 10 0c0 3-2 6-5 8z"/><path d="M12 7V4"/></svg>',
-    gemuese: '<svg viewBox="0 0 24 24"><path d="M6 14c0-4 3-7 6-7s6 3 6 7"/><path d="M12 7V4"/><path d="M9 10l-2-2M15 10l2-2"/></svg>'
+  const CATEGORY_ALIASES = {
+    'obst & gemuse':'Früchte & Gemüse','fruchte & gemuse':'Früchte & Gemüse',
+    'milchprodukte':'Milch & Käse','milch & kase':'Milch & Käse',
+    'getreide & backwaren':'Getreide & Beilagen','getreide & beilagen':'Getreide & Beilagen',
+    'brot & backwaren':'Brot & Backwaren','fleisch & fisch':'Fleisch & Fisch',
+    'tiefkuhl':'Tiefkühl','getranke':'Getränke','sonstiges':'Sonstiges'
   };
 
-  const FOOD_RULES = [
-    { k:['tomate','tomaten'], i:'tomate' },
-    { k:['gurke'], i:'gurke' }, { k:['apfel'], i:'apfel' }, { k:['banane'], i:'banane' },
-    { k:['karotte','mohre','mohren'], i:'karotte' }, { k:['zwiebel'], i:'zwiebel' },
-    { k:['salat','spinat','kohl','brokkoli'], i:'salat' },
-    { k:['hahnchen','huhn','pute','hack','fleisch','rind','steak','schwein','speck'], i:'fleisch' },
-    { k:['fisch','lachs','thunfisch','garnele'], i:'fisch' },
-    { k:['milch','sahne','joghurt'], i:'milch' },
-    { k:['kase','kaese','parmesan','mozzarella','feta','butter'], i:'kaese' },
-    { k:['ei','eier'], i:'ei' },
-    { k:['brot','toast','baguette','broetchen'], i:'brot' },
-    { k:['nudel','pasta','spaghetti','nudeln'], i:'nudeln' },
-    { k:['reis'], i:'reis' },
-    { k:['linse','linsen','kichererbse'], i:'linsen' },
-    { k:['bohne','bohnen'], i:'bohne' },
-    { k:['tiefkuhl','tiefgefroren','tk '], i:'tiefkuehl' },
-    { k:['salz','pfeffer','zucker','gewurz','olivenol','ol '], i:'gewuerz' }
-  ];
-  const CAT_ICON = {
-    'obst & gemuse':'gemuese', 'fleisch & fisch':'fleisch', 'milchprodukte':'milch',
-    'getreide & backwaren':'brot', 'tiefkuhl':'tiefkuehl', 'sonstiges':'default'
-  };
+  const productIndex = {};
+  function buildProductIndex(){
+    if(!window.PRODUCT_DB) return;
+    PRODUCT_DB.products.forEach(p => { productIndex[normalize(p.name)] = p; });
+  }
 
-  function getFoodIcon(name, category){
+  function normalizeCategory(cat){
+    const key = normalize(cat);
+    if(CATEGORY_ALIASES[key]) return CATEGORY_ALIASES[key];
+    if(DEFAULT_CATEGORIES.includes(cat)) return cat;
+    return cat || 'Sonstiges';
+  }
+
+  function resolveProduct(name){
     const n = normalize(name);
-    for(const r of FOOD_RULES){ if(r.k.some(k => n.includes(k))) return `<span class="food-icon">${FOOD_SVGS[r.i]}</span>`; }
-    const catKey = normalize(category);
-    const ci = CAT_ICON[catKey] || 'default';
-    return `<span class="food-icon">${FOOD_SVGS[ci]}</span>`;
+    if(productIndex[n]) return productIndex[n];
+    let best = null, bestLen = 0;
+    for(const p of (PRODUCT_DB?.products || [])){
+      const pn = normalize(p.name);
+      if(pn.includes(n) || n.includes(pn)){
+        if(pn.length > bestLen){ best = p; bestLen = pn.length; }
+      }
+    }
+    return best || { name: String(name||'').trim(), category:'Sonstiges', icon:'default' };
+  }
+
+  function searchProducts(query, limit){
+    const q = normalize(query);
+    if(!q) return [];
+    const starts = [], contains = [];
+    (PRODUCT_DB?.products || []).forEach(p => {
+      const n = normalize(p.name);
+      if(n.startsWith(q)) starts.push(p);
+      else if(n.includes(q)) contains.push(p);
+    });
+    return [...starts, ...contains].slice(0, limit || 8);
+  }
+
+  function iconSvg(key){
+    const paths = (window.PRODUCT_ICONS || {})[key] || (window.PRODUCT_ICONS || {}).default || '';
+    return `<svg viewBox="0 0 24 24">${paths}</svg>`;
+  }
+
+  function getFoodIcon(name, category, iconKey){
+    const key = iconKey || resolveProduct(name).icon || 'default';
+    return `<span class="food-icon">${iconSvg(key)}</span>`;
   }
 
   const KEYS = {
     week:'alexshop_week', pantry:'alexshop_pantry', settings:'alexshop_settings',
     meta:'alexshop_meta'
   };
-  const DEFAULT_CATEGORIES = ['Obst & Gemüse','Fleisch & Fisch','Milchprodukte','Getreide & Backwaren','Tiefkühl','Sonstiges'];
+  const DEFAULT_CATEGORIES = window.PRODUCT_DB ? PRODUCT_DB.categories : ['Früchte & Gemüse','Milch & Käse','Fleisch & Fisch','Getreide & Beilagen','Brot & Backwaren','Tiefkühl','Getränke','Sonstiges'];
   const UNITS = ['','g','kg','ml','l','Stk','Packung','Dose','Bund'];
 
   function loadJSON(key, fallback){
@@ -703,7 +730,7 @@
     settings: migrateSettings(loadJSON(KEYS.settings, { theme:'dark' })),
     meta,
     ui: {
-      tab:'liste', doneOpen:false, searchQuery:'', sortMode:'category',
+      tab:'liste', doneOpen:false, inputQuery:'', autocompleteOpen:false, sortMode:'category',
       addPantryCategory: DEFAULT_CATEGORIES[0], listMenuOpen:false
     }
   };
@@ -712,7 +739,7 @@
     const mk = (name, category) => ({ id: uid(), name, category });
     return [
       mk('Salz','Sonstiges'), mk('Pfeffer','Sonstiges'), mk('Olivenöl','Sonstiges'),
-      mk('Reis','Getreide & Backwaren'), mk('Zucker','Sonstiges'), mk('Mehl','Getreide & Backwaren')
+      mk('Reis','Getreide & Beilagen'), mk('Zucker','Sonstiges'), mk('Mehl','Getreide & Beilagen')
     ];
   }
 
@@ -775,7 +802,7 @@
     for(const raw of items){
       const name = String(raw.name||'').trim();
       if(!name) continue;
-      const category = String(raw.category||'Sonstiges').trim() || 'Sonstiges';
+      const category = normalizeCategory(String(raw.category||'').trim()) || resolveProduct(name).category;
       const key = normalize(name);
       if(map.has(key)){
         const existing = map.get(key);
@@ -840,16 +867,17 @@
   function groupByCategory(items){
     const groups = {};
     items.forEach(it => {
-      const cat = it.category || 'Sonstiges';
+      const cat = normalizeCategory(it.category || resolveProduct(it.name).category);
       if(!groups[cat]) groups[cat] = [];
       groups[cat].push(it);
     });
-    const cats = allCategories().filter(c => groups[c]);
-    return cats.map(cat => ({ cat, items: groups[cat].sort((a,b) => (a.order||0) - (b.order||0)) }));
+    const cats = DEFAULT_CATEGORIES.filter(c => groups[c]);
+    const extra = Object.keys(groups).filter(c => !DEFAULT_CATEGORIES.includes(c)).sort();
+    return [...cats, ...extra].map(cat => ({ cat, items: groups[cat].sort((a,b) => (a.order||0) - (b.order||0)) }));
   }
 
   function filterItems(items){
-    const q = normalize(state.ui.searchQuery);
+    const q = normalize(state.ui.inputQuery);
     if(!q) return items;
     return items.filter(i => normalize(i.name).includes(q) || normalize(i.category).includes(q));
   }
@@ -867,32 +895,28 @@
     return { total, done, remaining: total - done, pct };
   }
 
-  function itemRowHTML(item, showDrag){
-    const icon = getFoodIcon(item.name, item.category);
-    const fav = isFavorite(item.name);
+  function itemRowHTML(item){
+    const icon = getFoodIcon(item.name, item.category, item.icon);
     return `
       <li class="row-wrap" data-id="${item.id}">
         <div class="row-actions">
-          <button class="row-action-btn edit" data-action="editItem" data-id="${item.id}">${ICONS.edit}<span>Bearbeiten</span></button>
-          <button class="row-action-btn delete" data-action="deleteItem" data-id="${item.id}">${ICONS.trash}<span>Löschen</span></button>
+          <button class="row-action-btn delete" data-action="deleteItem" data-id="${item.id}">${ICONS.trash}</button>
         </div>
-        <div class="row-content ${item.done?'done':''}" data-id="${item.id}">
-          ${showDrag ? `<div class="drag-handle" data-drag-handle="1">${ICONS.drag}</div>` : ''}
+        <div class="row-content ${item.done?'done':''}" data-id="${item.id}" data-action="toggle">
           <div class="emoji-wrap">${icon}</div>
-          <div class="row-text" data-action="toggle" data-id="${item.id}">
-            <div class="row-name">${esc(item.name)}${fav ? ' ★' : ''}</div>
+          <div class="row-text">
+            <div class="row-name">${esc(item.name)}</div>
             ${item.amount ? `<div class="row-amount">${esc(item.amount)}</div>` : ''}
           </div>
-          <button class="row-menu-btn" data-action="itemMenu" data-id="${item.id}">${ICONS.more}</button>
-          <div class="check-circle" data-action="toggle" data-id="${item.id}">${ICONS.check}</div>
+          <div class="check-circle">${ICONS.check}</div>
         </div>
       </li>`;
   }
 
   function renderListeTab(){
-    let activeItems = sortItems(filterItems(state.week.items.filter(i => !i.done)));
-    const doneItems = filterItems(state.week.items.filter(i => i.done));
-    const groups = state.ui.sortMode === 'category' ? groupByCategory(activeItems) : [{ cat:'', items: activeItems }];
+    const activeItems = groupByCategory(state.week.items.filter(i => !i.done)).flatMap(g => g.items);
+    const doneItems = state.week.items.filter(i => i.done);
+    const groups = groupByCategory(state.week.items.filter(i => !i.done));
     const stats = progressStats();
     let html = '';
 
@@ -910,32 +934,6 @@
       </div>`;
     }
 
-    const suggestions = [];
-    if(state.settings.showRecent) state.meta.recent.slice(0, 5).forEach(r => suggestions.push(r));
-    if(state.settings.showFrequent){
-      Object.entries(state.meta.frequent).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([k]) => {
-        const rec = state.meta.recent.find(r => normalize(r.name) === k);
-        if(rec && !suggestions.some(s => normalize(s.name) === k)) suggestions.push(rec);
-      });
-    }
-    state.meta.favorites.slice(0, 5).forEach(name => {
-      if(!suggestions.some(s => normalize(s.name) === normalize(name)))
-        suggestions.push({ name, amount:'', category:'Sonstiges' });
-    });
-
-    if(suggestions.length && !state.ui.searchQuery){
-      html += `<div class="chip-row">${suggestions.map(s =>
-        `<button class="chip ${isFavorite(s.name)?'fav':''}" data-action="quickAddSuggestion" data-name="${esc(s.name)}" data-amount="${esc(s.amount||'')}" data-category="${esc(s.category||'Sonstiges')}">
-          ${getFoodIcon(s.name, s.category)}${esc(s.name)}
-        </button>`).join('')}</div>`;
-    }
-
-    html += `<div class="toolbar">
-      <button class="pill-btn ${state.ui.sortMode==='category'?'active':''}" data-action="setSort" data-sort="category">Kategorie</button>
-      <button class="pill-btn ${state.ui.sortMode==='name'?'active':''}" data-action="setSort" data-sort="name">A–Z</button>
-      <button class="pill-btn ${state.ui.sortMode==='recent'?'active':''}" data-action="setSort" data-sort="recent">Neueste</button>
-    </div>`;
-
     if(!activeItems.length && !doneItems.length){
       html += `<div class="empty-state">
         <div class="empty-icon">${ICONS.cart}</div>
@@ -947,17 +945,14 @@
       </div>`;
     } else {
       if(activeItems.length){
-        html += `<div class="list-card"><ul class="category-items" data-sortable="1">`;
-        if(state.ui.sortMode === 'category'){
-          groups.forEach(g => {
-            html += `<li class="category-section"><h3 class="category-title">${esc(g.cat)}</h3><ul class="category-items" data-sortable="1" data-category="${esc(g.cat)}">`;
-            html += g.items.map(it => itemRowHTML(it, state.ui.sortMode === 'category')).join('');
-            html += `</ul></li>`;
-          });
-        } else {
-          html += activeItems.map(it => itemRowHTML(it, false)).join('');
-        }
-        html += `</ul></div>`;
+        html += `<div class="list-card">`;
+        groups.forEach(g => {
+          if(!g.items.length) return;
+          html += `<div class="category-section"><h3 class="category-title">${esc(g.cat)}</h3><ul class="category-items">`;
+          html += g.items.map(it => itemRowHTML(it)).join('');
+          html += `</ul></div>`;
+        });
+        html += `</div>`;
       }
 
       if(doneItems.length){
@@ -966,7 +961,7 @@
         </div>`;
         if(state.ui.doneOpen){
           html += `<div class="list-card" style="opacity:.85"><ul class="category-items">`;
-          html += doneItems.map(it => itemRowHTML(it, false)).join('');
+          html += doneItems.map(it => itemRowHTML(it)).join('');
           html += `</ul></div>`;
         }
       }
@@ -1089,14 +1084,32 @@
     </header>`;
   }
 
+  function renderAutocomplete(){
+    const q = state.ui.inputQuery.trim();
+    if(!q || !state.ui.autocompleteOpen) return '';
+    const matches = searchProducts(q, 8);
+    if(!matches.length) return '';
+    return matches.map(p =>
+      `<button type="button" class="autocomplete-item" data-action="pickProduct" data-name="${esc(p.name)}" data-category="${esc(p.category)}" data-icon="${esc(p.icon)}">
+        ${getFoodIcon(p.name, p.category, p.icon)}
+        <span>${esc(p.name)}</span>
+        <span class="ac-cat">${esc(p.category)}</span>
+      </button>`
+    ).join('');
+  }
+
   function renderQuickBar(){
     if(state.ui.tab !== 'liste') return '';
-    return `<div class="quick-bar">
-      <div class="quick-input-wrap">
-        ${ICONS.search}
-        <input type="text" id="quickInput" placeholder="Ich brauche…" value="${esc(state.ui.searchQuery)}" autocomplete="off" enterkeyhint="done" />
+    const ac = renderAutocomplete();
+    return `<div class="quick-bar-wrap">
+      <div id="autocompleteDropdown" class="autocomplete-dropdown ${ac ? 'open' : ''}">${ac}</div>
+      <div class="quick-bar">
+        <div class="quick-input-wrap">
+          ${ICONS.search}
+          <input type="text" id="quickInput" placeholder="Ich brauche…" value="${esc(state.ui.inputQuery)}" autocomplete="off" enterkeyhint="done" />
+        </div>
+        <button class="quick-add-btn" data-action="quickAdd" aria-label="Hinzufügen">${ICONS.plus}</button>
       </div>
-      <button class="quick-add-btn" data-action="quickAdd" aria-label="Hinzufügen">${ICONS.plus}</button>
     </div>`;
   }
 
@@ -1115,7 +1128,6 @@
         </nav>
       </div>`;
     attachSwipeHandlers();
-    attachDragHandlers();
     updateKeyboardLayout();
   }
 
@@ -1127,18 +1139,20 @@
     toast._t = setTimeout(() => t.classList.remove('show'), 2000);
   }
 
-  function addItem(name, amount, category, merge){
+  function addItem(name, amount, category, merge, icon){
     name = String(name||'').trim();
     if(!name) return false;
-    category = String(category||'Sonstiges').trim() || 'Sonstiges';
+    const resolved = resolveProduct(name);
+    category = normalizeCategory(String(category||'').trim()) || resolved.category;
+    icon = icon || resolved.icon;
     amount = String(amount||'').trim();
     if(!allCategories().includes(category) && !state.meta.customCategories.includes(category))
       state.meta.customCategories.push(category);
     const key = normalize(name);
     if(merge){
       const existing = state.week.items.find(i => !i.done && normalize(i.name) === key);
-      if(existing){ existing.amount = combineAmounts(existing.amount, amount); existing.order = Date.now(); }
-      else state.week.items.unshift({ id: uid(), name, amount, category, done:false, order: Date.now() });
+      if(existing){ existing.amount = combineAmounts(existing.amount, amount); existing.order = Date.now(); existing.icon = icon || existing.icon; }
+      else state.week.items.unshift({ id: uid(), name, amount, category, icon, done:false, order: Date.now() });
     } else {
       state.week.items.unshift({ id: uid(), name, amount, category, done:false, order: Date.now() });
     }
@@ -1330,7 +1344,7 @@
       content.dataset.swipeBound = '1';
       content.style.transform = 'translateX(0)';
       let startX = 0, currentX = 0, dragging = false, opened = false;
-      const actionWidth = 144;
+      const actionWidth = 80;
       function onStart(e){
         if(e.target.closest('[data-drag-handle], .row-menu-btn, .check-circle')) return;
         closeAllSwipes();
@@ -1351,7 +1365,7 @@
         if(!dragging) return;
         dragging = false;
         content.style.transition = 'transform .2s ease';
-        if(currentX < -60){
+        if(currentX < -40){
           content.style.transform = `translateX(-${actionWidth}px)`;
           opened = true;
           openSwipeRow = wrap;
@@ -1544,10 +1558,18 @@
       case 'setSort': state.ui.sortMode = target.getAttribute('data-sort'); render(); haptic('light'); break;
       case 'quickAdd': {
         const inp = document.getElementById('quickInput');
-        if(inp && inp.value.trim()){ addItem(inp.value.trim(), '', 'Sonstiges', true); state.ui.searchQuery = ''; render(); toast('Hinzugefügt'); }
-        else openItemSheet();
+        if(inp && inp.value.trim()){
+          const r = resolveProduct(inp.value.trim());
+          addItem(r.name, '', r.category, true, r.icon);
+          state.ui.inputQuery = ''; state.ui.autocompleteOpen = false;
+          render(); toast('Hinzugefügt');
+        }
         break;
       }
+      case 'pickProduct':
+        addItem(target.getAttribute('data-name'), '', target.getAttribute('data-category'), true, target.getAttribute('data-icon'));
+        state.ui.inputQuery = ''; state.ui.autocompleteOpen = false;
+        render(); toast('Hinzugefügt'); haptic('light'); break;
       case 'quickAddSuggestion':
         addItem(target.getAttribute('data-name'), target.getAttribute('data-amount'), target.getAttribute('data-category'), true);
         render(); toast('Hinzugefügt'); break;
@@ -1563,15 +1585,31 @@
     }
   });
 
+  function refreshAutocomplete(){
+    const wrap = document.querySelector('.quick-bar-wrap');
+    if(!wrap || state.ui.tab !== 'liste') return;
+    const ac = renderAutocomplete();
+    let dd = document.getElementById('autocompleteDropdown');
+    if(!dd){
+      wrap.insertAdjacentHTML('afterbegin', `<div id="autocompleteDropdown" class="autocomplete-dropdown ${ac?'open':''}">${ac}</div>`);
+    } else {
+      dd.className = 'autocomplete-dropdown' + (ac ? ' open' : '');
+      dd.innerHTML = ac;
+    }
+  }
+
   document.addEventListener('input', function(e){
     if(e.target.id === 'quickInput'){
-      state.ui.searchQuery = e.target.value;
-      const main = document.getElementById('mainContent');
-      if(main && state.ui.tab === 'liste'){
-        main.innerHTML = renderListeTab();
-        attachSwipeHandlers();
-        attachDragHandlers();
-      }
+      state.ui.inputQuery = e.target.value;
+      state.ui.autocompleteOpen = !!e.target.value.trim();
+      refreshAutocomplete();
+    }
+  });
+
+  document.addEventListener('focusin', function(e){
+    if(e.target.id === 'quickInput' && e.target.value.trim()){
+      state.ui.autocompleteOpen = true;
+      refreshAutocomplete();
     }
   });
 
@@ -1579,7 +1617,12 @@
     if(e.target.id === 'quickInput' && e.key === 'Enter'){
       e.preventDefault();
       const val = e.target.value.trim();
-      if(val){ addItem(val, '', 'Sonstiges', true); state.ui.searchQuery = ''; render(); toast('Hinzugefügt'); }
+      if(val){
+        const r = resolveProduct(val);
+        addItem(r.name, '', r.category, true, r.icon);
+        state.ui.inputQuery = ''; state.ui.autocompleteOpen = false;
+        render(); toast('Hinzugefügt');
+      }
     }
   });
 
@@ -1587,7 +1630,19 @@
   document.addEventListener('gesturechange', e => e.preventDefault());
   document.addEventListener('gestureend', e => e.preventDefault());
 
+  function migrateWeekItems(){
+    let changed = false;
+    state.week.items.forEach(it => {
+      const resolved = resolveProduct(it.name);
+      const cat = normalizeCategory(it.category);
+      if(cat !== it.category || (!it.icon && resolved.icon)){ it.category = cat; it.icon = it.icon || resolved.icon; changed = true; }
+    });
+    if(changed) persistWeek();
+  }
+
   setupKeyboard();
+  buildProductIndex();
+  migrateWeekItems();
   render();
 })();
 
