@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>AlexShop</title>
+
+<!-- iOS "Zum Home-Bildschirm hinzufügen" Meta-Tags (Apple braucht kein manifest.json) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AlexShop">
+<meta name="theme-color" content="#12213B">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2312213B'/%3E%3Cpath d='M28 34h6l6 34h30l7-24H40' fill='none' stroke='%23FFC93C' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='45' cy='76' r='5' fill='%23FFC93C'/%3E%3Ccircle cx='68' cy='76' r='5' fill='%23FFC93C'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2312213B'/%3E%3Cpath d='M28 34h6l6 34h30l7-24H40' fill='none' stroke='%23FFC93C' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='45' cy='76' r='5' fill='%23FFC93C'/%3E%3Ccircle cx='68' cy='76' r='5' fill='%23FFC93C'/%3E%3C/svg%3E">
+
+<!-- Twemoji: rendert Unicode-Emoji als konsistente SVGs auf allen Geräten -->
+<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@latest/dist/twemoji.min.js"></script>
+
+<style>
+  :root{
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ---------- Theme: Bring! (dunkles Marineblau + Gelb) ---------- */
+  [data-theme="bring"]{
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --header-bg: #12213B;
+    --header-fg: #FFFFFF;
+    --accent: #FFC93C;
+    --accent-fg: #12213B;
+    --text: #1B1F27;
+    --text-muted: #767C8C;
+    --border: #E7E9EE;
+    --category-fg: #12213B;
+    --danger: #E4573D;
+    --success: #3CB878;
+    --chip-bg: #EFF1F5;
+    --done-bg: #ECEDF1;
+  }
+
+  /* ---------- Theme: Neutral/Minimal ---------- */
+  [data-theme="neutral"]{
+    --bg: #FAFAFA;
+    --surface: #FFFFFF;
+    --header-bg: #FFFFFF;
+    --header-fg: #111111;
+    --accent: #111111;
+    --accent-fg: #FFFFFF;
+    --text: #111111;
+    --text-muted: #8A8A8A;
+    --border: #EAEAEA;
+    --category-fg: #6B6B6B;
+    --danger: #C0392B;
+    --success: #2E7D5B;
+    --chip-bg: #F1F1F1;
+    --done-bg: #F3F3F3;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, Helvetica, Arial, sans-serif;
+    overscroll-behavior-y: contain;
+  }
+  #app{ min-height:100%; display:flex; flex-direction:column; }
+
+  header.topbar{
+    background: var(--header-bg);
+    color: var(--header-fg);
+    padding: calc(14px + var(--safe-top)) 16px 14px;
+    display:flex; align-items:center; justify-content:space-between;
+    position: sticky; top:0; z-index:20;
+  }
+  header.topbar h1{ font-size:20px; margin:0; font-weight:800; letter-spacing:.2px; }
+  header.topbar .sub{ font-size:12px; opacity:.75; margin-top:2px; font-weight:500; }
+  .icon-btn{
+    background: rgba(255,255,255,.12);
+    border:none; color: inherit; width:40px; height:40px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; font-size:19px;
+    cursor:pointer;
+  }
+  [data-theme="neutral"] .icon-btn{ background: var(--chip-bg); color:var(--text); }
+  .topbar-actions{ display:flex; gap:8px; }
+
+  main{ flex:1; padding: 12px 12px calc(90px + var(--safe-bottom)); }
+
+  .empty-state{
+    text-align:center; color:var(--text-muted); padding:60px 20px; font-size:15px;
+  }
+  .empty-state .emoji{ font-size:44px; display:block; margin-bottom:10px; }
+
+  .category-block{ margin-bottom: 18px; }
+  .category-title{
+    font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.6px;
+    color: var(--category-fg); padding: 4px 6px 8px;
+  }
+  .card{
+    background: var(--surface);
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+
+  .row-wrap{ position:relative; overflow:hidden; border-bottom:1px solid var(--border); }
+  .row-wrap:last-child{ border-bottom:none; }
+  .row-delete{
+    position:absolute; top:0; right:0; bottom:0; width:84px;
+    background: var(--danger); color:#fff; border:none;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px;
+  }
+  .row-content{
+    position:relative; background: var(--surface);
+    display:flex; align-items:center; gap:12px;
+    padding:14px 14px; min-height:60px;
+    transition: transform .18s ease, opacity .32s ease, background-color .25s ease;
+    touch-action: pan-y;
+  }
+  .row-content.done{ background: var(--done-bg); }
+  .row-content .emoji-wrap{
+    width:34px; height:34px; flex:none; display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .row-content img.emoji{ width:26px; height:26px; }
+  .row-text{ flex:1; min-width:0; }
+  .row-name{ font-size:16px; font-weight:600; line-height:1.3; transition: color .25s ease, text-decoration-color .25s ease; }
+  .row-amount{ font-size:13px; color: var(--text-muted); margin-top:1px; }
+  .row-content.done .row-name{ text-decoration: line-through; text-decoration-thickness:2px; color: var(--text-muted); }
+  .row-content.exiting{ opacity:0; transform: scale(.97); }
+  .check-circle{
+    width:26px; height:26px; border-radius:50%; border:2px solid var(--border); flex:none;
+    display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff;
+    transition: background-color .2s ease, border-color .2s ease;
+  }
+  .row-content.done .check-circle{ background: var(--success); border-color: var(--success); }
+
+  .done-toggle{
+    margin: 4px 4px 0; padding:14px 16px; border-radius:16px; background: var(--surface);
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+    font-weight:700; font-size:14px; color: var(--text-muted);
+  }
+  .done-toggle .count-badge{
+    background: var(--chip-bg); color: var(--text); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:800;
+  }
+  .done-panel{ margin-top:6px; }
+  .undo-btn{ font-size:12px; font-weight:800; color: var(--accent-fg); background:var(--accent); border:none; padding:6px 12px; border-radius:20px; }
+  [data-theme="neutral"] .undo-btn{ color:#fff; }
+
+  .filtered-note{
+    background: var(--chip-bg); border-radius:14px; padding:12px 14px; font-size:13px; color:var(--text-muted); margin-bottom:14px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .filtered-note button{ background:none; border:none; color:var(--text); font-weight:700; font-size:13px; }
+
+  nav.tabbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    background: var(--surface); border-top:1px solid var(--border);
+    padding: 8px 6px calc(8px + var(--safe-bottom));
+    display:flex; justify-content:space-around;
+  }
+  nav.tabbar button{
+    background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px;
+    color: var(--text-muted); font-size:11px; font-weight:700; padding:4px 14px; cursor:pointer;
+  }
+  nav.tabbar button .tab-icon{ font-size:21px; }
+  nav.tabbar button.active{ color: var(--text); }
+  nav.tabbar button.active .tab-icon{ transform: translateY(-1px); }
+
+  .fab{
+    position:fixed; right:18px; bottom: calc(84px + var(--safe-bottom)); z-index:21;
+    width:56px; height:56px; border-radius:50%; border:none;
+    background: var(--accent); color: var(--accent-fg); font-size:26px;
+    box-shadow: 0 6px 16px rgba(0,0,0,.18);
+  }
+
+  .sheet-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:30;
+    display:flex; align-items:flex-end;
+  }
+  .sheet{
+    background: var(--surface); width:100%; border-radius:20px 20px 0 0;
+    padding: 18px 18px calc(20px + var(--safe-bottom)); max-height:85vh; overflow-y:auto;
+  }
+  .sheet h2{ margin:0 0 4px; font-size:19px; }
+  .sheet p.hint{ font-size:13px; color:var(--text-muted); margin:0 0 12px; }
+  .sheet textarea{
+    width:100%; min-height:180px; border-radius:14px; border:1px solid var(--border);
+    padding:12px; font-size:14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--bg); color:var(--text); resize:vertical;
+  }
+  .sheet input[type=text]{
+    width:100%; border-radius:12px; border:1px solid var(--border); padding:12px 14px; font-size:15px;
+    background: var(--bg); color:var(--text);
+  }
+  .sheet-actions{ display:flex; gap:10px; margin-top:14px; }
+  .btn{
+    flex:1; border:none; padding:14px; border-radius:14px; font-size:15px; font-weight:800; cursor:pointer;
+  }
+  .btn-primary{ background: var(--accent); color: var(--accent-fg); }
+  .btn-secondary{ background: var(--chip-bg); color: var(--text); }
+  .error-msg{ color: var(--danger); font-size:13px; font-weight:700; margin-top:8px; min-height:16px; }
+  .close-x{ position:absolute; top:14px; right:14px; background:none; border:none; font-size:20px; color:var(--text-muted); }
+
+  /* ---------- Vorrat / Settings Tab ---------- */
+  .section-title{ font-size:15px; font-weight:800; margin: 4px 0 10px; }
+  .add-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .add-row input{ flex:1; border-radius:12px; border:1px solid var(--border); padding:12px 14px; font-size:15px; background:var(--surface); color:var(--text); }
+  .add-row select{ border-radius:12px; border:1px solid var(--border); padding:12px 10px; font-size:14px; background:var(--surface); color:var(--text); }
+  .add-row button{ background: var(--accent); color: var(--accent-fg); border:none; border-radius:12px; padding:0 18px; font-size:20px; font-weight:800; }
+
+  .pantry-row{
+    display:flex; align-items:center; justify-content:space-between; padding:13px 14px;
+    border-bottom:1px solid var(--border);
+  }
+  .pantry-row:last-child{ border-bottom:none; }
+  .pantry-row .name{ font-size:15px; font-weight:600; }
+  .pantry-row button{ background:none; border:none; color: var(--danger); font-size:20px; }
+
+  .theme-options{ display:flex; gap:10px; margin-bottom:20px; }
+  .theme-card{
+    flex:1; border-radius:16px; border:2px solid var(--border); padding:14px; cursor:pointer; text-align:center;
+  }
+  .theme-card.selected{ border-color: var(--accent); }
+  .theme-card .swatch{ height:34px; border-radius:10px; margin-bottom:8px; }
+  .theme-card .label{ font-size:13px; font-weight:700; }
+
+  .danger-btn{ width:100%; background: none; border:1px solid var(--danger); color:var(--danger); padding:14px; border-radius:14px; font-weight:700; font-size:14px; margin-top:10px; }
+
+  .toast{
+    position:fixed; left:50%; bottom: calc(100px + var(--safe-bottom)); transform: translateX(-50%);
+    background: #1B1F27; color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600;
+    z-index:40; opacity:0; pointer-events:none; transition: opacity .25s ease, transform .25s ease;
+  }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body data-theme="bring">
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     STORAGE
+  ============================================================ */
+  const KEYS = { week:'alexshop_week', pantry:'alexshop_pantry', settings:'alexshop_settings' };
+
+  function loadJSON(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  function saveJSON(key, val){
+    try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+  }
+
+  const CATEGORY_ORDER = ['Obst & Gemüse','Fleisch & Fisch','Milchprodukte','Getreide & Backwaren','Tiefkühl','Sonstiges'];
+
+  const state = {
+    week: loadJSON(KEYS.week, { label:'', items:[] }),
+    pantry: loadJSON(KEYS.pantry, defaultPantry()),
+    filteredOut: [],
+    settings: loadJSON(KEYS.settings, { theme:'bring' }),
+    ui: { tab:'liste', doneOpen:false, importOpen:false, addPantryCategory: CATEGORY_ORDER[0] }
+  };
+
+  function defaultPantry(){
+    return [
+      mk('Salz','Sonstiges'), mk('Pfeffer','Sonstiges'), mk('Olivenöl','Sonstiges'),
+      mk('Reis','Getreide & Backwaren'), mk('Zucker','Sonstiges'), mk('Mehl','Getreide & Backwaren')
+    ];
+    function mk(name, category){ return { id: uid(), name, category }; }
+  }
+
+  function persistWeek(){ saveJSON(KEYS.week, state.week); }
+  function persistPantry(){ saveJSON(KEYS.pantry, state.pantry); }
+  function persistSettings(){ saveJSON(KEYS.settings, state.settings); }
+
+  function uid(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+  /* ============================================================
+     TEXT / AMOUNT HELPERS
+  ============================================================ */
+  function normalize(str){
+    return String(str||'').toLowerCase().trim()
+      .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss');
+  }
+
+  function parseAmount(str){
+    if(!str) return null;
+    const m = String(str).trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+    if(!m) return null;
+    return { value: parseFloat(m[1].replace(',', '.')), unit: m[2].trim() };
+  }
+  function formatNumber(n){
+    const rounded = Math.round(n*100)/100;
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',');
+  }
+  function combineAmounts(a, b){
+    const pa = parseAmount(a), pb = parseAmount(b);
+    if(pa && pb && pa.unit.toLowerCase() === pb.unit.toLowerCase()){
+      const sum = formatNumber(pa.value + pb.value);
+      return pa.unit ? (sum + ' ' + pa.unit) : sum;
+    }
+    if(!a) return b; if(!b) return a;
+    return a + ' + ' + b;
+  }
+
+  function mergeItems(items){
+    const map = new Map();
+    for(const raw of items){
+      const name = String(raw.name||'').trim();
+      if(!name) continue;
+      const category = String(raw.category||'Sonstiges').trim() || 'Sonstiges';
+      const key = normalize(name);
+      if(map.has(key)){
+        const existing = map.get(key);
+        existing.amount = combineAmounts(existing.amount, raw.amount);
+      } else {
+        map.set(key, { id: uid(), name, amount: String(raw.amount||'').trim(), category, done:false });
+      }
+    }
+    return Array.from(map.values());
+  }
+
+  /* ============================================================
+     EMOJI MAPPING (3-Stufen-Fallback)
+  ============================================================ */
+  const EMOJI_MAP = [
+    { k:['tomate'], e:'🍅' }, { k:['gurke'], e:'🥒' }, { k:['zwiebel'], e:'🧅' },
+    { k:['knoblauch'], e:'🧄' }, { k:['kartoffel'], e:'🥔' }, { k:['karotte','mohre'], e:'🥕' },
+    { k:['paprika'], e:'🫑' }, { k:['salat'], e:'🥬' }, { k:['brokkoli'], e:'🥦' },
+    { k:['champignon','pilz'], e:'🍄' }, { k:['zitrone'], e:'🍋' }, { k:['limette'], e:'🍋' },
+    { k:['apfel'], e:'🍎' }, { k:['banane'], e:'🍌' }, { k:['orange'], e:'🍊' },
+    { k:['avocado'], e:'🥑' }, { k:['mais'], e:'🌽' }, { k:['chili'], e:'🌶️' },
+    { k:['ingwer'], e:'🫚' }, { k:['spinat'], e:'🥬' }, { k:['aubergine'], e:'🍆' },
+    { k:['gurke'], e:'🥒' }, { k:['kraut','kohl'], e:'🥬' }, { k:['zucchini'], e:'🥒' },
+    { k:['beeren','erdbeer'], e:'🍓' }, { k:['weintraube'], e:'🍇' }, { k:['birne'], e:'🍐' },
+    { k:['kokos'], e:'🥥' }, { k:['pfirsich'], e:'🍑' },
+
+    { k:['hahnchenbrust','hahnchen','huhn','geflugel','pute'], e:'🍗' },
+    { k:['hackfleisch','hack'], e:'🥩' }, { k:['rindfleisch','rind','steak'], e:'🥩' },
+    { k:['schweinefleisch','schwein'], e:'🥩' }, { k:['speck','bacon'], e:'🥓' },
+    { k:['wurst','salami','schinken'], e:'🌭' }, { k:['lachs'], e:'🐟' },
+    { k:['garnele','shrimp'], e:'🍤' }, { k:['fisch'], e:'🐟' },
+
+    { k:['milch'], e:'🥛' }, { k:['kase','parmesan','mozzarella','feta'], e:'🧀' },
+    { k:['butter'], e:'🧈' }, { k:['sahne'], e:'🥛' }, { k:['joghurt'], e:'🥣' },
+    { k:['quark'], e:'🥣' }, { k:['frischkase'], e:'🧀' }, { k:['ei ','eier'], e:'🥚' },
+
+    { k:['brot'], e:'🍞' }, { k:['nudel','pasta','spaghetti'], e:'🍝' }, { k:['reis'], e:'🍚' },
+    { k:['mehl'], e:'🌾' }, { k:['haferflocken','muesli'], e:'🌾' }, { k:['brotchen'], e:'🥐' },
+    { k:['baguette'], e:'🥖' }, { k:['tortilla','wrap'], e:'🌯' }, { k:['toast'], e:'🍞' },
+    { k:['pizza'], e:'🍕' },
+
+    { k:['pommes'], e:'🍟' }, { k:['eis'], e:'🍨' },
+
+    { k:['linse'], e:'🫘' }, { k:['kichererbse'], e:'🫘' }, { k:['bohne'], e:'🫘' },
+    { k:['gewurz','pfeffer','currypulver','paprikapulver','zimt','muskat','kreuzkummel'], e:'🧂' },
+    { k:['ol '], e:'🫒' }, { k:['olivenol'], e:'🫒' }, { k:['essig'], e:'🫙' },
+    { k:['honig'], e:'🍯' }, { k:['zucker'], e:'🧂' }, { k:['nuss','nusse','mandel','walnuss'], e:'🥜' },
+    { k:['schokolade'], e:'🍫' }, { k:['wasser'], e:'💧' }, { k:['wein'], e:'🍷' },
+    { k:['bier'], e:'🍺' }, { k:['kaffee'], e:'☕' }, { k:['tee'], e:'🍵' },
+    { k:['saft'], e:'🧃' }, { k:['thunfisch'], e:'🐟' }
+  ];
+
+  const GENERIC_KEYWORDS = [
+    { test: n => /dose|konserve/.test(n), e:'🥫' },
+    { test: n => /tiefkuhl|tiefgefroren|\btk\b/.test(n), e:'❄️' },
+    { test: n => /hulsenfruchte/.test(n), e:'🫘' }
+  ];
+
+  const CATEGORY_FALLBACK = {
+    'obst & gemuse':'🥬', 'fleisch & fisch':'🍗', 'milchprodukte':'🥛',
+    'getreide & backwaren':'🍞', 'tiefkuhl':'❄️', 'sonstiges':'🛒'
+  };
+
+  function getEmoji(name, category){
+    const n = normalize(name);
+    for(const entry of EMOJI_MAP){
+      if(entry.k.some(k => n.includes(k))) return entry.e;
+    }
+    for(const g of GENERIC_KEYWORDS){
+      if(g.test(n)) return g.e;
+    }
+    const catKey = normalize(category);
+    if(CATEGORY_FALLBACK[catKey]) return CATEGORY_FALLBACK[catKey];
+    return '🛒';
+  }
+
+  /* ============================================================
+     IMPORT
+  ============================================================ */
+  function importFromJSON(text){
+    let data;
+    try{ data = JSON.parse(text); }
+    catch(e){ return { ok:false, error:'Ungültiges JSON – bitte Format prüfen.' }; }
+    if(!data || !Array.isArray(data.items)){
+      return { ok:false, error:'Kein "items"-Array im JSON gefunden.' };
+    }
+    const merged = mergeItems(data.items);
+    const pantryKeys = state.pantry.map(p => normalize(p.name));
+    const kept = [];
+    const filtered = [];
+    for(const it of merged){
+      const n = normalize(it.name);
+      const isPantry = pantryKeys.some(pk => pk && (n.includes(pk) || pk.includes(n)));
+      if(isPantry) filtered.push(it); else kept.push(it);
+    }
+    state.week = { label: String(data.week||''), items: kept };
+    state.filteredOut = filtered;
+    persistWeek();
+    return { ok:true, keptCount: kept.length, filteredCount: filtered.length };
+  }
+
+  /* ============================================================
+     RENDER
+  ============================================================ */
+  const app = document.getElementById('app');
+
+  function groupByCategory(items){
+    const groups = {};
+    for(const it of items){
+      const cat = it.category || 'Sonstiges';
+      if(!groups[cat]) groups[cat] = [];
+      groups[cat].push(it);
+    }
+    const orderedKeys = CATEGORY_ORDER.filter(c => groups[c]);
+    const extraKeys = Object.keys(groups).filter(c => !CATEGORY_ORDER.includes(c)).sort();
+    return [...orderedKeys, ...extraKeys].map(cat => ({ cat, items: groups[cat] }));
+  }
+
+  function esc(s){
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function itemRowHTML(item){
+    const emoji = getEmoji(item.name, item.category);
+    return `
+      <div class="row-wrap" data-id="${item.id}">
+        <button class="row-delete" data-action="delete" data-id="${item.id}">🗑️</button>
+        <div class="row-content ${item.done?'done':''}" data-id="${item.id}" data-action="toggle">
+          <div class="emoji-wrap">${emoji}</div>
+          <div class="row-text">
+            <div class="row-name">${esc(item.name)}</div>
+            ${item.amount ? `<div class="row-amount">${esc(item.amount)}</div>` : ''}
+          </div>
+          <div class="check-circle">${item.done ? '✓' : ''}</div>
+        </div>
+      </div>`;
+  }
+
+  function renderListeTab(){
+    const activeItems = state.week.items.filter(i => !i.done);
+    const doneItems = state.week.items.filter(i => i.done);
+    const groups = groupByCategory(activeItems);
+
+    let html = '';
+
+    if(state.filteredOut && state.filteredOut.length){
+      html += `<div class="filtered-note">
+        <span>${state.filteredOut.length} Artikel aus Vorrat automatisch gefiltert</span>
+        <button data-action="showFiltered">Anzeigen</button>
+      </div>`;
+    }
+
+    if(!activeItems.length && !doneItems.length){
+      html += `<div class="empty-state"><span class="emoji">🛒</span>Noch keine Einkaufsliste.<br>Importiere unten deinen Wochenplan.</div>`;
+    } else {
+      for(const g of groups){
+        html += `<div class="category-block"><div class="category-title">${esc(g.cat)}</div><div class="card">`;
+        html += g.items.map(itemRowHTML).join('');
+        html += `</div></div>`;
+      }
+
+      if(doneItems.length){
+        html += `<div class="done-toggle" data-action="toggleDoneSection">
+          <span>Erledigt</span><span class="count-badge">${doneItems.length} erledigt</span>
+        </div>`;
+        if(state.ui.doneOpen){
+          html += `<div class="done-panel"><div class="card">`;
+          html += doneItems.map(itemRowHTML).join('');
+          html += `</div></div>`;
+        }
+      }
+    }
+
+    return html;
+  }
+
+  function renderVorratTab(){
+    const groups = groupByCategory(state.pantry);
+    const options = CATEGORY_ORDER.map(c => `<option value="${esc(c)}" ${c===state.ui.addPantryCategory?'selected':''}>${esc(c)}</option>`).join('');
+
+    let html = `<div class="section-title">Vorrats-Liste</div>
+      <div class="add-row">
+        <input type="text" id="pantryInput" placeholder="z.B. Reis" />
+        <select id="pantryCategory">${options}</select>
+        <button data-action="addPantry">+</button>
+      </div>`;
+
+    if(!state.pantry.length){
+      html += `<div class="empty-state"><span class="emoji">🧺</span>Vorrats-Liste ist leer.</div>`;
+    } else {
+      for(const g of groups){
+        html += `<div class="category-block"><div class="category-title">${esc(g.cat)}</div><div class="card">`;
+        html += g.items.map(it => `
+          <div class="pantry-row">
+            <span class="name">${getEmoji(it.name, it.category)} ${esc(it.name)}</span>
+            <button data-action="removePantry" data-id="${it.id}">✕</button>
+          </div>`).join('');
+        html += `</div></div>`;
+      }
+    }
+    return html;
+  }
+
+  function renderSettingsTab(){
+    const theme = state.settings.theme;
+    return `
+      <div class="section-title">Design</div>
+      <div class="theme-options">
+        <div class="theme-card ${theme==='bring'?'selected':''}" data-action="setTheme" data-theme="bring">
+          <div class="swatch" style="background: linear-gradient(90deg,#12213B 50%,#FFC93C 50%)"></div>
+          <div class="label">Bring!-Stil</div>
+        </div>
+        <div class="theme-card ${theme==='neutral'?'selected':''}" data-action="setTheme" data-theme="neutral">
+          <div class="swatch" style="background: linear-gradient(90deg,#111111 50%,#EAEAEA 50%)"></div>
+          <div class="label">Neutral/Minimal</div>
+        </div>
+      </div>
+      <div class="section-title">Daten</div>
+      <button class="danger-btn" data-action="resetAll">Alle Daten zurücksetzen</button>
+    `;
+  }
+
+  function render(){
+    document.body.setAttribute('data-theme', state.settings.theme);
+
+    let title = 'AlexShop';
+    let sub = '';
+    if(state.ui.tab === 'liste'){
+      const remaining = state.week.items.filter(i=>!i.done).length;
+      sub = state.week.label ? `Woche ${state.week.label} · ${remaining} offen` : `${remaining} offen`;
+    } else if(state.ui.tab === 'vorrat'){ sub = 'Immer vorrätige Artikel'; }
+    else if(state.ui.tab === 'settings'){ sub = 'Design & Daten'; }
+
+    let body = '';
+    if(state.ui.tab === 'liste') body = renderListeTab();
+    else if(state.ui.tab === 'vorrat') body = renderVorratTab();
+    else body = renderSettingsTab();
+
+    app.innerHTML = `
+      <header class="topbar">
+        <div><h1>${title}</h1><div class="sub">${esc(sub)}</div></div>
+        <div class="topbar-actions">
+          ${state.ui.tab==='liste' ? '' : ''}
+        </div>
+      </header>
+      <main>${body}</main>
+      ${state.ui.tab==='liste' ? '<button class="fab" data-action="openImport">＋</button>' : ''}
+      <nav class="tabbar">
+        <button class="${state.ui.tab==='liste'?'active':''}" data-action="tab" data-tab="liste">
+          <span class="tab-icon">🛒</span>Liste
+        </button>
+        <button class="${state.ui.tab==='vorrat'?'active':''}" data-action="tab" data-tab="vorrat">
+          <span class="tab-icon">🧺</span>Vorrat
+        </button>
+        <button class="${state.ui.tab==='settings'?'active':''}" data-action="tab" data-tab="settings">
+          <span class="tab-icon">⚙️</span>Einstellungen
+        </button>
+      </nav>
+    `;
+
+    parseEmoji(app);
+    attachSwipeHandlers();
+  }
+
+  function parseEmoji(container){
+    if(window.twemoji){
+      twemoji.parse(container, {
+        folder:'svg', ext:'.svg',
+        base:'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/',
+        className: 'emoji'
+      });
+    }
+  }
+
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  /* ============================================================
+     SWIPE-TO-DELETE
+  ============================================================ */
+  function attachSwipeHandlers(){
+    app.querySelectorAll('.row-wrap').forEach(wrap => {
+      const content = wrap.querySelector('.row-content');
+      if(!content) return;
+      let startX = 0, currentX = 0, dragging = false, opened = false;
+
+      function onStart(e){
+        startX = (e.touches ? e.touches[0].clientX : e.clientX);
+        dragging = true;
+        content.style.transition = 'none';
+      }
+      function onMove(e){
+        if(!dragging) return;
+        const x = (e.touches ? e.touches[0].clientX : e.clientX);
+        let delta = x - startX;
+        if(opened) delta -= 84;
+        delta = Math.max(-84, Math.min(0, delta));
+        currentX = delta;
+        content.style.transform = `translateX(${delta}px)`;
+      }
+      function onEnd(){
+        if(!dragging) return;
+        dragging = false;
+        content.style.transition = 'transform .18s ease';
+        if(currentX < -40){
+          content.style.transform = 'translateX(-84px)';
+          opened = true;
+        } else {
+          content.style.transform = 'translateX(0)';
+          opened = false;
+        }
+      }
+      content.addEventListener('touchstart', onStart, {passive:true});
+      content.addEventListener('touchmove', onMove, {passive:true});
+      content.addEventListener('touchend', onEnd);
+      content.addEventListener('mousedown', onStart);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onEnd);
+    });
+  }
+
+  /* ============================================================
+     ACTIONS
+  ============================================================ */
+  function markDone(id, container){
+    const rowContent = container.querySelector(`.row-content[data-id="${id}"]`);
+    if(rowContent){
+      rowContent.classList.add('exiting');
+      setTimeout(()=>{
+        const item = state.week.items.find(i=>i.id===id);
+        if(item){ item.done = true; persistWeek(); render(); }
+      }, 320);
+    } else {
+      const item = state.week.items.find(i=>i.id===id);
+      if(item){ item.done = true; persistWeek(); render(); }
+    }
+  }
+  function unmarkDone(id){
+    const item = state.week.items.find(i=>i.id===id);
+    if(item){ item.done = false; persistWeek(); render(); }
+  }
+  function deleteItem(id){
+    state.week.items = state.week.items.filter(i=>i.id!==id);
+    persistWeek(); render();
+  }
+
+  function openImportSheet(){
+    state.ui.importOpen = true;
+    renderImportSheet();
+  }
+  function closeImportSheet(){
+    state.ui.importOpen = false;
+    const el = document.getElementById('importBackdrop');
+    if(el) el.remove();
+  }
+  function renderImportSheet(){
+    const existing = document.getElementById('importBackdrop');
+    if(existing) existing.remove();
+    const div = document.createElement('div');
+    div.id = 'importBackdrop';
+    div.className = 'sheet-backdrop';
+    div.innerHTML = `
+      <div class="sheet">
+        <button class="close-x" data-action="closeImport">✕</button>
+        <h2>Wochenplan importieren</h2>
+        <p class="hint">JSON aus deinem Essensplan-Chat hier einfügen.</p>
+        <textarea id="importText" placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Obst & Gemüse"}]}'></textarea>
+        <div class="error-msg" id="importError"></div>
+        <div class="sheet-actions">
+          <button class="btn btn-secondary" data-action="closeImport">Abbrechen</button>
+          <button class="btn btn-primary" data-action="doImport">Importieren</button>
+        </div>
+      </div>`;
+    div.addEventListener('click', (e)=>{ if(e.target === div) closeImportSheet(); });
+    document.body.appendChild(div);
+  }
+
+  function showFilteredSheet(){
+    const existing = document.getElementById('filteredBackdrop');
+    if(existing){ existing.remove(); return; }
+    const div = document.createElement('div');
+    div.id = 'filteredBackdrop';
+    div.className = 'sheet-backdrop';
+    const rows = state.filteredOut.map(it => `
+      <div class="pantry-row">
+        <span class="name">${getEmoji(it.name, it.category)} ${esc(it.name)} ${it.amount?('· '+esc(it.amount)):''}</span>
+        <button data-action="restoreFiltered" data-id="${it.id}">＋</button>
+      </div>`).join('');
+    div.innerHTML = `
+      <div class="sheet">
+        <button class="close-x" data-action="closeFiltered">✕</button>
+        <h2>Aus Vorrat gefiltert</h2>
+        <p class="hint">Diese Artikel stehen auf deiner Vorrats-Liste und wurden automatisch entfernt. Bei Bedarf einzeln zurückholen.</p>
+        <div class="card">${rows}</div>
+      </div>`;
+    div.addEventListener('click', (e)=>{ if(e.target === div) div.remove(); });
+    document.body.appendChild(div);
+    parseEmoji(div);
+  }
+
+  function doImport(){
+    const text = document.getElementById('importText').value.trim();
+    const errEl = document.getElementById('importError');
+    if(!text){ errEl.textContent = 'Bitte JSON einfügen.'; return; }
+    const result = importFromJSON(text);
+    if(!result.ok){ errEl.textContent = result.error; return; }
+    closeImportSheet();
+    render();
+    toast(`${result.keptCount} Artikel importiert${result.filteredCount ? ', '+result.filteredCount+' aus Vorrat gefiltert' : ''}`);
+  }
+
+  function addPantryItem(){
+    const input = document.getElementById('pantryInput');
+    const select = document.getElementById('pantryCategory');
+    const name = input.value.trim();
+    if(!name) return;
+    state.pantry.push({ id: uid(), name, category: select.value });
+    state.ui.addPantryCategory = select.value;
+    persistPantry();
+    render();
+  }
+  function removePantryItem(id){
+    state.pantry = state.pantry.filter(p=>p.id!==id);
+    persistPantry(); render();
+  }
+  function restoreFilteredItem(id){
+    const it = state.filteredOut.find(i=>i.id===id);
+    if(!it) return;
+    state.week.items.push(it);
+    state.filteredOut = state.filteredOut.filter(i=>i.id!==id);
+    persistWeek();
+    const el = document.getElementById('filteredBackdrop');
+    if(el) el.remove();
+    render();
+  }
+
+  function setTheme(theme){
+    state.settings.theme = theme;
+    persistSettings();
+    render();
+  }
+  function resetAll(){
+    if(!confirm('Wirklich alle Daten (Liste, Vorrat, Einstellungen) löschen?')) return;
+    localStorage.removeItem(KEYS.week);
+    localStorage.removeItem(KEYS.pantry);
+    localStorage.removeItem(KEYS.settings);
+    state.week = { label:'', items:[] };
+    state.pantry = defaultPantry();
+    state.filteredOut = [];
+    state.settings = { theme:'bring' };
+    persistWeek(); persistPantry(); persistSettings();
+    render();
+  }
+
+  /* ============================================================
+     EVENT DELEGATION
+  ============================================================ */
+  document.addEventListener('click', function(e){
+    const target = e.target.closest('[data-action]');
+    if(!target) return;
+    const action = target.getAttribute('data-action');
+    const id = target.getAttribute('data-id');
+
+    switch(action){
+      case 'tab':
+        state.ui.tab = target.getAttribute('data-tab');
+        render();
+        break;
+      case 'toggle': {
+        const item = state.week.items.find(i=>i.id===id);
+        if(!item) return;
+        if(item.done) unmarkDone(id);
+        else markDone(id, app);
+        break;
+      }
+      case 'delete':
+        deleteItem(id);
+        break;
+      case 'toggleDoneSection':
+        state.ui.doneOpen = !state.ui.doneOpen;
+        render();
+        break;
+      case 'openImport':
+        openImportSheet();
+        break;
+      case 'closeImport':
+        closeImportSheet();
+        break;
+      case 'doImport':
+        doImport();
+        break;
+      case 'showFiltered':
+        showFilteredSheet();
+        break;
+      case 'closeFiltered': {
+        const el = document.getElementById('filteredBackdrop');
+        if(el) el.remove();
+        break;
+      }
+      case 'restoreFiltered':
+        restoreFilteredItem(id);
+        break;
+      case 'addPantry':
+        addPantryItem();
+        break;
+      case 'removePantry':
+        removePantryItem(id);
+        break;
+      case 'setTheme':
+        setTheme(target.getAttribute('data-theme'));
+        break;
+      case 'resetAll':
+        resetAll();
+        break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
