@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
             Deine Daten bleiben gespeichert. Ein Neuladen hilft meistens.
           </p>
           <button
-            className="btn-duo rounded-xl px-6 py-3 text-sm"
+            className="btn-primary tap-scale rounded-xl px-6 py-3 text-sm"
             onClick={() => window.location.reload()}
           >
             Neu laden

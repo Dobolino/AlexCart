@@ -1,58 +1,77 @@
 import { useStore } from '@/store/useStore'
-import { topItems, categoryBreakdown } from '@/utils/stats'
+import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek } from '@/utils/stats'
 import { PageHeader } from '@/components/PageHeader'
-import { Icon } from '@/components/Icon'
+import { EmptyState } from '@/components/EmptyState'
 import { ICON_PATHS } from '@/constants/icons'
+
+function StatTile({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div className="card-surface flex-1 px-3 py-4 text-center">
+      <div className="mb-0.5 text-[22px] font-extrabold leading-none">{value}</div>
+      <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </div>
+    </div>
+  )
+}
 
 export function StatsPage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
-  const streak = useStore((s) => s.streak)
+  const stats = useStore((s) => s.stats)
   const resetStats = useStore((s) => s.resetStats)
 
   const top = topItems(purchaseLog)
   const categories = categoryBreakdown(purchaseLog)
+  const weeks = productsPerWeek(purchaseLog, 8)
   const maxCategoryCount = categories[0]?.count ?? 1
   const maxTopCount = top[0]?.count ?? 1
+  const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
+  const completionRate = stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
 
   return (
     <>
       <PageHeader title="Statistik" subtitle="Deine Einkaufsgewohnheiten" />
       <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(90px + var(--safe-bottom))' }}>
-        <div className="mb-4 flex gap-2.5">
-          <div className="card-surface flex-1 px-4 py-4 text-center">
-            <div className="mb-1 flex items-center justify-center gap-1.5" style={{ color: 'var(--accent)' }}>
-              <Icon path={ICON_PATHS.flame} size={22} />
-              <span className="text-[24px] font-extrabold" style={{ color: 'var(--text)' }}>
-                {streak.current}
-              </span>
-            </div>
-            <div className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-              Tage-Streak
-            </div>
-          </div>
-          <div className="card-surface flex-1 px-4 py-4 text-center">
-            <div className="mb-1 text-[24px] font-extrabold">{streak.longest}</div>
-            <div className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-              Längste Serie
-            </div>
-          </div>
-          <div className="card-surface flex-1 px-4 py-4 text-center">
-            <div className="mb-1 text-[24px] font-extrabold">{purchaseLog.length}</div>
-            <div className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-              Abgehakt gesamt
-            </div>
-          </div>
+        <div className="mb-2.5 grid grid-cols-3 gap-2.5">
+          <StatTile value={stats.listsCreated} label="Listen erstellt" />
+          <StatTile value={purchaseLog.length} label="Produkte gekauft" />
+          <StatTile value={`${completionRate}%`} label="Erledigungsquote" />
+        </div>
+        <div className="mb-4.5 grid grid-cols-3 gap-2.5">
+          <StatTile value={avgItemsPerTrip(purchaseLog).toFixed(1)} label="Ø pro Einkauf" />
+          <StatTile value={stats.importsCount} label="Importierte Listen" />
+          <StatTile value={stats.manualProductsCreated} label="Eigene Produkte" />
         </div>
 
         {!purchaseLog.length ? (
-          <div className="py-10 text-center text-[15px]" style={{ color: 'var(--text-muted)' }}>
-            <div className="mb-2.5 flex justify-center">
-              <Icon path={ICON_PATHS.chart} size={40} />
-            </div>
-            Noch keine Daten. Hak ein paar Artikel in deiner Liste ab.
-          </div>
+          <EmptyState
+            icon={ICON_PATHS.chart}
+            title="Noch keine Daten"
+            hint="Hak ein paar Artikel in deiner Liste ab, um Statistiken zu sehen."
+          />
         ) : (
           <>
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Produkte pro Woche
+            </div>
+            <div className="card-surface mb-4.5 flex items-end gap-1.5 px-4 py-4" style={{ height: 100 }}>
+              {weeks.map((w) => (
+                <div key={w.weekStart} className="flex flex-1 flex-col items-center justify-end gap-1">
+                  <div
+                    className="w-full rounded-t-md"
+                    style={{
+                      height: `${Math.max(4, (w.count / maxWeekCount) * 64)}px`,
+                      background: 'var(--accent)',
+                      opacity: w.count ? 1 : 0.25,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
             <div
               className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
               style={{ color: 'var(--category-fg)' }}
@@ -77,7 +96,7 @@ export function StatsPage() {
               className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
               style={{ color: 'var(--category-fg)' }}
             >
-              Kategorien
+              Meistgenutzte Kategorien
             </div>
             <div className="card-surface mb-4.5 px-4 py-3.5">
               {categories.map((entry) => (
@@ -96,8 +115,12 @@ export function StatsPage() {
               ))}
             </div>
 
+            <p className="mb-4 px-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              An {distinctShoppingDays(purchaseLog)} Tagen eingekauft.
+            </p>
+
             <button
-              className="w-full rounded-2xl py-3 text-[13px] font-bold"
+              className="btn-soft w-full py-3 text-[13px]"
               style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
               onClick={() => {
                 if (window.confirm('Statistik wirklich zurücksetzen?')) resetStats()

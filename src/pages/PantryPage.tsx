@@ -4,6 +4,7 @@ import { groupByCategory } from '@/utils/group'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
 import { CATEGORIES } from '@/data/products'
 import { PageHeader } from '@/components/PageHeader'
+import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 
@@ -20,47 +21,48 @@ export function PantryPage() {
     <>
       <PageHeader title="Vorrat" subtitle="Immer vorrätige Artikel" />
       <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(90px + var(--safe-bottom))' }}>
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex flex-col gap-2">
           <input
             type="text"
-            className="flex-1 rounded-xl border px-3.5 py-3 text-[15px]"
+            className="w-full min-w-0 rounded-xl border px-3.5 py-3 text-[15px]"
             style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
             placeholder="z.B. Reis"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <select
-            className="rounded-xl border px-2.5 text-[14px]"
-            style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn-duo rounded-xl px-4.5 text-xl"
-            aria-label="Zum Vorrat hinzufügen"
-            onClick={() => {
-              if (!name.trim()) return
-              addPantryItem(name, category)
-              setName('')
-            }}
-          >
-            <Icon path={ICON_PATHS.plus} size={18} />
-          </button>
+          <div className="flex gap-2">
+            <select
+              className="min-w-0 flex-1 rounded-xl border px-2.5 py-2 text-[14px]"
+              style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn-primary tap-scale flex-none rounded-xl px-5 text-xl"
+              aria-label="Zum Vorrat hinzufügen"
+              onClick={() => {
+                if (!name.trim()) return
+                addPantryItem(name, category)
+                setName('')
+              }}
+            >
+              <Icon path={ICON_PATHS.plus} size={18} />
+            </button>
+          </div>
         </div>
 
         {!pantry.length ? (
-          <div className="py-14 text-center text-[15px]" style={{ color: 'var(--text-muted)' }}>
-            <div className="mb-2.5 flex justify-center">
-              <Icon path={ICON_PATHS.pantry} size={44} />
-            </div>
-            Vorrats-Liste ist leer.
-          </div>
+          <EmptyState
+            icon={ICON_PATHS.pantry}
+            title="Vorrats-Liste ist leer"
+            hint="Füge Artikel hinzu, die du immer zuhause hast – sie werden bei Importen automatisch rausgefiltert."
+          />
         ) : (
           groups.map((g) => (
             <div key={g.category} className="mb-4.5">
@@ -80,10 +82,16 @@ export function PantryPage() {
                       style={{ borderColor: 'var(--border)' }}
                     >
                       <span className="flex items-center gap-2.5 text-[15px] font-semibold">
-                        <Icon path={getIconSvgPath(iconKey)} size={20} />
+                        <span
+                          className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
+                          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                        >
+                          <Icon path={getIconSvgPath(iconKey)} size={18} />
+                        </span>
                         {item.name}
                       </span>
                       <button
+                        className="tap-scale"
                         style={{ color: 'var(--danger)' }}
                         onClick={() => removePantryItem(item.id)}
                         aria-label={`${item.name} entfernen`}

@@ -51,3 +51,19 @@ export interface CalculatorEntry {
   id: string
   amount: number
 }
+
+export interface CustomProduct {
+  id: string
+  name: string
+  category: string
+  defaultAmount: string
+  note?: string
+  createdAt: number
+}
+
+export interface AppStats {
+  listsCreated: number
+  importsCount: number
+  manualProductsCreated: number
+  itemsAddedTotal: number
+}

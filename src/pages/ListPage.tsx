@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { ItemRow } from '@/components/ItemRow'
-import { ImportSheet } from '@/components/ImportSheet'
+import { AddItemSheet } from '@/components/AddItemSheet'
 import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
+import { EmptyState } from '@/components/EmptyState'
+import { PageHeader } from '@/components/PageHeader'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
@@ -17,7 +20,7 @@ export function ListPage() {
   const restoreFilteredItem = useStore((s) => s.restoreFilteredItem)
   const clearFilteredNote = useStore((s) => s.clearFilteredNote)
 
-  const [importOpen, setImportOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [filteredOpen, setFilteredOpen] = useState(false)
   const [doneOpen, setDoneOpen] = useState(false)
@@ -36,46 +39,40 @@ export function ListPage() {
 
   return (
     <>
-      <header
-        className="sticky top-0 z-20 flex items-center justify-between px-4"
-        style={{
-          background: 'var(--header-bg)',
-          color: 'var(--header-fg)',
-          paddingTop: 'calc(14px + var(--safe-top))',
-          paddingBottom: '14px',
-        }}
-      >
-        <button className="text-left" onClick={() => setSwitcherOpen(true)}>
-          <h1 className="text-[20px] font-extrabold leading-none">{list.name}</h1>
-          <div className="mt-0.5 text-[12px] font-medium opacity-75">
-            {list.weekLabel ? `Woche ${list.weekLabel} · ` : ''}
-            {activeItems.length} offen
-          </div>
-        </button>
-      </header>
+      <PageHeader
+        title={list.name}
+        subtitle={`${list.weekLabel ? `Woche ${list.weekLabel} · ` : ''}${activeItems.length} offen`}
+        onTitleClick={() => setSwitcherOpen(true)}
+      />
 
-      <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(90px + var(--safe-bottom))' }}>
+      <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(96px + var(--safe-bottom))' }}>
         {filteredItems.length > 0 && (
           <div
-            className="mb-3.5 flex items-center justify-between gap-2.5 rounded-[14px] px-3.5 py-3 text-[13px]"
-            style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
+            className="glass-card mb-3.5 flex items-center justify-between gap-2.5 px-3.5 py-3 text-[13px]"
+            style={{ color: 'var(--text-muted)' }}
           >
             <span>{filteredItems.length} Artikel aus Vorrat automatisch gefiltert</span>
-            <button className="font-bold" style={{ color: 'var(--text)' }} onClick={() => setFilteredOpen(true)}>
+            <button
+              className="tap-scale font-bold"
+              style={{ color: 'var(--accent)' }}
+              onClick={() => setFilteredOpen(true)}
+            >
               Anzeigen
             </button>
           </div>
         )}
 
         {!activeItems.length && !doneItems.length ? (
-          <div className="py-14 text-center text-[15px]" style={{ color: 'var(--text-muted)' }}>
-            <div className="mb-2.5 flex justify-center" style={{ color: 'var(--text-muted)' }}>
-              <Icon path={ICON_PATHS.cart} size={44} />
-            </div>
-            Noch keine Einkaufsliste.
-            <br />
-            Importiere unten deinen Wochenplan.
-          </div>
+          <EmptyState
+            icon={ICON_PATHS.cart}
+            title="Noch keine Einkaufsliste"
+            hint="Füge unten Artikel hinzu oder importiere deinen Wochenplan."
+            action={
+              <button className="btn-primary tap-scale mt-1 rounded-full px-6 py-3 text-[14px]" onClick={() => setAddOpen(true)}>
+                Artikel hinzufügen
+              </button>
+            }
+          />
         ) : (
           <>
             {groups.map((g) => (
@@ -87,9 +84,11 @@ export function ListPage() {
                   {g.category}
                 </div>
                 <div className="card-surface">
-                  {g.items.map((item) => (
-                    <ItemRow key={item.id} item={item} onToggle={toggleItemDone} onDelete={deleteItem} />
-                  ))}
+                  <AnimatePresence initial={false}>
+                    {g.items.map((item) => (
+                      <ItemRow key={item.id} item={item} onToggle={toggleItemDone} onDelete={deleteItem} />
+                    ))}
+                  </AnimatePresence>
                 </div>
               </div>
             ))}
@@ -97,8 +96,8 @@ export function ListPage() {
             {doneItems.length > 0 && (
               <>
                 <div
-                  className="mt-1 flex cursor-pointer items-center justify-between rounded-2xl px-4 py-3.5 text-[14px] font-bold"
-                  style={{ background: 'var(--surface)', color: 'var(--text-muted)' }}
+                  className="card-surface tap-scale mt-1 flex cursor-pointer items-center justify-between px-4 py-3.5 text-[14px] font-bold"
+                  style={{ color: 'var(--text-muted)' }}
                   onClick={() => setDoneOpen((o) => !o)}
                 >
                   <span>Erledigt</span>
@@ -111,9 +110,11 @@ export function ListPage() {
                 </div>
                 {doneOpen && (
                   <div className="card-surface mt-1.5">
-                    {doneItems.map((item) => (
-                      <ItemRow key={item.id} item={item} onToggle={toggleItemDone} onDelete={deleteItem} />
-                    ))}
+                    <AnimatePresence initial={false}>
+                      {doneItems.map((item) => (
+                        <ItemRow key={item.id} item={item} onToggle={toggleItemDone} onDelete={deleteItem} />
+                      ))}
+                    </AnimatePresence>
                   </div>
                 )}
               </>
@@ -123,15 +124,15 @@ export function ListPage() {
       </main>
 
       <button
-        className="btn-duo fixed right-4.5 z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl"
-        style={{ bottom: 'calc(84px + var(--safe-bottom))' }}
-        onClick={() => setImportOpen(true)}
-        aria-label="Wochenplan importieren"
+        className="btn-primary tap-scale fixed right-4.5 z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
+        style={{ bottom: 'calc(90px + var(--safe-bottom))' }}
+        onClick={() => setAddOpen(true)}
+        aria-label="Artikel hinzufügen"
       >
-        <Icon path={ICON_PATHS.import} size={24} />
+        <Icon path={ICON_PATHS.plus} size={26} />
       </button>
 
-      {importOpen && <ImportSheet onClose={() => setImportOpen(false)} onImported={showToast} />}
+      {addOpen && <AddItemSheet onClose={() => setAddOpen(false)} onImported={showToast} />}
       {switcherOpen && <ListSwitcherSheet onClose={() => setSwitcherOpen(false)} />}
       {filteredOpen && (
         <Sheet onClose={() => setFilteredOpen(false)}>
@@ -154,6 +155,7 @@ export function ListPage() {
                     {item.name} {item.amount && `· ${item.amount}`}
                   </span>
                   <button
+                    className="tap-scale"
                     onClick={() => {
                       restoreFilteredItem(item.id)
                       if (filteredItems.length <= 1) setFilteredOpen(false)
@@ -166,8 +168,7 @@ export function ListPage() {
             })}
           </div>
           <button
-            className="mt-3 w-full rounded-[14px] py-3 text-[13px] font-bold"
-            style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+            className="btn-soft mt-3 w-full py-3 text-[13px]"
             onClick={() => {
               clearFilteredNote()
               setFilteredOpen(false)
@@ -180,8 +181,8 @@ export function ListPage() {
 
       {toast && (
         <div
-          className="fixed left-1/2 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold text-white"
-          style={{ background: '#1b1f27', bottom: 'calc(100px + var(--safe-bottom))' }}
+          className="glass fixed left-1/2 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold"
+          style={{ bottom: 'calc(100px + var(--safe-bottom))', color: 'var(--text)' }}
         >
           {toast}
         </div>

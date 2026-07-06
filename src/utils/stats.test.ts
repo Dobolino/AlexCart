@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { topItems, categoryBreakdown } from './stats'
+import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek } from './stats'
 
 const log = [
   { name: 'Tomaten', category: 'Früchte & Gemüse', date: '2026-07-01' },
@@ -22,5 +22,37 @@ describe('categoryBreakdown', () => {
       { label: 'Früchte & Gemüse', count: 2 },
       { label: 'Milch & Käse', count: 1 },
     ])
+  })
+})
+
+describe('distinctShoppingDays', () => {
+  it('counts distinct calendar dates', () => {
+    expect(distinctShoppingDays(log)).toBe(2)
+    expect(distinctShoppingDays([])).toBe(0)
+  })
+})
+
+describe('avgItemsPerTrip', () => {
+  it('divides total items by distinct shopping days', () => {
+    expect(avgItemsPerTrip(log)).toBeCloseTo(1.5)
+  })
+  it('returns 0 for an empty log', () => {
+    expect(avgItemsPerTrip([])).toBe(0)
+  })
+})
+
+describe('productsPerWeek', () => {
+  it('returns the requested number of week buckets, oldest first', () => {
+    const result = productsPerWeek(log, 4)
+    expect(result).toHaveLength(4)
+  })
+  it('buckets two entries from the current week together', () => {
+    const today = new Date().toLocaleDateString('sv-SE')
+    const sameWeekLog = [
+      { name: 'A', category: 'Sonstiges', date: today },
+      { name: 'B', category: 'Sonstiges', date: today },
+    ]
+    const result = productsPerWeek(sameWeekLog, 1)
+    expect(result[0].count).toBe(2)
   })
 })

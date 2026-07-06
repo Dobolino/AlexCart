@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
@@ -56,7 +57,15 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
   }
 
   return (
-    <div className="relative overflow-hidden border-b" style={{ borderColor: 'var(--border)' }}>
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, x: -60, transition: { duration: 0.15 } }}
+      transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+      className="relative overflow-hidden border-b"
+      style={{ borderColor: 'var(--border)' }}
+    >
       <button
         className="absolute inset-y-0 right-0 flex items-center justify-center text-white"
         style={{ width: DELETE_WIDTH, background: 'var(--danger)' }}
@@ -70,7 +79,7 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
           transform: `translateX(${dragX}px)`,
-          transition: dragging ? 'none' : 'transform 0.18s ease, opacity 0.32s ease',
+          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
           opacity: exiting ? 0 : 1,
           touchAction: 'pan-y',
         }}
@@ -80,10 +89,10 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
         onPointerCancel={handlePointerUp}
       >
         <div
-          className="flex h-8 w-8 flex-none items-center justify-center"
-          style={{ color: 'var(--category-fg)' }}
+          className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
         >
-          <Icon path={svgPath} size={26} />
+          <Icon path={svgPath} size={20} />
         </div>
         <div className="min-w-0 flex-1" onClick={handleToggle}>
           <div
@@ -114,6 +123,6 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
           {item.done && <Icon path={ICON_PATHS.check} size={14} />}
         </button>
       </div>
-    </div>
+    </motion.div>
   )
 }

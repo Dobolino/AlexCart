@@ -22,7 +22,7 @@ export default defineConfig({
         short_name: 'AlexShop',
         description: 'Einkaufslisten-App mit Wochenplan-Import und Vorrats-Verwaltung',
         theme_color: '#12213B',
-        background_color: '#F4F5F7',
+        background_color: '#12213B',
         display: 'standalone',
         orientation: 'portrait',
         scope: `/${REPO_NAME}/`,

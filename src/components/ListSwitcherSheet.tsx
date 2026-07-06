@@ -61,7 +61,7 @@ export function ListSwitcherSheet({ onClose }: ListSwitcherSheetProps) {
           onChange={(e) => setNewName(e.target.value)}
         />
         <button
-          className="btn-duo rounded-xl px-5 text-xl"
+          className="btn-primary tap-scale rounded-xl px-5 text-xl"
           aria-label="Neue Liste anlegen"
           onClick={() => {
             if (!newName.trim()) return

@@ -49,16 +49,16 @@ export function CalculatorPage() {
       <PageHeader title="Rechner" subtitle="Preise beim Einkaufen summieren" />
       <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(90px + var(--safe-bottom))' }}>
         <div
-          className="card-surface mb-3 flex items-center justify-between px-5 py-5"
-          style={{ background: 'var(--header-bg)', color: 'var(--header-fg)' }}
+          className="mb-3 flex items-center justify-between rounded-3xl px-5 py-5"
+          style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
-          <span className="text-[14px] font-semibold opacity-75">Summe</span>
+          <span className="text-[14px] font-semibold opacity-80">Summe</span>
           <span className="text-[28px] font-extrabold">{formatEuro(total * 100)} €</span>
         </div>
 
         <div
-          className="mb-3 flex items-center justify-end rounded-2xl px-5 py-4 text-[26px] font-bold"
-          style={{ background: 'var(--surface)', color: 'var(--text)', minHeight: 64 }}
+          className="card-surface mb-3 flex items-center justify-end px-5 py-4 text-[26px] font-bold"
+          style={{ color: 'var(--text)', minHeight: 64 }}
         >
           {input ? `${input} €` : <span style={{ color: 'var(--text-muted)' }}>0,00 €</span>}
         </div>
@@ -68,8 +68,8 @@ export function CalculatorPage() {
             <button
               key={key}
               data-testid="calc-key"
-              className="rounded-2xl py-4 text-[22px] font-bold"
-              style={{ background: 'var(--surface)', color: 'var(--text)' }}
+              className="card-surface tap-scale py-4 text-[22px] font-bold"
+              style={{ color: 'var(--text)' }}
               onClick={() => pressKey(key)}
             >
               {key}
@@ -77,7 +77,7 @@ export function CalculatorPage() {
           ))}
         </div>
 
-        <button className="btn-duo mb-4 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
+        <button className="btn-primary tap-scale mb-4 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
           <span className="inline-flex items-center gap-2">
             <Icon path={ICON_PATHS.plus} size={20} /> Hinzufügen
           </span>

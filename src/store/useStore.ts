@@ -2,8 +2,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
-import { todayKey, updateStreak, type StreakState } from '@/utils/date'
-import type { CalculatorEntry, PantryItem, PurchaseLogEntry, ShoppingItem, ShoppingList, Theme } from '@/types'
+import { todayKey } from '@/utils/date'
+import { normalizeCategory } from '@/utils/icon'
+import type {
+  AppStats,
+  CalculatorEntry,
+  CustomProduct,
+  PantryItem,
+  PurchaseLogEntry,
+  ShoppingItem,
+  ShoppingList,
+  Theme,
+} from '@/types'
 
 const STORE_VERSION = 1
 const STORE_NAME = 'alexshop-store'
@@ -21,6 +31,10 @@ function defaultPantry(): PantryItem[] {
 
 function newList(name: string): ShoppingList {
   return { id: uid(), name, weekLabel: '', items: [], createdAt: Date.now() }
+}
+
+function defaultStats(): AppStats {
+  return { listsCreated: 1, importsCount: 0, manualProductsCreated: 0, itemsAddedTotal: 0 }
 }
 
 /** Stabile Referenz für den "keine gefilterten Items" Fall – ein neues [] bei jedem Aufruf
@@ -55,8 +69,9 @@ interface AppState {
   lists: ShoppingList[]
   activeListId: string
   pantry: PantryItem[]
+  customProducts: CustomProduct[]
   purchaseLog: PurchaseLogEntry[]
-  streak: StreakState
+  stats: AppStats
   filtered: FilteredEntry[]
   settings: { theme: Theme }
   calculatorEntries: CalculatorEntry[]
@@ -65,6 +80,7 @@ interface AppState {
   filteredForActiveList: () => ShoppingItem[]
 
   importIntoActiveList: (text: string) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number }
+  addItemToActiveList: (item: { name: string; amount: string; category: string }) => void
   toggleItemDone: (itemId: string) => void
   deleteItem: (itemId: string) => void
   restoreFilteredItem: (itemId: string) => void
@@ -77,6 +93,10 @@ interface AppState {
 
   addPantryItem: (name: string, category: string) => void
   removePantryItem: (id: string) => void
+
+  addCustomProduct: (input: { name: string; category: string; amount: string; note?: string }) => CustomProduct
+  updateCustomProduct: (id: string, patch: Partial<Omit<CustomProduct, 'id' | 'createdAt'>>) => void
+  removeCustomProduct: (id: string) => void
 
   setTheme: (theme: Theme) => void
   resetAll: () => void
@@ -94,8 +114,9 @@ export const useStore = create<AppState>()(
       lists: [newList('Wocheneinkauf')],
       activeListId: '',
       pantry: defaultPantry(),
+      customProducts: [],
       purchaseLog: [],
-      streak: { current: 0, longest: 0, lastDate: '' },
+      stats: defaultStats(),
       filtered: [],
       settings: { theme: 'system' },
       calculatorEntries: [],
@@ -124,8 +145,30 @@ export const useStore = create<AppState>()(
             ...state.filtered.filter((f) => f.listId !== list.id),
             ...(result.filtered && result.filtered.length ? [{ listId: list.id, items: result.filtered }] : []),
           ],
+          stats: {
+            ...state.stats,
+            importsCount: state.stats.importsCount + 1,
+            itemsAddedTotal: state.stats.itemsAddedTotal + result.kept!.length,
+          },
         }))
         return { ok: true, keptCount: result.kept.length, filteredCount: result.filtered?.length ?? 0 }
+      },
+
+      addItemToActiveList: (item) => {
+        const list = get().activeList()
+        if (!list || !item.name.trim()) return
+        const newItem: ShoppingItem = {
+          id: uid(),
+          name: item.name.trim(),
+          amount: item.amount.trim(),
+          category: normalizeCategory(item.category),
+          done: false,
+          addedAt: Date.now(),
+        }
+        set((state) => ({
+          lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: [...l.items, newItem] })),
+          stats: { ...state.stats, itemsAddedTotal: state.stats.itemsAddedTotal + 1 },
+        }))
       },
 
       toggleItemDone: (itemId) => {
@@ -144,7 +187,6 @@ export const useStore = create<AppState>()(
           purchaseLog: nowDone
             ? [...state.purchaseLog, { name: item.name, category: item.category, date: todayKey() }]
             : state.purchaseLog,
-          streak: nowDone ? updateStreak(state.streak) : state.streak,
         }))
       },
 
@@ -169,6 +211,7 @@ export const useStore = create<AppState>()(
           filtered: state.filtered.map((f) =>
             f.listId !== list.id ? f : { ...f, items: f.items.filter((i) => i.id !== itemId) }
           ),
+          stats: { ...state.stats, itemsAddedTotal: state.stats.itemsAddedTotal + 1 },
         }))
       },
 
@@ -180,7 +223,11 @@ export const useStore = create<AppState>()(
 
       createList: (name) => {
         const list = newList(name.trim() || 'Neue Liste')
-        set((state) => ({ lists: [...state.lists, list], activeListId: list.id }))
+        set((state) => ({
+          lists: [...state.lists, list],
+          activeListId: list.id,
+          stats: { ...state.stats, listsCreated: state.stats.listsCreated + 1 },
+        }))
       },
       switchList: (listId) => set({ activeListId: listId }),
       renameList: (listId, name) =>
@@ -202,6 +249,28 @@ export const useStore = create<AppState>()(
       },
       removePantryItem: (id) => set((state) => ({ pantry: state.pantry.filter((p) => p.id !== id) })),
 
+      addCustomProduct: (input) => {
+        const product: CustomProduct = {
+          id: uid(),
+          name: input.name.trim(),
+          category: normalizeCategory(input.category),
+          defaultAmount: input.amount.trim(),
+          note: input.note?.trim() || undefined,
+          createdAt: Date.now(),
+        }
+        set((state) => ({
+          customProducts: [...state.customProducts, product],
+          stats: { ...state.stats, manualProductsCreated: state.stats.manualProductsCreated + 1 },
+        }))
+        return product
+      },
+      updateCustomProduct: (id, patch) =>
+        set((state) => ({
+          customProducts: state.customProducts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })),
+      removeCustomProduct: (id) =>
+        set((state) => ({ customProducts: state.customProducts.filter((p) => p.id !== id) })),
+
       setTheme: (theme) => set((state) => ({ settings: { ...state.settings, theme } })),
 
       resetAll: () =>
@@ -211,8 +280,9 @@ export const useStore = create<AppState>()(
             lists: [list],
             activeListId: list.id,
             pantry: defaultPantry(),
+            customProducts: [],
             purchaseLog: [],
-            streak: { current: 0, longest: 0, lastDate: '' },
+            stats: defaultStats(),
             filtered: [],
             settings: { theme: 'system' },
             calculatorEntries: [],
@@ -227,7 +297,7 @@ export const useStore = create<AppState>()(
         set((state) => ({ calculatorEntries: state.calculatorEntries.filter((e) => e.id !== id) })),
       clearCalculator: () => set({ calculatorEntries: [] }),
 
-      resetStats: () => set({ purchaseLog: [], streak: { current: 0, longest: 0, lastDate: '' } }),
+      resetStats: () => set({ purchaseLog: [], stats: defaultStats() }),
     }),
     {
       name: STORE_NAME,
@@ -236,8 +306,9 @@ export const useStore = create<AppState>()(
         lists: state.lists,
         activeListId: state.activeListId,
         pantry: state.pantry,
+        customProducts: state.customProducts,
         purchaseLog: state.purchaseLog,
-        streak: state.streak,
+        stats: state.stats,
         filtered: state.filtered,
         settings: state.settings,
         calculatorEntries: state.calculatorEntries,
@@ -249,6 +320,7 @@ export const useStore = create<AppState>()(
           return {
             ...currentState,
             ...persisted,
+            stats: { ...defaultStats(), ...persisted.stats },
             activeListId: persisted.activeListId || persisted.lists![0].id,
           }
         }
