@@ -314,28 +314,36 @@ export const useStore = create<AppState>()(
         calculatorEntries: state.calculatorEntries,
       }),
       merge: (persistedState, currentState) => {
-        const persisted = (persistedState as Partial<AppState>) || {}
-        const hasPersisted = persisted.lists && persisted.lists.length > 0
-        if (hasPersisted) {
-          return {
-            ...currentState,
-            ...persisted,
-            stats: { ...defaultStats(), ...persisted.stats },
-            activeListId: persisted.activeListId || persisted.lists![0].id,
+        try {
+          const persisted = (persistedState as Partial<AppState>) || {}
+          const hasPersisted = persisted.lists && persisted.lists.length > 0
+          if (hasPersisted) {
+            return {
+              ...currentState,
+              ...persisted,
+              stats: { ...defaultStats(), ...persisted.stats },
+              activeListId: persisted.activeListId || persisted.lists![0].id,
+            }
           }
-        }
 
-        const legacy = readLegacyState()
-        if (legacy) {
-          return {
-            ...currentState,
-            lists: [legacy.list],
-            activeListId: legacy.list.id,
-            pantry: legacy.pantry,
+          const legacy = readLegacyState()
+          if (legacy) {
+            return {
+              ...currentState,
+              lists: [legacy.list],
+              activeListId: legacy.list.id,
+              pantry: legacy.pantry,
+            }
           }
-        }
 
-        return { ...currentState, activeListId: currentState.lists[0].id }
+          return { ...currentState, activeListId: currentState.lists[0].id }
+        } catch (err) {
+          console.error('AlexShop: Store-Merge fehlgeschlagen', err)
+          return { ...currentState, activeListId: currentState.lists[0]?.id ?? '' }
+        }
+      },
+      onRehydrateStorage: () => (_state, err) => {
+        if (err) console.error('AlexShop: Store-Rehydration fehlgeschlagen', err)
       },
     }
   )

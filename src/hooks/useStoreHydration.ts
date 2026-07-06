@@ -1,12 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 
-export function useStoreHydration(): boolean {
-  const [hydrated, setHydrated] = useState(useStore.persist.hasHydrated())
-
+/** Stellt sicher, dass der persistierte Store geladen wird – blockiert die UI nicht. */
+export function useEnsureStoreHydration(): void {
   useEffect(() => {
-    return useStore.persist.onFinishHydration(() => setHydrated(true))
-  }, [])
+    if (useStore.persist.hasHydrated()) return
 
-  return hydrated
+    const unsub = useStore.persist.onFinishHydration(() => unsub())
+
+    const rehydrate = useStore.persist.rehydrate()
+    if (rehydrate instanceof Promise) {
+      void rehydrate.catch((err: unknown) => {
+        console.error('AlexShop: Store-Rehydration fehlgeschlagen', err)
+      })
+    }
+
+    return unsub
+  }, [])
 }

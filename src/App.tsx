@@ -2,10 +2,8 @@ import { HashRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BottomNav } from './components/BottomNav'
-import { Icon } from './components/Icon'
-import { ICON_PATHS } from './constants/icons'
 import { useTheme } from './hooks/useTheme'
-import { useStoreHydration } from './hooks/useStoreHydration'
+import { useEnsureStoreHydration } from './hooks/useStoreHydration'
 import { ListPage } from './pages/ListPage'
 import { PantryPage } from './pages/PantryPage'
 import { CalculatorPage } from './pages/CalculatorPage'
@@ -38,17 +36,7 @@ function AnimatedRoutes() {
 
 function AppShell() {
   useTheme()
-  const hydrated = useStoreHydration()
-
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center" style={{ color: 'var(--text-muted)' }}>
-        <motion.div animate={{ opacity: [0.35, 1, 0.35], scale: [0.96, 1, 0.96] }} transition={{ duration: 1.1, repeat: Infinity }}>
-          <Icon path={ICON_PATHS.cart} size={48} />
-        </motion.div>
-      </div>
-    )
-  }
+  useEnsureStoreHydration()
 
   return (
     <div className="app-shell">
