@@ -1,0 +1,150 @@
+@import 'tailwindcss';
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-height: 62px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme='light'] {
+  --bg: #f4f5f7;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-hover: #f7f8fa;
+  --header-bg: #12213b;
+  --header-fg: #ffffff;
+  --accent: #ffc93c;
+  --accent-fg: #12213b;
+  --accent-soft: rgba(255, 201, 60, 0.18);
+  --text: #1b1f27;
+  --text-secondary: rgba(27, 31, 39, 0.72);
+  --text-muted: #767c8c;
+  --border: #e7e9ee;
+  --category-fg: #12213b;
+  --danger: #e4573d;
+  --danger-soft: rgba(228, 87, 61, 0.12);
+  --success: #3cb878;
+  --chip-bg: #eff1f5;
+  --chip-fg: #1b1f27;
+  --done-bg: #ecedf1;
+  --nav-bg: rgba(255, 255, 255, 0.92);
+  --progress-track: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --bg: #000000;
+  --bg-elevated: #141414;
+  --surface: #1a1a1a;
+  --surface-hover: #222222;
+  --header-bg: #0b1526;
+  --header-fg: #ffffff;
+  --accent: #ffc93c;
+  --accent-fg: #12213b;
+  --accent-soft: rgba(255, 201, 60, 0.15);
+  --text: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.48);
+  --border: rgba(255, 255, 255, 0.1);
+  --category-fg: rgba(255, 255, 255, 0.85);
+  --danger: #ef5350;
+  --danger-soft: rgba(239, 83, 80, 0.15);
+  --success: #66bb6a;
+  --chip-bg: rgba(255, 255, 255, 0.08);
+  --chip-fg: rgba(255, 255, 255, 0.85);
+  --done-bg: rgba(255, 255, 255, 0.06);
+  --nav-bg: rgba(20, 20, 20, 0.92);
+  --progress-track: rgba(255, 255, 255, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  overscroll-behavior-y: contain;
+}
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-surface {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.btn-duo {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+.btn-duo:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.18);
+}
+
+.chip {
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.chip--active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.progress-track {
+  background: var(--progress-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  background: var(--accent);
+  height: 100%;
+  transition: width var(--transition);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
