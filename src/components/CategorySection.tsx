@@ -61,6 +61,8 @@ export function CategorySection({
                 onToggleFavorite={onToggleFavorite}
                 onAdjustAmount={onAdjustAmount}
                 dragHandleProps={dragProps}
+                isDragging={drag.dragId === item.id}
+                dragDeltaY={drag.dragId === item.id ? drag.dragDeltaY : 0}
                 isDragOver={drag.overId === item.id && drag.dragId !== item.id}
               />
             ))}
@@ -91,6 +93,8 @@ export function CategorySection({
               onToggleFavorite={onToggleFavorite}
               onAdjustAmount={onAdjustAmount}
               dragHandleProps={dragProps}
+              isDragging={drag.dragId === item.id}
+              dragDeltaY={drag.dragId === item.id ? drag.dragDeltaY : 0}
               isDragOver={drag.overId === item.id && drag.dragId !== item.id}
             />
           ))}

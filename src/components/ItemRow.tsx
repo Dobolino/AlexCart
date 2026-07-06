@@ -21,8 +21,10 @@ interface ItemRowProps {
   dragHandleProps?: {
     onPointerDown: (e: React.PointerEvent, id: string) => void
     onPointerMove: (e: React.PointerEvent) => void
-    onPointerUp: () => void
+    onPointerUp: (e: React.PointerEvent) => void
   }
+  isDragging?: boolean
+  dragDeltaY?: number
   isDragOver?: boolean
 }
 
@@ -40,6 +42,8 @@ export function ItemRow({
   onToggleFavorite,
   onAdjustAmount,
   dragHandleProps,
+  isDragging = false,
+  dragDeltaY = 0,
   isDragOver,
 }: ItemRowProps) {
   const [dragX, setDragX] = useState(0)
@@ -107,7 +111,7 @@ export function ItemRow({
 
   return (
     <motion.div
-      layout
+      layout={!isDragging}
       data-item-id={item.id}
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -117,16 +121,28 @@ export function ItemRow({
       style={{
         borderColor: 'var(--border)',
         outline: isDragOver ? '2px solid var(--accent)' : 'none',
+        zIndex: isDragging ? 40 : undefined,
       }}
     >
+      {isDragging && (
+        <div
+          className="absolute inset-0"
+          style={{ background: 'var(--surface)', opacity: 0.45 }}
+          aria-hidden
+        />
+      )}
       <div
         className="relative flex min-h-[60px] items-center gap-3 px-3.5 py-3.5"
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
-          transform: `translateX(${dragX}px)`,
-          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
-          opacity: exiting ? 0 : 1,
-          touchAction: 'pan-y',
+          transform: isDragging
+            ? `translateY(${dragDeltaY}px) scale(1.02)`
+            : `translateX(${dragX}px)`,
+          transition: dragging || isDragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
+          opacity: isDragging ? 0.98 : exiting ? 0 : 1,
+          touchAction: isDragging ? 'none' : 'pan-y',
+          boxShadow: isDragging ? '0 10px 28px rgba(0,0,0,0.16)' : undefined,
+          pointerEvents: isDragging ? 'none' : undefined,
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
