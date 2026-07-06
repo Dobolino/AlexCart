@@ -4,7 +4,8 @@ import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
 import { ICON_PATHS } from '@/constants/icons'
 import { DEFAULT_UNIT } from '@/constants/units'
-import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getIconKey } from '@/utils/icon'
+import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
 import { parseAmount, joinAmount } from '@/utils/amount'
@@ -143,7 +144,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
                     className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
                     style={{ background: color.bg, color: color.fg }}
                   >
-                    <Icon path={getIconSvgPath(iconKey)} size={20} />
+                    <ProductIcon iconKey={iconKey} size={20} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{r.name}</span>

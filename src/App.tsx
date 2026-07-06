@@ -2,7 +2,9 @@ import { HashRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { BottomNav } from './components/BottomNav'
+import { useStore } from './store/useStore'
 import { useTheme } from './hooks/useTheme'
+import { OnboardingSheet } from './components/OnboardingSheet'
 import { useEnsureStoreHydration } from './hooks/useStoreHydration'
 import { ListPage } from './pages/ListPage'
 import { PantryPage } from './pages/PantryPage'
@@ -37,11 +39,14 @@ function AnimatedRoutes() {
 function AppShell() {
   useTheme()
   useEnsureStoreHydration()
+  const hasSeenOnboarding = useStore((s) => s.settings.hasSeenOnboarding)
+  const setHasSeenOnboarding = useStore((s) => s.setHasSeenOnboarding)
 
   return (
     <div className="app-shell">
       <AnimatedRoutes />
       <BottomNav />
+      {!hasSeenOnboarding && <OnboardingSheet onDone={setHasSeenOnboarding} />}
     </div>
   )
 }

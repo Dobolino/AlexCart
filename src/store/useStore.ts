@@ -4,10 +4,13 @@ import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
 import { todayKey } from '@/utils/date'
 import { normalizeCategory } from '@/utils/icon'
+import { groupByCategory } from '@/utils/group'
 import type {
+  AppSettings,
   AppStats,
   CalculatorEntry,
   CustomProduct,
+  ListViewMode,
   PantryItem,
   PurchaseLogEntry,
   ShoppingItem,
@@ -15,8 +18,12 @@ import type {
   Theme,
 } from '@/types'
 
-const STORE_VERSION = 1
+const STORE_VERSION = 2
 const STORE_NAME = 'alexshop-store'
+
+function defaultSettings(): AppSettings {
+  return { theme: 'system', listViewMode: 'tiles', hasSeenOnboarding: false }
+}
 
 function defaultPantry(): PantryItem[] {
   return [
@@ -73,7 +80,7 @@ interface AppState {
   purchaseLog: PurchaseLogEntry[]
   stats: AppStats
   filtered: FilteredEntry[]
-  settings: { theme: Theme }
+  settings: AppSettings
   calculatorEntries: CalculatorEntry[]
 
   activeList: () => ShoppingList | undefined
@@ -88,6 +95,8 @@ interface AppState {
   restoreItem: (item: ShoppingItem) => void
   restoreFilteredItem: (itemId: string) => void
   clearFilteredNote: () => void
+  reorderItemsInCategory: (category: string, orderedIds: string[]) => void
+  reorderDoneItems: (orderedIds: string[]) => void
 
   createList: (name: string) => void
   switchList: (listId: string) => void
@@ -102,6 +111,8 @@ interface AppState {
   removeCustomProduct: (id: string) => void
 
   setTheme: (theme: Theme) => void
+  setListViewMode: (mode: ListViewMode) => void
+  setHasSeenOnboarding: () => void
   resetAll: () => void
 
   addCalculatorEntry: (amount: number) => void
@@ -121,7 +132,7 @@ export const useStore = create<AppState>()(
       purchaseLog: [],
       stats: defaultStats(),
       filtered: [],
-      settings: { theme: 'system' },
+      settings: defaultSettings(),
       calculatorEntries: [],
 
       activeList: () => {
@@ -273,6 +284,35 @@ export const useStore = create<AppState>()(
         set((state) => ({ filtered: state.filtered.filter((f) => f.listId !== list.id) }))
       },
 
+      reorderDoneItems: (orderedIds) => {
+        const list = get().activeList()
+        if (!list) return
+        const doneItems = list.items.filter((i) => i.done)
+        if (doneItems.length !== orderedIds.length) return
+        const byId = new Map(doneItems.map((i) => [i.id, i]))
+        if (!orderedIds.every((id) => byId.has(id))) return
+        const reorderedDone = orderedIds.map((id) => byId.get(id)!)
+        let di = 0
+        const newItems = list.items.map((item) => (item.done ? reorderedDone[di++]! : item))
+        set((state) => ({
+          lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: newItems })),
+        }))
+      },
+      reorderItemsInCategory: (category, orderedIds) => {
+        const list = get().activeList()
+        if (!list) return
+        const groups = groupByCategory(list.items)
+        const group = groups.find((g) => g.category === category)
+        if (!group || group.items.length !== orderedIds.length) return
+        const byId = new Map(group.items.map((i) => [i.id, i]))
+        if (!orderedIds.every((id) => byId.has(id))) return
+        const reordered = orderedIds.map((id) => byId.get(id)!)
+        const newItems = groups.flatMap((g) => (g.category === category ? reordered : g.items))
+        set((state) => ({
+          lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: newItems })),
+        }))
+      },
+
       createList: (name) => {
         const list = newList(name.trim() || 'Neue Liste')
         set((state) => ({
@@ -324,6 +364,9 @@ export const useStore = create<AppState>()(
         set((state) => ({ customProducts: state.customProducts.filter((p) => p.id !== id) })),
 
       setTheme: (theme) => set((state) => ({ settings: { ...state.settings, theme } })),
+      setListViewMode: (listViewMode) => set((state) => ({ settings: { ...state.settings, listViewMode } })),
+      setHasSeenOnboarding: () =>
+        set((state) => ({ settings: { ...state.settings, hasSeenOnboarding: true } })),
 
       resetAll: () =>
         set(() => {
@@ -336,7 +379,7 @@ export const useStore = create<AppState>()(
             purchaseLog: [],
             stats: defaultStats(),
             filtered: [],
-            settings: { theme: 'system' },
+            settings: defaultSettings(),
             calculatorEntries: [],
           }
         }),
@@ -354,6 +397,13 @@ export const useStore = create<AppState>()(
     {
       name: STORE_NAME,
       version: STORE_VERSION,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<AppState>
+        if (version < 2) {
+          state.settings = { ...defaultSettings(), ...(state.settings as Partial<AppSettings>) }
+        }
+        return state as AppState
+      },
       partialize: (state) => ({
         lists: state.lists,
         activeListId: state.activeListId,
@@ -374,6 +424,7 @@ export const useStore = create<AppState>()(
               ...currentState,
               ...persisted,
               stats: { ...defaultStats(), ...persisted.stats },
+              settings: { ...defaultSettings(), ...persisted.settings },
               activeListId: persisted.activeListId || persisted.lists![0].id,
             }
           }
