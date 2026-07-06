@@ -85,6 +85,7 @@ interface AppState {
   toggleItemDone: (itemId: string) => void
   toggleItemFavorite: (itemId: string) => void
   deleteItem: (itemId: string) => void
+  restoreItem: (item: ShoppingItem) => void
   restoreFilteredItem: (itemId: string) => void
   clearFilteredNote: () => void
 
@@ -238,6 +239,16 @@ export const useStore = create<AppState>()(
           lists: state.lists.map((l) =>
             l.id !== list.id ? l : { ...l, items: l.items.filter((i) => i.id !== itemId) }
           ),
+        }))
+      },
+
+      /** Setzt ein zuvor gelöschtes Artikel-Objekt unverändert (gleiche id, done, favorite, ...)
+       *  zurück in die aktive Liste - für "Rückgängig" nach dem Löschen. */
+      restoreItem: (item) => {
+        const list = get().activeList()
+        if (!list) return
+        set((state) => ({
+          lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: [...l.items, item] })),
         }))
       },
 

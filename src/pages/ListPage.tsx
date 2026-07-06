@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
+import { adjustAmount } from '@/utils/amount'
+import { buildShareText } from '@/utils/shareText'
 import { ItemRow } from '@/components/ItemRow'
 import { AddItemSheet } from '@/components/AddItemSheet'
 import { EditItemSheet } from '@/components/EditItemSheet'
@@ -15,12 +17,19 @@ import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
 import type { ShoppingItem } from '@/types'
 
+interface ToastState {
+  message: string
+  action?: { label: string; onClick: () => void }
+}
+
 export function ListPage() {
   const list = useStore((s) => s.activeList())
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const toggleItemFavorite = useStore((s) => s.toggleItemFavorite)
   const deleteItem = useStore((s) => s.deleteItem)
+  const restoreItem = useStore((s) => s.restoreItem)
+  const updateItemInActiveList = useStore((s) => s.updateItemInActiveList)
   const addPantryItem = useStore((s) => s.addPantryItem)
   const restoreFilteredItem = useStore((s) => s.restoreFilteredItem)
   const clearFilteredNote = useStore((s) => s.clearFilteredNote)
@@ -30,7 +39,8 @@ export function ListPage() {
   const [filteredOpen, setFilteredOpen] = useState(false)
   const [doneOpen, setDoneOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<ToastState | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   if (!list) return null
 
@@ -38,14 +48,43 @@ export function ListPage() {
   const doneItems = list.items.filter((i) => i.done)
   const groups = groupByCategory(activeItems)
 
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(''), 1800)
+  function showToast(message: string, action?: ToastState['action']) {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ message, action })
+    toastTimer.current = setTimeout(() => setToast(null), action ? 4000 : 1800)
   }
 
   function handleAddToPantry(item: ShoppingItem) {
     addPantryItem(item.name, item.category)
     showToast(`${item.name} zum Vorrat hinzugefügt`)
+  }
+
+  function handleDelete(itemId: string) {
+    const item = list!.items.find((i) => i.id === itemId)
+    if (!item) return
+    deleteItem(itemId)
+    showToast(`„${item.name}“ gelöscht`, { label: 'Rückgängig', onClick: () => restoreItem(item) })
+  }
+
+  function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
+    updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
+  }
+
+  async function handleShareList() {
+    const text = buildShareText(list!)
+    const nav = navigator as Navigator & { share?: (data: { title?: string; text?: string }) => Promise<void> }
+    if (nav.share) {
+      try {
+        await nav.share({ title: list!.name, text })
+      } catch {
+        // Nutzer hat abgebrochen - kein Fehler
+      }
+      return
+    }
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text)
+      showToast('Liste in Zwischenablage kopiert')
+    }
   }
 
   return (
@@ -54,6 +93,16 @@ export function ListPage() {
         title={list.name}
         subtitle={`${list.weekLabel ? `Woche ${list.weekLabel} · ` : ''}${activeItems.length} offen`}
         onTitleClick={() => setSwitcherOpen(true)}
+        right={
+          <button
+            className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+            style={{ color: 'var(--text-muted)' }}
+            onClick={handleShareList}
+            aria-label="Liste teilen"
+          >
+            <Icon path={ICON_PATHS.share} size={19} />
+          </button>
+        }
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
@@ -101,10 +150,11 @@ export function ListPage() {
                         key={item.id}
                         item={item}
                         onToggle={toggleItemDone}
-                        onDelete={deleteItem}
+                        onDelete={handleDelete}
                         onEdit={setEditingItem}
                         onAddToPantry={handleAddToPantry}
                         onToggleFavorite={toggleItemFavorite}
+                        onAdjustAmount={handleAdjustAmount}
                       />
                     ))}
                   </AnimatePresence>
@@ -135,10 +185,11 @@ export function ListPage() {
                           key={item.id}
                           item={item}
                           onToggle={toggleItemDone}
-                          onDelete={deleteItem}
+                          onDelete={handleDelete}
                           onEdit={setEditingItem}
                           onAddToPantry={handleAddToPantry}
                           onToggleFavorite={toggleItemFavorite}
+                          onAdjustAmount={handleAdjustAmount}
                         />
                       ))}
                     </AnimatePresence>
@@ -215,13 +266,25 @@ export function ListPage() {
       {toast && (
         <FloatingPortal>
           <div
-            className="glass fixed left-1/2 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold"
+            className="glass fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full py-2.5 pl-4.5 pr-2 text-[13px] font-semibold"
             style={{
               color: 'var(--text)',
               bottom: 'calc(88px + var(--safe-bottom))',
             }}
           >
-            {toast}
+            <span>{toast.message}</span>
+            {toast.action && (
+              <button
+                className="tap-scale rounded-full px-3 py-1.5 text-[13px] font-bold"
+                style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+                onClick={() => {
+                  toast.action!.onClick()
+                  setToast(null)
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
           </div>
         </FloatingPortal>
       )}

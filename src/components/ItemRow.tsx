@@ -5,6 +5,7 @@ import { ItemActionSheet } from './ItemActionSheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
+import { parseAmount } from '@/utils/amount'
 import type { ShoppingItem } from '@/types'
 
 interface ItemRowProps {
@@ -14,6 +15,7 @@ interface ItemRowProps {
   onEdit: (item: ShoppingItem) => void
   onAddToPantry: (item: ShoppingItem) => void
   onToggleFavorite: (id: string) => void
+  onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
 }
 
 const SWIPE_TRIGGER = 64
@@ -21,7 +23,15 @@ const SWIPE_MAX = 88
 const DEADZONE = 10
 const EXIT_ANIMATION_MS = 320
 
-export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onToggleFavorite }: ItemRowProps) {
+export function ItemRow({
+  item,
+  onToggle,
+  onDelete,
+  onEdit,
+  onAddToPantry,
+  onToggleFavorite,
+  onAdjustAmount,
+}: ItemRowProps) {
   const [dragX, setDragX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [exiting, setExiting] = useState(false)
@@ -33,6 +43,8 @@ export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onTog
   const iconKey = getIconKey(item.name, item.category)
   const svgPath = getIconSvgPath(iconKey)
   const color = getCategoryColor(item.category, item.done)
+  const parsedAmount = parseAmount(item.amount)
+  const showStepper = parsedAmount && !item.done
 
   function handleToggle() {
     if (item.done) {
@@ -132,8 +144,33 @@ export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onTog
             </div>
           </div>
           {(item.amount || item.note) && (
-            <div className="mt-0.5 truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
-              {[item.amount, item.note].filter(Boolean).join(' · ')}
+            <div className="mt-1 flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              {showStepper ? (
+                <span className="flex flex-none items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="tap-scale flex h-6 w-6 flex-none items-center justify-center rounded-full"
+                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                    onClick={() => onAdjustAmount(item, -1)}
+                    aria-label={`${item.name} Menge verringern`}
+                  >
+                    <Icon path={ICON_PATHS.minus} size={13} />
+                  </button>
+                  <span className="min-w-[3.2rem] truncate text-center font-semibold" style={{ color: 'var(--text)' }}>
+                    {item.amount}
+                  </span>
+                  <button
+                    className="tap-scale flex h-6 w-6 flex-none items-center justify-center rounded-full"
+                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                    onClick={() => onAdjustAmount(item, 1)}
+                    aria-label={`${item.name} Menge erhöhen`}
+                  >
+                    <Icon path={ICON_PATHS.plus} size={13} />
+                  </button>
+                </span>
+              ) : (
+                item.amount && <span className="truncate">{item.amount}</span>
+              )}
+              {item.note && <span className="truncate">{item.note}</span>}
             </div>
           )}
         </div>

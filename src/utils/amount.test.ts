@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, combineAmounts, mergeItems } from './amount'
+import { parseAmount, combineAmounts, mergeItems, adjustAmount, stepForUnit } from './amount'
 
 describe('parseAmount', () => {
   it('splits value and unit', () => {
@@ -24,6 +24,36 @@ describe('combineAmounts', () => {
   it('handles one-sided empty amounts', () => {
     expect(combineAmounts('', '2 Stk')).toBe('2 Stk')
     expect(combineAmounts('2 Stk', '')).toBe('2 Stk')
+  })
+})
+
+describe('stepForUnit', () => {
+  it('uses coarser steps for weight/volume units', () => {
+    expect(stepForUnit('g')).toBe(50)
+    expect(stepForUnit('ml')).toBe(50)
+    expect(stepForUnit('kg')).toBe(0.5)
+    expect(stepForUnit('l')).toBe(0.5)
+  })
+  it('uses a step of 1 for count-like units', () => {
+    expect(stepForUnit('Stück')).toBe(1)
+    expect(stepForUnit('Dose')).toBe(1)
+  })
+})
+
+describe('adjustAmount', () => {
+  it('increments by the unit step', () => {
+    expect(adjustAmount('500 g', 1)).toBe('550 g')
+    expect(adjustAmount('2 Stück', 1)).toBe('3 Stück')
+  })
+  it('decrements by the unit step, preserving casing', () => {
+    expect(adjustAmount('500 g', -1)).toBe('450 g')
+  })
+  it('never decrements below one step', () => {
+    expect(adjustAmount('20 g', -1)).toBe('50 g')
+    expect(adjustAmount('1 Stück', -1)).toBe('1 Stück')
+  })
+  it('leaves unparseable amounts unchanged', () => {
+    expect(adjustAmount('nach Bedarf', 1)).toBe('nach Bedarf')
   })
 })
 

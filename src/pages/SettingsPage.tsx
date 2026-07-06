@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
+import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
 import type { CustomProduct, Theme } from '@/types'
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
@@ -22,6 +23,38 @@ export function SettingsPage() {
   const customProducts = useStore((s) => s.customProducts)
   const removeCustomProduct = useStore((s) => s.removeCustomProduct)
   const [editing, setEditing] = useState<CustomProduct | null>(null)
+  const [backupMessage, setBackupMessage] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleExportBackup() {
+    const json = readBackupJSON()
+    if (!json) {
+      setBackupMessage('Keine Daten zum Sichern gefunden.')
+      return
+    }
+    await shareOrDownloadBackup(json, backupFilename())
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click()
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!window.confirm('Sicherung einspielen? Das ersetzt alle aktuellen Daten in dieser App.')) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = restoreBackupJSON(String(reader.result || ''))
+      if (result.ok) {
+        window.location.reload()
+      } else {
+        setBackupMessage(result.error || 'Sicherung konnte nicht geladen werden.')
+      }
+    }
+    reader.readAsText(file)
+  }
 
   return (
     <>
@@ -115,6 +148,35 @@ export function SettingsPage() {
         >
           Daten
         </div>
+        <div className="card-surface mb-3 flex flex-col">
+          <button
+            className="tap-scale flex items-center gap-3 border-b px-3.5 py-3.5 text-left text-[14px] font-semibold"
+            style={{ borderColor: 'var(--border)' }}
+            onClick={handleExportBackup}
+          >
+            <Icon path={ICON_PATHS.share} size={18} />
+            Sicherung exportieren
+          </button>
+          <button
+            className="tap-scale flex items-center gap-3 px-3.5 py-3.5 text-left text-[14px] font-semibold"
+            onClick={handleImportClick}
+          >
+            <Icon path={ICON_PATHS.import} size={18} />
+            Sicherung einspielen
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+        {backupMessage && (
+          <p className="mb-3 px-1.5 text-[12px]" style={{ color: 'var(--danger)' }}>
+            {backupMessage}
+          </p>
+        )}
         <button
           className="btn-soft w-full py-3.5 text-[14px]"
           style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}

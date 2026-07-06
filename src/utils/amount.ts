@@ -28,6 +28,26 @@ export function joinAmount(value: string, unit: string): string {
   return u ? `${v} ${u}` : v
 }
 
+/** Sinnvolle Schrittgröße pro Einheit für den +/- Stepper (Stückgut in 1er-Schritten,
+ *  Gewicht/Volumen in gröberen Schritten, da 1g/1ml kaum je relevant ist). */
+export function stepForUnit(unit: string): number {
+  const u = unit.trim().toLowerCase()
+  if (u === 'kg' || u === 'l') return 0.5
+  if (u === 'g' || u === 'ml') return 50
+  return 1
+}
+
+/** Erhöht/verringert eine Mengenangabe um einen sinnvollen Schritt; nicht unter
+ *  einen Schritt sinken (0 oder negative Mengen ergeben keinen Sinn - dafür löscht
+ *  man den Artikel). Nicht parsebare Mengen bleiben unverändert. */
+export function adjustAmount(amount: string, direction: 1 | -1): string {
+  const parsed = parseAmount(amount)
+  if (!parsed) return amount
+  const step = stepForUnit(parsed.unit)
+  const next = direction > 0 ? parsed.value + step : Math.max(step, parsed.value - step)
+  return joinAmount(formatNumber(next), parsed.unit)
+}
+
 export function combineAmounts(a: string, b: string): string {
   const pa = parseAmount(a)
   const pb = parseAmount(b)
