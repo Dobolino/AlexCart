@@ -7,6 +7,8 @@ export interface ShoppingItem {
   category: string
   done: boolean
   addedAt: number
+  note?: string
+  favorite?: boolean
 }
 
 export interface ShoppingList {

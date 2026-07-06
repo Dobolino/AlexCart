@@ -7,6 +7,7 @@ export interface SearchableProduct {
   category: string
   icon?: string
   amount?: string
+  note?: string
   isCustom?: boolean
   customId?: string
 }
@@ -16,7 +17,14 @@ function toSearchable(p: Product): SearchableProduct {
 }
 
 function customToSearchable(p: CustomProduct): SearchableProduct {
-  return { name: p.name, category: p.category, amount: p.defaultAmount, isCustom: true, customId: p.id }
+  return {
+    name: p.name,
+    category: p.category,
+    amount: p.defaultAmount,
+    note: p.note,
+    isCustom: true,
+    customId: p.id,
+  }
 }
 
 /** Sucht zuerst in eigenen Produkten (Nutzer-Priorität), dann in der Standard-Datenbank.

@@ -4,6 +4,7 @@ import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { ItemRow } from '@/components/ItemRow'
 import { AddItemSheet } from '@/components/AddItemSheet'
+import { EditItemSheet } from '@/components/EditItemSheet'
 import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
@@ -12,12 +13,15 @@ import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import type { ShoppingItem } from '@/types'
 
 export function ListPage() {
   const list = useStore((s) => s.activeList())
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
+  const toggleItemFavorite = useStore((s) => s.toggleItemFavorite)
   const deleteItem = useStore((s) => s.deleteItem)
+  const addPantryItem = useStore((s) => s.addPantryItem)
   const restoreFilteredItem = useStore((s) => s.restoreFilteredItem)
   const clearFilteredNote = useStore((s) => s.clearFilteredNote)
 
@@ -25,6 +29,7 @@ export function ListPage() {
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [filteredOpen, setFilteredOpen] = useState(false)
   const [doneOpen, setDoneOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null)
   const [toast, setToast] = useState('')
 
   if (!list) return null
@@ -36,6 +41,11 @@ export function ListPage() {
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 1800)
+  }
+
+  function handleAddToPantry(item: ShoppingItem) {
+    addPantryItem(item.name, item.category)
+    showToast(`${item.name} zum Vorrat hinzugefügt`)
   }
 
   return (
@@ -87,7 +97,15 @@ export function ListPage() {
                 <div className="card-surface">
                   <AnimatePresence initial={false}>
                     {g.items.map((item) => (
-                      <ItemRow key={item.id} item={item} onToggle={toggleItemDone} onDelete={deleteItem} />
+                      <ItemRow
+                        key={item.id}
+                        item={item}
+                        onToggle={toggleItemDone}
+                        onDelete={deleteItem}
+                        onEdit={setEditingItem}
+                        onAddToPantry={handleAddToPantry}
+                        onToggleFavorite={toggleItemFavorite}
+                      />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -113,7 +131,15 @@ export function ListPage() {
                   <div className="card-surface mt-1.5">
                     <AnimatePresence initial={false}>
                       {doneItems.map((item) => (
-                        <ItemRow key={item.id} item={item} onToggle={toggleItemDone} onDelete={deleteItem} />
+                        <ItemRow
+                          key={item.id}
+                          item={item}
+                          onToggle={toggleItemDone}
+                          onDelete={deleteItem}
+                          onEdit={setEditingItem}
+                          onAddToPantry={handleAddToPantry}
+                          onToggleFavorite={toggleItemFavorite}
+                        />
                       ))}
                     </AnimatePresence>
                   </div>
@@ -139,6 +165,7 @@ export function ListPage() {
       </FloatingPortal>
 
       {addOpen && <AddItemSheet onClose={() => setAddOpen(false)} onImported={showToast} />}
+      {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
       {switcherOpen && <ListSwitcherSheet onClose={() => setSwitcherOpen(false)} />}
       {filteredOpen && (
         <Sheet onClose={() => setFilteredOpen(false)}>

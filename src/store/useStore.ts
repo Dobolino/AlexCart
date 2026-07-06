@@ -80,8 +80,10 @@ interface AppState {
   filteredForActiveList: () => ShoppingItem[]
 
   importIntoActiveList: (text: string) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number }
-  addItemToActiveList: (item: { name: string; amount: string; category: string }) => void
+  addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
+  updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note'>>) => void
   toggleItemDone: (itemId: string) => void
+  toggleItemFavorite: (itemId: string) => void
   deleteItem: (itemId: string) => void
   restoreFilteredItem: (itemId: string) => void
   clearFilteredNote: () => void
@@ -162,12 +164,51 @@ export const useStore = create<AppState>()(
           name: item.name.trim(),
           amount: item.amount.trim(),
           category: normalizeCategory(item.category),
+          note: item.note?.trim() || undefined,
           done: false,
+          favorite: false,
           addedAt: Date.now(),
         }
         set((state) => ({
           lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: [...l.items, newItem] })),
           stats: { ...state.stats, itemsAddedTotal: state.stats.itemsAddedTotal + 1 },
+        }))
+      },
+
+      updateItemInActiveList: (itemId, patch) => {
+        const list = get().activeList()
+        if (!list) return
+        set((state) => ({
+          lists: state.lists.map((l) =>
+            l.id !== list.id
+              ? l
+              : {
+                  ...l,
+                  items: l.items.map((i) =>
+                    i.id !== itemId
+                      ? i
+                      : {
+                          ...i,
+                          ...(patch.name !== undefined ? { name: patch.name.trim() || i.name } : {}),
+                          ...(patch.amount !== undefined ? { amount: patch.amount.trim() } : {}),
+                          ...(patch.category !== undefined ? { category: normalizeCategory(patch.category) } : {}),
+                          ...(patch.note !== undefined ? { note: patch.note.trim() || undefined } : {}),
+                        }
+                  ),
+                }
+          ),
+        }))
+      },
+
+      toggleItemFavorite: (itemId) => {
+        const list = get().activeList()
+        if (!list) return
+        set((state) => ({
+          lists: state.lists.map((l) =>
+            l.id !== list.id
+              ? l
+              : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, favorite: !i.favorite } : i)) }
+          ),
         }))
       },
 

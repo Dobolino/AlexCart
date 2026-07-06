@@ -6,6 +6,7 @@ import { EditCustomProductSheet } from '@/components/EditCustomProductSheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getCategoryColor } from '@/utils/categoryColor'
 import type { CustomProduct, Theme } from '@/types'
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
@@ -66,6 +67,7 @@ export function SettingsPage() {
           <div className="card-surface mb-4.5">
             {customProducts.map((p) => {
               const iconKey = getIconKey(p.name, p.category)
+              const color = getCategoryColor(p.category)
               return (
                 <div
                   key={p.id}
@@ -74,7 +76,7 @@ export function SettingsPage() {
                 >
                   <span
                     className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                    style={{ background: color.bg, color: color.fg }}
                   >
                     <Icon path={getIconSvgPath(iconKey)} size={20} />
                   </span>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getCategoryColor } from '@/utils/categoryColor'
 import { CATEGORIES } from '@/data/products'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -24,16 +25,14 @@ export function PantryPage() {
         <div className="mb-4 flex flex-col gap-2">
           <input
             type="text"
-            className="w-full min-w-0 rounded-xl border px-3.5 py-3 text-[15px]"
-            style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
+            className="input w-full min-w-0"
             placeholder="z.B. Reis"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <div className="flex gap-2">
             <select
-              className="min-w-0 flex-1 rounded-xl border px-2.5 py-2 text-[14px]"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
+              className="input min-w-0 flex-1"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -75,6 +74,7 @@ export function PantryPage() {
               <div className="card-surface">
                 {g.items.map((item) => {
                   const iconKey = getIconKey(item.name, item.category)
+                  const color = getCategoryColor(item.category)
                   return (
                     <div
                       key={item.id}
@@ -84,7 +84,7 @@ export function PantryPage() {
                       <span className="flex items-center gap-2.5 text-[15px] font-semibold">
                         <span
                           className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
-                          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                          style={{ background: color.bg, color: color.fg }}
                         >
                           <Icon path={getIconSvgPath(iconKey)} size={18} />
                         </span>

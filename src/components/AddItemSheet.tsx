@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { Icon } from './Icon'
+import { ProductForm, type ProductFormValues } from './ProductForm'
 import { ICON_PATHS } from '@/constants/icons'
+import { DEFAULT_UNIT } from '@/constants/units'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
+import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
 
@@ -12,51 +16,71 @@ interface AddItemSheetProps {
   onImported: (message: string) => void
 }
 
-type Mode = 'search' | 'create' | 'import'
+type Mode = 'search' | 'form' | 'import'
+type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom'
+
+const EMPTY_FORM: ProductFormValues = { name: '', category: CATEGORIES[0], amountValue: '', unit: DEFAULT_UNIT, note: '' }
 
 export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const customProducts = useStore((s) => s.customProducts)
   const addItemToActiveList = useStore((s) => s.addItemToActiveList)
   const addCustomProduct = useStore((s) => s.addCustomProduct)
+  const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
 
   const [mode, setMode] = useState<Mode>('search')
   const [query, setQuery] = useState('')
   const [addedCount, setAddedCount] = useState(0)
 
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState(CATEGORIES[0])
-  const [amountValue, setAmountValue] = useState('')
-  const [unit, setUnit] = useState('')
-  const [note, setNote] = useState('')
+  const [formMode, setFormMode] = useState<FormMode>('new')
+  const [editingCustomId, setEditingCustomId] = useState<string | null>(null)
+  const [form, setForm] = useState<ProductFormValues>(EMPTY_FORM)
 
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
 
   const results = searchProducts(query, customProducts)
 
-  function pick(result: (typeof results)[number]) {
-    addItemToActiveList({ name: result.name, amount: result.amount || '', category: result.category })
-    setAddedCount((c) => c + 1)
-    setQuery('')
+  function openConfirmFor(result: (typeof results)[number]) {
+    const parsed = parseAmount(result.amount)
+    setForm({
+      name: result.name,
+      category: result.category,
+      amountValue: parsed ? String(parsed.value) : '',
+      unit: parsed?.unit || DEFAULT_UNIT,
+      note: result.note || '',
+    })
+    setFormMode(result.isCustom ? 'confirm-custom' : 'confirm-builtin')
+    setEditingCustomId(result.customId ?? null)
+    setMode('form')
   }
 
   function openCreateForm() {
-    setName(query)
-    setMode('create')
+    setForm({ ...EMPTY_FORM, name: query })
+    setFormMode('new')
+    setEditingCustomId(null)
+    setMode('form')
   }
 
-  function handleCreate() {
-    if (!name.trim()) return
-    const amount = [amountValue.trim(), unit.trim()].filter(Boolean).join(' ')
-    const product = addCustomProduct({ name, category, amount, note })
-    addItemToActiveList({ name: product.name, amount: product.defaultAmount, category: product.category })
+  function handleFormSubmit() {
+    if (!form.name.trim()) return
+    const amount = joinAmount(form.amountValue, form.unit)
+
+    if (formMode === 'new') {
+      addCustomProduct({ name: form.name, category: form.category, amount, note: form.note })
+    } else if (formMode === 'confirm-custom' && editingCustomId) {
+      updateCustomProduct(editingCustomId, {
+        name: form.name.trim(),
+        category: form.category,
+        defaultAmount: amount,
+        note: form.note.trim() || undefined,
+      })
+    }
+
+    addItemToActiveList({ name: form.name, amount, category: form.category, note: form.note })
     setAddedCount((c) => c + 1)
-    setName('')
-    setAmountValue('')
-    setUnit('')
-    setNote('')
     setQuery('')
+    setForm(EMPTY_FORM)
     setMode('search')
   }
 
@@ -83,7 +107,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             key={m}
             className="flex-1 rounded-xl py-2 text-[13px] font-bold tap-scale"
             style={{
-              background: mode === m || (m === 'search' && mode === 'create') ? 'var(--surface)' : 'transparent',
+              background: mode === m || (m === 'search' && mode === 'form') ? 'var(--surface)' : 'transparent',
               color: 'var(--text)',
             }}
             onClick={() => setMode(m)}
@@ -93,139 +117,92 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
         ))}
       </div>
 
-      {mode !== 'import' ? (
-        mode === 'search' ? (
-          <>
-            <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
-            <input
-              autoFocus
-              type="text"
-              className="w-full rounded-2xl border px-4 py-3.5 text-[16px]"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-              placeholder="z.B. Tomaten"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <div className="mt-2 max-h-[300px] overflow-y-auto">
-              {results.map((r) => {
-                const iconKey = getIconKey(r.name, r.category)
-                return (
-                  <button
-                    key={r.customId || r.name}
-                    className="tap-scale flex w-full items-center gap-3 border-b px-1 py-3 text-left"
-                    style={{ borderColor: 'var(--border)' }}
-                    onClick={() => pick(r)}
-                  >
-                    <span
-                      className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                      style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-                    >
-                      <Icon path={getIconSvgPath(iconKey)} size={20} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold">{r.name}</span>
-                      <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        {r.category}
-                      </span>
-                    </span>
-                    <Icon path={ICON_PATHS.plus} size={18} />
-                  </button>
-                )
-              })}
-              {query.trim() && (
+      {mode === 'search' && (
+        <>
+          <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
+          <input
+            autoFocus
+            type="text"
+            className="input"
+            placeholder="z.B. Tomaten"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <div className="mt-2 max-h-[300px] overflow-y-auto">
+            {results.map((r) => {
+              const iconKey = getIconKey(r.name, r.category)
+              const color = getCategoryColor(r.category)
+              return (
                 <button
-                  className="tap-scale mt-1 flex w-full items-center gap-3 px-1 py-3 text-left"
-                  onClick={openCreateForm}
+                  key={r.customId || r.name}
+                  className="tap-scale flex w-full items-center gap-3 border-b px-1 py-3 text-left"
+                  style={{ borderColor: 'var(--border)' }}
+                  onClick={() => openConfirmFor(r)}
                 >
                   <span
                     className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                    style={{ background: color.bg, color: color.fg }}
                   >
-                    <Icon path={ICON_PATHS.plus} size={18} />
+                    <Icon path={getIconSvgPath(iconKey)} size={20} />
                   </span>
-                  <span className="text-[15px] font-semibold" style={{ color: 'var(--accent)' }}>
-                    „{query}“ als neues Produkt anlegen
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold">{r.name}</span>
+                    <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      {r.category}
+                    </span>
                   </span>
+                  <Icon path={ICON_PATHS.plus} size={18} />
                 </button>
-              )}
-            </div>
-            {addedCount > 0 && (
-              <button className="btn-primary mt-4 w-full py-3.5 text-[15px]" onClick={onClose}>
-                Fertig ({addedCount} hinzugefügt)
+              )
+            })}
+            {query.trim() && (
+              <button
+                className="tap-scale mt-1 flex w-full items-center gap-3 px-1 py-3 text-left"
+                onClick={openCreateForm}
+              >
+                <span
+                  className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                  style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                >
+                  <Icon path={ICON_PATHS.plus} size={18} />
+                </span>
+                <span className="text-[15px] font-semibold" style={{ color: 'var(--accent)' }}>
+                  „{query}“ als neues Produkt anlegen
+                </span>
               </button>
             )}
-          </>
-        ) : (
-          <>
-            <h2 className="mb-3 text-lg font-bold">Neues Produkt</h2>
-            <div className="flex flex-col gap-2.5">
-              <input
-                type="text"
-                className="rounded-2xl border px-4 py-3 text-[15px]"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <select
-                className="rounded-2xl border px-4 py-3 text-[15px]"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2.5">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className="w-1/2 rounded-2xl border px-4 py-3 text-[15px]"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                  placeholder="Menge (z.B. 500)"
-                  value={amountValue}
-                  onChange={(e) => setAmountValue(e.target.value)}
-                />
-                <input
-                  type="text"
-                  className="w-1/2 rounded-2xl border px-4 py-3 text-[15px]"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                  placeholder="Einheit (z.B. g)"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                />
-              </div>
-              <input
-                type="text"
-                className="rounded-2xl border px-4 py-3 text-[15px]"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                placeholder="Notiz (optional)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-            <div className="mt-4 flex gap-2.5">
-              <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setMode('search')}>
-                Zurück
-              </button>
-              <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={handleCreate}>
-                Anlegen &amp; hinzufügen
-              </button>
-            </div>
-          </>
-        )
-      ) : (
+          </div>
+          {addedCount > 0 && (
+            <button className="btn-primary mt-4 w-full py-3.5 text-[15px]" onClick={onClose}>
+              Fertig ({addedCount} hinzugefügt)
+            </button>
+          )}
+        </>
+      )}
+
+      {mode === 'form' && (
+        <>
+          <h2 className="mb-3 text-lg font-bold">{formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}</h2>
+          <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
+          <div className="mt-4 flex gap-2.5">
+            <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setMode('search')}>
+              Zurück
+            </button>
+            <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={handleFormSubmit}>
+              {formMode === 'new' ? 'Anlegen & hinzufügen' : 'Hinzufügen'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {mode === 'import' && (
         <>
           <h2 className="mb-1 text-lg font-bold">Wochenplan importieren</h2>
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             JSON aus deinem Essensplan-Chat hier einfügen.
           </p>
           <textarea
-            className="min-h-[160px] w-full rounded-2xl border p-3 font-mono text-[14px]"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+            className="input min-h-[160px] font-mono text-[14px]"
             placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Obst & Gemüse"}]}'
             value={importText}
             onChange={(e) => setImportText(e.target.value)}

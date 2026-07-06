@@ -41,8 +41,11 @@ export function ListSwitcherSheet({ onClose }: ListSwitcherSheetProps) {
             </button>
             {lists.length > 1 && (
               <button
+                className="tap-scale p-1"
                 style={{ color: 'var(--danger)' }}
-                onClick={() => deleteList(list.id)}
+                onClick={() => {
+                  if (window.confirm(`„${list.name}“ wirklich löschen?`)) deleteList(list.id)
+                }}
                 aria-label={`${list.name} löschen`}
               >
                 <Icon path={ICON_PATHS.trash} size={18} />
@@ -54,8 +57,7 @@ export function ListSwitcherSheet({ onClose }: ListSwitcherSheetProps) {
       <div className="flex gap-2">
         <input
           type="text"
-          className="flex-1 rounded-xl border px-3.5 py-3 text-[15px]"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+          className="input flex-1"
           placeholder="z.B. Grillfest"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}

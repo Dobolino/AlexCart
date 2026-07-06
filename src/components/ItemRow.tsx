@@ -1,51 +1,37 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
+import { ItemActionSheet } from './ItemActionSheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getCategoryColor } from '@/utils/categoryColor'
 import type { ShoppingItem } from '@/types'
 
 interface ItemRowProps {
   item: ShoppingItem
   onToggle: (id: string) => void
   onDelete: (id: string) => void
+  onEdit: (item: ShoppingItem) => void
+  onAddToPantry: (item: ShoppingItem) => void
+  onToggleFavorite: (id: string) => void
 }
 
-const DELETE_WIDTH = 84
+const SWIPE_TRIGGER = 64
+const SWIPE_MAX = 88
+const DEADZONE = 10
 const EXIT_ANIMATION_MS = 320
 
-export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
+export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onToggleFavorite }: ItemRowProps) {
   const [dragX, setDragX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [exiting, setExiting] = useState(false)
-  const dragState = useRef<{ startX: number; opened: boolean }>({ startX: 0, opened: false })
+  const [menuOpen, setMenuOpen] = useState(false)
+  const start = useRef({ x: 0, y: 0 })
+  const horizontalConfirmed = useRef(false)
 
   const iconKey = getIconKey(item.name, item.category)
   const svgPath = getIconSvgPath(iconKey)
-
-  function handlePointerDown(e: React.PointerEvent) {
-    dragState.current.startX = e.clientX
-    setDragging(true)
-    ;(e.target as Element).setPointerCapture(e.pointerId)
-  }
-  function handlePointerMove(e: React.PointerEvent) {
-    if (!dragging) return
-    let delta = e.clientX - dragState.current.startX
-    if (dragState.current.opened) delta -= DELETE_WIDTH
-    delta = Math.max(-DELETE_WIDTH, Math.min(0, delta))
-    setDragX(delta)
-  }
-  function handlePointerUp() {
-    if (!dragging) return
-    setDragging(false)
-    if (dragX < -40) {
-      dragState.current.opened = true
-      setDragX(-DELETE_WIDTH)
-    } else {
-      dragState.current.opened = false
-      setDragX(0)
-    }
-  }
+  const color = getCategoryColor(item.category, item.done)
 
   function handleToggle() {
     if (item.done) {
@@ -54,6 +40,33 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
     }
     setExiting(true)
     setTimeout(() => onToggle(item.id), EXIT_ANIMATION_MS)
+  }
+
+  // Wisch nach rechts zum Abhaken, mit Deadzone: erst wenn die Bewegung eindeutig
+  // horizontal ist, reagieren wir überhaupt - sonst würde ein Tap oder vertikales
+  // Scrollen (leichtes Zittern reicht) kurz sichtbar die Zeile verschieben.
+  function handlePointerDown(e: React.PointerEvent) {
+    start.current = { x: e.clientX, y: e.clientY }
+    horizontalConfirmed.current = false
+    setDragging(true)
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+  }
+  function handlePointerMove(e: React.PointerEvent) {
+    if (!dragging) return
+    const dx = e.clientX - start.current.x
+    const dy = e.clientY - start.current.y
+    if (!horizontalConfirmed.current) {
+      if (Math.abs(dx) < DEADZONE || Math.abs(dy) > Math.abs(dx)) return
+      horizontalConfirmed.current = true
+    }
+    setDragX(Math.max(0, Math.min(SWIPE_MAX, dx)))
+  }
+  function handlePointerUp() {
+    if (!dragging) return
+    setDragging(false)
+    const shouldToggle = horizontalConfirmed.current && dragX > SWIPE_TRIGGER
+    setDragX(0)
+    if (shouldToggle) handleToggle()
   }
 
   return (
@@ -66,14 +79,6 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
       className="relative overflow-hidden border-b"
       style={{ borderColor: 'var(--border)' }}
     >
-      <button
-        className="absolute inset-y-0 right-0 flex items-center justify-center text-white"
-        style={{ width: DELETE_WIDTH, background: 'var(--danger)' }}
-        onClick={() => onDelete(item.id)}
-        aria-label={`${item.name} löschen`}
-      >
-        <Icon path={ICON_PATHS.trash} size={20} />
-      </button>
       <div
         className="relative flex min-h-[60px] items-center gap-3 px-3.5 py-3.5"
         style={{
@@ -87,42 +92,73 @@ export function ItemRow({ item, onToggle, onDelete }: ItemRowProps) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onClick={handleToggle}
       >
         <div
           className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+          style={{ background: color.bg, color: color.fg }}
         >
           <Icon path={svgPath} size={20} />
         </div>
-        <div className="min-w-0 flex-1" onClick={handleToggle}>
-          <div
-            className="text-[16px] font-semibold leading-tight"
-            style={{
-              color: item.done ? 'var(--text-muted)' : 'var(--text)',
-              textDecoration: item.done ? 'line-through' : 'none',
-              textDecorationThickness: '2px',
-            }}
-          >
-            {item.name}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {item.favorite && (
+              <span className="flex-none" style={{ color: 'var(--accent)' }}>
+                <Icon path={ICON_PATHS.star} size={12} />
+              </span>
+            )}
+            <div
+              className="truncate text-[16px] font-semibold leading-tight"
+              style={{
+                color: item.done ? 'var(--text-muted)' : 'var(--text)',
+                textDecoration: item.done ? 'line-through' : 'none',
+                textDecorationThickness: '2px',
+              }}
+            >
+              {item.name}
+            </div>
           </div>
-          {item.amount && (
-            <div className="mt-0.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-              {item.amount}
+          {(item.amount || item.note) && (
+            <div className="mt-0.5 truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              {[item.amount, item.note].filter(Boolean).join(' · ')}
             </div>
           )}
         </div>
         <button
-          className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-white"
-          style={{
-            borderColor: item.done ? 'var(--success)' : 'var(--border)',
-            background: item.done ? 'var(--success)' : 'transparent',
+          className="tap-scale flex h-8 w-8 flex-none items-center justify-center rounded-full"
+          style={{ color: 'var(--text-muted)' }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setMenuOpen(true)
           }}
-          onClick={handleToggle}
-          aria-label={item.done ? 'Als offen markieren' : 'Als erledigt markieren'}
+          aria-label={`Aktionen für ${item.name}`}
         >
-          {item.done && <Icon path={ICON_PATHS.check} size={14} />}
+          <Icon path={ICON_PATHS.more} size={20} />
         </button>
       </div>
+
+      {menuOpen && (
+        <ItemActionSheet
+          item={item}
+          onClose={() => setMenuOpen(false)}
+          onEdit={() => {
+            setMenuOpen(false)
+            onEdit(item)
+          }}
+          onAddToPantry={() => {
+            setMenuOpen(false)
+            onAddToPantry(item)
+          }}
+          onToggleFavorite={() => {
+            setMenuOpen(false)
+            onToggleFavorite(item.id)
+          }}
+          onDelete={() => {
+            setMenuOpen(false)
+            onDelete(item.id)
+          }}
+        />
+      )}
     </motion.div>
   )
 }

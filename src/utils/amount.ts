@@ -20,6 +20,14 @@ export function formatNumber(n: number): string {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',')
 }
 
+/** Fügt einen Mengenwert und eine Einheit zu einem Anzeige-String zusammen, z.B. ("500", "g") -> "500 g". */
+export function joinAmount(value: string, unit: string): string {
+  const v = value.trim()
+  const u = unit.trim()
+  if (!v) return u
+  return u ? `${v} ${u}` : v
+}
+
 export function combineAmounts(a: string, b: string): string {
   const pa = parseAmount(a)
   const pb = parseAmount(b)

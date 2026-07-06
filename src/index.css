@@ -36,6 +36,24 @@
   --nav-glass: rgba(255, 255, 255, 0.78);
   --progress-track: rgba(0, 0, 0, 0.08);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.04);
+
+  /* Dezente Kategorie-Akzentfarben (nur als sanfte Icon-Chip-Farbe genutzt) */
+  --cat-fruits-bg: rgba(52, 199, 89, 0.14);
+  --cat-fruits-fg: #248a3d;
+  --cat-dairy-bg: rgba(255, 204, 0, 0.16);
+  --cat-dairy-fg: #93750a;
+  --cat-meat-bg: rgba(255, 59, 48, 0.13);
+  --cat-meat-fg: #c62b21;
+  --cat-grains-bg: rgba(175, 130, 60, 0.16);
+  --cat-grains-fg: #8a5a1f;
+  --cat-bread-bg: rgba(162, 110, 60, 0.18);
+  --cat-bread-fg: #7a4a1e;
+  --cat-frozen-bg: rgba(50, 173, 230, 0.16);
+  --cat-frozen-fg: #1c7fa8;
+  --cat-drinks-bg: rgba(0, 122, 255, 0.13);
+  --cat-drinks-fg: #0a5dc2;
+  --cat-other-bg: rgba(120, 120, 128, 0.14);
+  --cat-other-fg: #5b5b60;
 }
 
 [data-theme='dark'] {
@@ -61,6 +79,24 @@
   --nav-glass: rgba(20, 20, 22, 0.72);
   --progress-track: rgba(255, 255, 255, 0.12);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* Dezente Kategorie-Akzentfarben (nur als sanfte Icon-Chip-Farbe genutzt) */
+  --cat-fruits-bg: rgba(48, 209, 88, 0.18);
+  --cat-fruits-fg: #63e07f;
+  --cat-dairy-bg: rgba(255, 214, 10, 0.18);
+  --cat-dairy-fg: #ffd60a;
+  --cat-meat-bg: rgba(255, 69, 58, 0.18);
+  --cat-meat-fg: #ff6961;
+  --cat-grains-bg: rgba(191, 144, 74, 0.2);
+  --cat-grains-fg: #d2a869;
+  --cat-bread-bg: rgba(191, 138, 90, 0.2);
+  --cat-bread-fg: #d9a875;
+  --cat-frozen-bg: rgba(90, 200, 250, 0.18);
+  --cat-frozen-fg: #7fd4ff;
+  --cat-drinks-bg: rgba(10, 132, 255, 0.18);
+  --cat-drinks-fg: #6ab6ff;
+  --cat-other-bg: rgba(142, 142, 147, 0.18);
+  --cat-other-fg: #aeaeb2;
 }
 
 * {
@@ -68,11 +104,18 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* html/body are hard-locked to the viewport (overflow: hidden) so the document
+   itself can never scroll or rubber-band bounce - only elements that explicitly
+   opt in (main[overflow-y:auto] inside .app-shell) scroll. Without this, iOS
+   Safari can still let the whole page drag/bounce even when every visible
+   element looks correctly contained, which drags the "fixed" header/nav and
+   any open Sheet along with it. */
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 html {
@@ -80,7 +123,7 @@ html {
 }
 
 body {
-  min-height: 100dvh;
+  height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -89,7 +132,10 @@ body {
     BlinkMacSystemFont,
     system-ui,
     sans-serif;
-  overscroll-behavior-y: contain;
+  overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
 }
 
 h1,
@@ -175,6 +221,39 @@ h3,
 }
 .tap-scale:active {
   transform: scale(0.94);
+}
+
+/* ---------- Form controls ---------- */
+/* One consistent look for every text input/select/textarea in the app,
+   replacing the native blue focus outline with a single accent-colored ring. */
+.input {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 12px 16px;
+  font-size: 15px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238e8e93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 8 10 12 14 8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+  padding-right: 38px;
 }
 
 .progress-track {

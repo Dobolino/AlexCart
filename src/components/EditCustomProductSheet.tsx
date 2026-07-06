@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
+import { Icon } from './Icon'
+import { ProductForm, type ProductFormValues } from './ProductForm'
+import { ICON_PATHS } from '@/constants/icons'
+import { DEFAULT_UNIT } from '@/constants/units'
 import { useStore } from '@/store/useStore'
-import { CATEGORIES } from '@/data/products'
-import { parseAmount } from '@/utils/amount'
+import { parseAmount, joinAmount } from '@/utils/amount'
 import type { CustomProduct } from '@/types'
 
 interface EditCustomProductSheetProps {
@@ -12,73 +15,48 @@ interface EditCustomProductSheetProps {
 
 export function EditCustomProductSheet({ product, onClose }: EditCustomProductSheetProps) {
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
+  const removeCustomProduct = useStore((s) => s.removeCustomProduct)
   const parsed = parseAmount(product.defaultAmount)
 
-  const [name, setName] = useState(product.name)
-  const [category, setCategory] = useState(product.category)
-  const [amountValue, setAmountValue] = useState(parsed ? String(parsed.value) : '')
-  const [unit, setUnit] = useState(parsed?.unit || '')
-  const [note, setNote] = useState(product.note || '')
+  const [form, setForm] = useState<ProductFormValues>({
+    name: product.name,
+    category: product.category,
+    amountValue: parsed ? String(parsed.value) : '',
+    unit: parsed?.unit || DEFAULT_UNIT,
+    note: product.note || '',
+  })
 
   function handleSave() {
-    if (!name.trim()) return
-    const amount = [amountValue.trim(), unit.trim()].filter(Boolean).join(' ')
-    updateCustomProduct(product.id, { name: name.trim(), category, defaultAmount: amount, note: note.trim() })
+    if (!form.name.trim()) return
+    updateCustomProduct(product.id, {
+      name: form.name.trim(),
+      category: form.category,
+      defaultAmount: joinAmount(form.amountValue, form.unit),
+      note: form.note.trim() || undefined,
+    })
+    onClose()
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`„${product.name}“ wirklich löschen?`)) return
+    removeCustomProduct(product.id)
     onClose()
   }
 
   return (
     <Sheet onClose={onClose}>
-      <h2 className="mb-3 text-lg font-bold">Produkt bearbeiten</h2>
-      <div className="flex flex-col gap-2.5">
-        <input
-          type="text"
-          className="rounded-2xl border px-4 py-3 text-[15px]"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <select
-          className="rounded-2xl border px-4 py-3 text-[15px]"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-bold">Produkt bearbeiten</h2>
+        <button
+          className="tap-scale flex h-8 w-8 items-center justify-center rounded-full"
+          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+          onClick={handleDelete}
+          aria-label={`${product.name} löschen`}
         >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <div className="flex gap-2.5">
-          <input
-            type="text"
-            inputMode="decimal"
-            className="w-1/2 rounded-2xl border px-4 py-3 text-[15px]"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-            placeholder="Menge"
-            value={amountValue}
-            onChange={(e) => setAmountValue(e.target.value)}
-          />
-          <input
-            type="text"
-            className="w-1/2 rounded-2xl border px-4 py-3 text-[15px]"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-            placeholder="Einheit"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-          />
-        </div>
-        <input
-          type="text"
-          className="rounded-2xl border px-4 py-3 text-[15px]"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-          placeholder="Notiz (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
+          <Icon path={ICON_PATHS.trash} size={16} />
+        </button>
       </div>
+      <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
       <div className="mt-4 flex gap-2.5">
         <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={onClose}>
           Abbrechen
