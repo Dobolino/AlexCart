@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+import { THEME_COLORS } from './src/constants/theme'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const REPO_NAME = 'AlexCart'
 
@@ -21,8 +23,8 @@ export default defineConfig({
         name: 'AlexShop',
         short_name: 'AlexShop',
         description: 'Einkaufslisten-App mit Wochenplan-Import und Vorrats-Verwaltung',
-        theme_color: '#12213B',
-        background_color: '#12213B',
+        theme_color: THEME_COLORS.dark.themeColor,
+        background_color: THEME_COLORS.dark.bg,
         display: 'standalone',
         orientation: 'portrait',
         scope: `/${REPO_NAME}/`,

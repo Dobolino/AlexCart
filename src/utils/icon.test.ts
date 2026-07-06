@@ -8,6 +8,9 @@ describe('getIconKey', () => {
   it('finds a substring match for unlisted variants', () => {
     expect(getIconKey('Bio Cherrytomaten klein', 'Früchte & Gemüse')).toBe('tomate')
   })
+  it('resolves Krevetten to the garnelen icon via synonym', () => {
+    expect(getIconKey('Krevetten', 'Fleisch & Fisch')).toBe('garnelen')
+  })
   it('falls back to the category icon when nothing matches', () => {
     expect(getIconKey('Voll unbekanntes Ding XYZ', 'Tiefkühl')).toBe('tiefkuehl')
   })

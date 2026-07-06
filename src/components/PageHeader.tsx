@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
       }}
     >
       <Title className="tap-scale text-left" onClick={onTitleClick}>
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-tight" style={{ color: 'var(--text)' }}>
+        <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-tight" style={{ color: 'var(--text)' }}>
           {title}
         </h1>
         {subtitle && (
