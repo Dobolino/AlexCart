@@ -16,8 +16,25 @@ const CATEGORY_COLORS: Record<string, CategoryColor> = {
   Sonstiges: NEUTRAL,
 }
 
+const CATEGORY_TILE_COLORS: Record<string, CategoryColor> = {
+  'Früchte & Gemüse': { bg: '#c75b54', fg: '#ffffff' },
+  'Milch & Käse': { bg: '#4a9a9a', fg: '#ffffff' },
+  'Fleisch & Fisch': { bg: '#b85c4a', fg: '#ffffff' },
+  'Getreide & Beilagen': { bg: '#b8863a', fg: '#ffffff' },
+  'Brot & Backwaren': { bg: '#a67c52', fg: '#ffffff' },
+  Tiefkühl: { bg: '#4a7eb8', fg: '#ffffff' },
+  Getränke: { bg: '#5b7fb8', fg: '#ffffff' },
+  Sonstiges: { bg: '#6b6b70', fg: '#ffffff' },
+}
+
 /** Dezente Akzentfarbe pro Kategorie – erledigte Artikel bleiben bewusst grau. */
 export function getCategoryColor(category: string, done = false): CategoryColor {
   if (done) return NEUTRAL
   return CATEGORY_COLORS[category] ?? NEUTRAL
+}
+
+/** Volle Kachel-Farben für Bring!-Ansicht. */
+export function getCategoryTileColor(category: string, done = false): CategoryColor {
+  if (done) return { bg: 'var(--done-bg)', fg: 'var(--text-muted)' }
+  return CATEGORY_TILE_COLORS[category] ?? CATEGORY_TILE_COLORS.Sonstiges
 }

@@ -5,13 +5,14 @@ import { ProductIcon } from './product-icons/ProductIcon'
 import { ItemActionSheet } from './ItemActionSheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
-import { getCategoryColor } from '@/utils/categoryColor'
+import { getCategoryTileColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { hapticSuccess } from '@/utils/haptics'
 import type { ShoppingItem } from '@/types'
 
-interface ItemRowProps {
+interface ItemTileProps {
   item: ShoppingItem
+  category: string
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onEdit: (item: ShoppingItem) => void
@@ -31,8 +32,9 @@ const SWIPE_MAX = 88
 const DEADZONE = 10
 const EXIT_ANIMATION_MS = 320
 
-export function ItemRow({
+export function ItemTile({
   item,
+  category,
   onToggle,
   onDelete,
   onEdit,
@@ -41,7 +43,7 @@ export function ItemRow({
   onAdjustAmount,
   dragHandleProps,
   isDragOver,
-}: ItemRowProps) {
+}: ItemTileProps) {
   const [dragX, setDragX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [exiting, setExiting] = useState(false)
@@ -51,7 +53,7 @@ export function ItemRow({
   const suppressClickRef = useRef(false)
 
   const iconKey = getIconKey(item.name, item.category)
-  const color = getCategoryColor(item.category, item.done)
+  const colors = getCategoryTileColor(category, item.done)
   const parsedAmount = parseAmount(item.amount)
   const showStepper = parsedAmount && !item.done
 
@@ -65,9 +67,6 @@ export function ItemRow({
     setTimeout(() => onToggle(item.id), EXIT_ANIMATION_MS)
   }
 
-  // Wisch nach rechts zum Abhaken, mit Deadzone: erst wenn die Bewegung eindeutig
-  // horizontal ist, reagieren wir überhaupt - sonst würde ein Tap oder vertikales
-  // Scrollen (leichtes Zittern reicht) kurz sichtbar die Zeile verschieben.
   function handlePointerDown(e: React.PointerEvent) {
     if (dragHandleProps) return
     start.current = { x: e.clientX, y: e.clientY }
@@ -91,8 +90,6 @@ export function ItemRow({
     const wasHorizontal = horizontalConfirmed.current
     const shouldToggle = wasHorizontal && dragX > SWIPE_TRIGGER
     setDragX(0)
-    // Nach horizontalem Wisch feuert iOS/Safari oft noch ein click – das würde
-    // den Artikel direkt wieder als offen markieren (Doppel-Toggle).
     if (wasHorizontal) suppressClickRef.current = true
     if (shouldToggle) handleToggle()
   }
@@ -109,23 +106,21 @@ export function ItemRow({
     <motion.div
       layout
       data-item-id={item.id}
-      initial={{ opacity: 0, scale: 0.97 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, x: -60, transition: { duration: 0.15 } }}
-      transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-      className="relative overflow-hidden border-b"
+      exit={{ opacity: 0, x: -40, transition: { duration: 0.12 } }}
+      className="item-tile overflow-hidden rounded-[10px]"
       style={{
-        borderColor: 'var(--border)',
+        background: colors.bg,
+        opacity: isDragOver ? 0.85 : exiting ? 0 : 1,
         outline: isDragOver ? '2px solid var(--accent)' : 'none',
       }}
     >
       <div
-        className="relative flex min-h-[60px] items-center gap-3 px-3.5 py-3.5"
+        className="relative flex min-h-[52px] items-center gap-2.5 px-3 py-3"
         style={{
-          background: item.done ? 'var(--done-bg)' : 'var(--surface)',
           transform: `translateX(${dragX}px)`,
-          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
-          opacity: exiting ? 0 : 1,
+          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
           touchAction: 'pan-y',
         }}
         onPointerDown={handlePointerDown}
@@ -136,8 +131,8 @@ export function ItemRow({
       >
         {dragHandleProps && (
           <button
-            className="tap-scale flex h-7 w-5 flex-none touch-none items-center justify-center opacity-40"
-            style={{ color: 'var(--text-muted)' }}
+            className="tap-scale flex h-7 w-5 flex-none touch-none items-center justify-center opacity-60"
+            style={{ color: colors.fg }}
             aria-label="Verschieben"
             onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
             onPointerMove={dragHandleProps.onPointerMove}
@@ -148,71 +143,64 @@ export function ItemRow({
             <Icon path={ICON_PATHS.drag} size={16} />
           </button>
         )}
-        <div
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-          style={{ background: color.bg, color: color.fg }}
-        >
-          <ProductIcon iconKey={iconKey} size={20} />
+        <div className="flex h-8 w-8 flex-none items-center justify-center" style={{ color: colors.fg }}>
+          <ProductIcon iconKey={iconKey} size={22} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {item.favorite && (
-              <span className="flex-none" style={{ color: 'var(--accent)' }}>
-                <Icon path={ICON_PATHS.star} size={12} />
+              <span className="flex-none" style={{ color: colors.fg, opacity: 0.9 }}>
+                <Icon path={ICON_PATHS.star} size={11} />
               </span>
             )}
             <div
-              className="truncate text-[16px] font-semibold leading-tight"
+              className="truncate text-[15px] font-semibold leading-tight"
               style={{
-                color: item.done ? 'var(--text-muted)' : 'var(--text)',
+                color: colors.fg,
                 textDecoration: item.done ? 'line-through' : 'none',
-                textDecorationThickness: '2px',
+                opacity: item.done ? 0.65 : 1,
               }}
             >
               {item.name}
             </div>
           </div>
           {(item.amount || item.note) && (
-            <div className="mt-1 flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="mt-0.5 flex items-center gap-2 text-[12px]" style={{ color: colors.fg, opacity: 0.8 }}>
               {showStepper ? (
-                <span className="flex flex-none items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <button
-                    className="tap-scale flex h-6 w-6 flex-none items-center justify-center rounded-full"
-                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                    className="tap-scale flex h-5 w-5 items-center justify-center rounded-full"
+                    style={{ background: 'rgba(255,255,255,0.2)' }}
                     onClick={() => onAdjustAmount(item, -1)}
-                    aria-label={`${item.name} Menge verringern`}
                   >
-                    <Icon path={ICON_PATHS.minus} size={13} />
+                    <Icon path={ICON_PATHS.minus} size={11} />
                   </button>
-                  <span className="min-w-[3.2rem] truncate text-center font-semibold" style={{ color: 'var(--text)' }}>
-                    {item.amount}
-                  </span>
+                  <span className="min-w-[2.8rem] text-center font-semibold">{item.amount}</span>
                   <button
-                    className="tap-scale flex h-6 w-6 flex-none items-center justify-center rounded-full"
-                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                    className="tap-scale flex h-5 w-5 items-center justify-center rounded-full"
+                    style={{ background: 'rgba(255,255,255,0.2)' }}
                     onClick={() => onAdjustAmount(item, 1)}
-                    aria-label={`${item.name} Menge erhöhen`}
                   >
-                    <Icon path={ICON_PATHS.plus} size={13} />
+                    <Icon path={ICON_PATHS.plus} size={11} />
                   </button>
                 </span>
               ) : (
                 item.amount && <span className="truncate">{item.amount}</span>
               )}
-              {item.note && <span className="truncate">{item.note}</span>}
+              {item.note && <span className="truncate opacity-80">{item.note}</span>}
             </div>
           )}
         </div>
         <button
-          className="tap-scale flex h-8 w-8 flex-none items-center justify-center rounded-full"
-          style={{ color: 'var(--text-muted)' }}
+          className="tap-scale flex h-7 w-7 flex-none items-center justify-center rounded-full"
+          style={{ color: colors.fg, opacity: 0.75 }}
           onClick={(e) => {
             e.stopPropagation()
             setMenuOpen(true)
           }}
           aria-label={`Aktionen für ${item.name}`}
         >
-          <Icon path={ICON_PATHS.more} size={20} />
+          <Icon path={ICON_PATHS.more} size={18} />
         </button>
       </div>
 

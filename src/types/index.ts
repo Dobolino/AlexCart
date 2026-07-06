@@ -1,4 +1,11 @@
 export type Theme = 'light' | 'dark' | 'system'
+export type ListViewMode = 'list' | 'tiles'
+
+export interface AppSettings {
+  theme: Theme
+  listViewMode: ListViewMode
+  hasSeenOnboarding: boolean
+}
 
 export interface ShoppingItem {
   id: string

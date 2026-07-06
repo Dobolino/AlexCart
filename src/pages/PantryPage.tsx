@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
-import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getIconKey } from '@/utils/icon'
+import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { CATEGORIES } from '@/data/products'
 import { PageHeader } from '@/components/PageHeader'
@@ -86,7 +87,7 @@ export function PantryPage() {
                           className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
                           style={{ background: color.bg, color: color.fg }}
                         >
-                          <Icon path={getIconSvgPath(iconKey)} size={18} />
+                          <ProductIcon iconKey={iconKey} size={18} />
                         </span>
                         {item.name}
                       </span>

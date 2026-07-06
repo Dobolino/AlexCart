@@ -15,7 +15,7 @@ describe('getIconKey', () => {
     expect(getIconKey('Voll unbekanntes Ding XYZ', 'Tiefkühl')).toBe('tiefkuehl')
   })
   it('falls back to default when category is also unknown', () => {
-    expect(getIconKey('Voll unbekanntes Ding XYZ', 'Nicht existente Kategorie')).toBe('default')
+    expect(getIconKey('Voll unbekanntes Ding XYZ', 'Nicht existente Kategorie')).toBe('gemuese')
   })
 })
 

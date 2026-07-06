@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
 import { buildShareText } from '@/utils/shareText'
-import { ItemRow } from '@/components/ItemRow'
+import { CategorySection } from '@/components/CategorySection'
+import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { AddItemSheet } from '@/components/AddItemSheet'
 import { EditItemSheet } from '@/components/EditItemSheet'
 import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
@@ -14,7 +14,7 @@ import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
-import { getIconKey, getIconSvgPath } from '@/utils/icon'
+import { getIconKey } from '@/utils/icon'
 import type { ShoppingItem } from '@/types'
 
 interface ToastState {
@@ -33,6 +33,10 @@ export function ListPage() {
   const addPantryItem = useStore((s) => s.addPantryItem)
   const restoreFilteredItem = useStore((s) => s.restoreFilteredItem)
   const clearFilteredNote = useStore((s) => s.clearFilteredNote)
+  const reorderItemsInCategory = useStore((s) => s.reorderItemsInCategory)
+  const reorderDoneItems = useStore((s) => s.reorderDoneItems)
+  const listViewMode = useStore((s) => s.settings.listViewMode)
+  const setListViewMode = useStore((s) => s.setListViewMode)
 
   const [addOpen, setAddOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -94,14 +98,38 @@ export function ListPage() {
         subtitle={`${list.weekLabel ? `Woche ${list.weekLabel} · ` : ''}${activeItems.length} offen`}
         onTitleClick={() => setSwitcherOpen(true)}
         right={
-          <button
-            className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
-            style={{ color: 'var(--text-muted)' }}
-            onClick={handleShareList}
-            aria-label="Liste teilen"
-          >
-            <Icon path={ICON_PATHS.share} size={19} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+              style={{
+                color: listViewMode === 'tiles' ? 'var(--accent)' : 'var(--text-muted)',
+                background: listViewMode === 'tiles' ? 'var(--accent-soft)' : 'transparent',
+              }}
+              onClick={() => setListViewMode('tiles')}
+              aria-label="Kachel-Ansicht"
+            >
+              <Icon path={ICON_PATHS.grid} size={18} />
+            </button>
+            <button
+              className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+              style={{
+                color: listViewMode === 'list' ? 'var(--accent)' : 'var(--text-muted)',
+                background: listViewMode === 'list' ? 'var(--accent-soft)' : 'transparent',
+              }}
+              onClick={() => setListViewMode('list')}
+              aria-label="Listen-Ansicht"
+            >
+              <Icon path={ICON_PATHS.layoutList} size={18} />
+            </button>
+            <button
+              className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+              style={{ color: 'var(--text-muted)' }}
+              onClick={handleShareList}
+              aria-label="Liste teilen"
+            >
+              <Icon path={ICON_PATHS.share} size={19} />
+            </button>
+          </div>
         }
       />
 
@@ -136,30 +164,19 @@ export function ListPage() {
         ) : (
           <>
             {groups.map((g) => (
-              <div key={g.category} className="mb-4.5">
-                <div
-                  className="px-1.5 pb-2 pt-1 text-[13px] font-extrabold uppercase tracking-wide"
-                  style={{ color: 'var(--category-fg)' }}
-                >
-                  {g.category}
-                </div>
-                <div className="card-surface">
-                  <AnimatePresence initial={false}>
-                    {g.items.map((item) => (
-                      <ItemRow
-                        key={item.id}
-                        item={item}
-                        onToggle={toggleItemDone}
-                        onDelete={handleDelete}
-                        onEdit={setEditingItem}
-                        onAddToPantry={handleAddToPantry}
-                        onToggleFavorite={toggleItemFavorite}
-                        onAdjustAmount={handleAdjustAmount}
-                      />
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
+              <CategorySection
+                key={g.category}
+                category={g.category}
+                items={g.items}
+                viewMode={listViewMode}
+                onReorder={(ids) => reorderItemsInCategory(g.category, ids)}
+                onToggle={toggleItemDone}
+                onDelete={handleDelete}
+                onEdit={setEditingItem}
+                onAddToPantry={handleAddToPantry}
+                onToggleFavorite={toggleItemFavorite}
+                onAdjustAmount={handleAdjustAmount}
+              />
             ))}
 
             {doneItems.length > 0 && (
@@ -178,22 +195,18 @@ export function ListPage() {
                   </span>
                 </div>
                 {doneOpen && (
-                  <div className="card-surface mt-1.5">
-                    <AnimatePresence initial={false}>
-                      {doneItems.map((item) => (
-                        <ItemRow
-                          key={item.id}
-                          item={item}
-                          onToggle={toggleItemDone}
-                          onDelete={handleDelete}
-                          onEdit={setEditingItem}
-                          onAddToPantry={handleAddToPantry}
-                          onToggleFavorite={toggleItemFavorite}
-                          onAdjustAmount={handleAdjustAmount}
-                        />
-                      ))}
-                    </AnimatePresence>
-                  </div>
+                  <CategorySection
+                    category="Erledigt"
+                    items={doneItems}
+                    viewMode={listViewMode}
+                    onReorder={reorderDoneItems}
+                    onToggle={toggleItemDone}
+                    onDelete={handleDelete}
+                    onEdit={setEditingItem}
+                    onAddToPantry={handleAddToPantry}
+                    onToggleFavorite={toggleItemFavorite}
+                    onAdjustAmount={handleAdjustAmount}
+                  />
                 )}
               </>
             )}
@@ -235,7 +248,7 @@ export function ListPage() {
                   style={{ borderColor: 'var(--border)' }}
                 >
                   <span className="flex items-center gap-2.5 text-[15px] font-semibold">
-                    <Icon path={getIconSvgPath(iconKey)} size={20} />
+                    <ProductIcon iconKey={iconKey} size={20} />
                     {item.name} {item.amount && `· ${item.amount}`}
                   </span>
                   <button

@@ -15,7 +15,7 @@ const CATEGORY_FALLBACK_ICON: Record<string, string> = {
   'brot & backwaren': 'brot',
   tiefkuhl: 'tiefkuehl',
   getranke: 'getraenk',
-  sonstiges: 'default',
+  sonstiges: 'gemuese',
 }
 
 /** Bekannte Schreibweisen-Varianten für Zutatennamen (z.B. aus Essensplan-Imports). */
@@ -102,7 +102,7 @@ export function getIconKey(name: string, category: string): string {
   const catKey = normalize(normalizeCategory(category))
   if (CATEGORY_FALLBACK_ICON[catKey]) return CATEGORY_FALLBACK_ICON[catKey]
 
-  return 'default'
+  return 'gemuese'
 }
 
 export function getIconSvgPath(key: string): string {
