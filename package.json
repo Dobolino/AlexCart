@@ -4,8 +4,9 @@
   "description": "AlexShop – Einkaufslisten-PWA für iPhone",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite dev.html",
     "build": "tsc && vite build",
+    "publish:pages": "npm run build && node scripts/publish-legacy-pages.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

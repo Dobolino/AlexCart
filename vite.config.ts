@@ -13,6 +13,11 @@ const REPO_NAME = 'AlexCart'
 
 export default defineConfig({
   base: `/${REPO_NAME}/`,
+  build: {
+    rollupOptions: {
+      input: path.resolve(__dirname, 'dev.html'),
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
