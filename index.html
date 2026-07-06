@@ -86,7 +86,45 @@
           transform: scale(1);
         }
       }
+      #boot-fallback {
+        display: none;
+        position: fixed;
+        inset: 0;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 24px;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      #boot-fallback p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.45;
+        opacity: 0.75;
+      }
+      #boot-fallback button {
+        border: none;
+        border-radius: 12px;
+        padding: 12px 20px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        background: #007aff;
+        color: #fff;
+      }
     </style>
+    <script>
+      /* Wenn das JS-Bundle nicht lädt (z. B. veralteter Service Worker), nicht ewig pulsieren. */
+      window.setTimeout(function () {
+        var sk = document.getElementById('boot-skeleton')
+        var fb = document.getElementById('boot-fallback')
+        if (!sk || !fb) return
+        sk.style.display = 'none'
+        fb.style.display = 'flex'
+      }, 8000)
+    </script>
   </head>
   <body>
     <div id="root">
@@ -95,6 +133,10 @@
           <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
         </svg>
+      </div>
+      <div id="boot-fallback" aria-live="polite">
+        <p>AlexShop konnte nicht starten.<br />Bitte einmal neu laden – oft hilft das nach einem Update.</p>
+        <button type="button" onclick="location.reload()">Neu laden</button>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
