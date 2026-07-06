@@ -15,6 +15,7 @@
 
 [data-theme='light'] {
   --bg: #f2f2f7;
+  --theme-color: #f2f2f7;
   --surface: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(0, 0, 0, 0.06);
@@ -39,6 +40,7 @@
 
 [data-theme='dark'] {
   --bg: #000000;
+  --theme-color: #000000;
   --surface: #1c1c1e;
   --glass-bg: rgba(28, 28, 30, 0.68);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -82,14 +84,25 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family:
+    'SF Pro Text',
     -apple-system,
     BlinkMacSystemFont,
-    'SF Pro Text',
-    Roboto,
-    Helvetica,
-    Arial,
+    system-ui,
     sans-serif;
   overscroll-behavior-y: contain;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family:
+    'SF Pro Display',
+    'SF Pro Text',
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
 }
 
 /* Feste Höhe statt min-height + normale Flex-Reihenfolge (Header/Main/Nav) ohne

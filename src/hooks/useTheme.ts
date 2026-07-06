@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useStore } from '@/store/useStore'
+import { themeColorFor } from '@/constants/theme'
 
 function resolveTheme(theme: 'light' | 'dark' | 'system'): 'light' | 'dark' {
   if (theme !== 'system') return theme
@@ -15,7 +16,7 @@ export function useTheme() {
       document.documentElement.dataset.theme = resolved
       document.documentElement.style.colorScheme = resolved
       const meta = document.querySelector('meta[name="theme-color"]')
-      if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0b1526' : '#12213b')
+      if (meta) meta.setAttribute('content', themeColorFor(resolved))
     }
     apply()
 

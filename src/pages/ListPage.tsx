@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
+import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey, getIconSvgPath } from '@/utils/icon'
 
 export function ListPage() {
@@ -123,13 +124,19 @@ export function ListPage() {
         )}
       </main>
 
-      <button
-        className="btn-primary tap-scale absolute right-4.5 bottom-5 z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
-        onClick={() => setAddOpen(true)}
-        aria-label="Artikel hinzufügen"
-      >
-        <Icon path={ICON_PATHS.plus} size={26} />
-      </button>
+      <FloatingPortal>
+        <button
+          className="btn-primary tap-scale fixed z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
+          style={{
+            right: 'calc(18px + var(--safe-right))',
+            bottom: 'calc(72px + var(--safe-bottom))',
+          }}
+          onClick={() => setAddOpen(true)}
+          aria-label="Artikel hinzufügen"
+        >
+          <Icon path={ICON_PATHS.plus} size={26} />
+        </button>
+      </FloatingPortal>
 
       {addOpen && <AddItemSheet onClose={() => setAddOpen(false)} onImported={showToast} />}
       {switcherOpen && <ListSwitcherSheet onClose={() => setSwitcherOpen(false)} />}
@@ -179,12 +186,17 @@ export function ListPage() {
       )}
 
       {toast && (
-        <div
-          className="glass absolute left-1/2 bottom-24 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold"
-          style={{ color: 'var(--text)' }}
-        >
-          {toast}
-        </div>
+        <FloatingPortal>
+          <div
+            className="glass fixed left-1/2 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold"
+            style={{
+              color: 'var(--text)',
+              bottom: 'calc(88px + var(--safe-bottom))',
+            }}
+          >
+            {toast}
+          </div>
+        </FloatingPortal>
       )}
     </>
   )
