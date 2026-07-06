@@ -22,8 +22,10 @@ interface ItemTileProps {
   dragHandleProps?: {
     onPointerDown: (e: React.PointerEvent, id: string) => void
     onPointerMove: (e: React.PointerEvent) => void
-    onPointerUp: () => void
+    onPointerUp: (e: React.PointerEvent) => void
   }
+  isDragging?: boolean
+  dragDeltaY?: number
   isDragOver?: boolean
 }
 
@@ -42,6 +44,8 @@ export function ItemTile({
   onToggleFavorite,
   onAdjustAmount,
   dragHandleProps,
+  isDragging = false,
+  dragDeltaY = 0,
   isDragOver,
 }: ItemTileProps) {
   const [dragX, setDragX] = useState(0)
@@ -104,24 +108,37 @@ export function ItemTile({
 
   return (
     <motion.div
-      layout
+      layout={!isDragging}
       data-item-id={item.id}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, x: -40, transition: { duration: 0.12 } }}
-      className="item-tile overflow-hidden rounded-[10px]"
+      className="item-tile relative overflow-hidden rounded-[10px]"
       style={{
-        background: colors.bg,
-        opacity: isDragOver ? 0.85 : exiting ? 0 : 1,
         outline: isDragOver ? '2px solid var(--accent)' : 'none',
+        zIndex: isDragging ? 40 : undefined,
       }}
     >
+      {isDragging && (
+        <div
+          className="absolute inset-0 rounded-[10px]"
+          style={{ background: colors.bg, opacity: 0.28 }}
+          aria-hidden
+        />
+      )}
       <div
         className="relative flex min-h-[52px] items-center gap-2.5 px-3 py-3"
         style={{
-          transform: `translateX(${dragX}px)`,
-          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
-          touchAction: 'pan-y',
+          background: colors.bg,
+          transform: isDragging
+            ? `translateY(${dragDeltaY}px) scale(1.03)`
+            : `translateX(${dragX}px)`,
+          transition: dragging || isDragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
+          opacity: isDragging ? 0.98 : exiting ? 0 : 1,
+          touchAction: isDragging ? 'none' : 'pan-y',
+          boxShadow: isDragging ? '0 10px 28px rgba(0,0,0,0.22)' : undefined,
+          borderRadius: '10px',
+          pointerEvents: isDragging ? 'none' : undefined,
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
