@@ -22,7 +22,7 @@ function AnimatedRoutes() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-        className="flex flex-1 flex-col"
+        className="relative flex min-h-0 flex-1 flex-col"
       >
         <Routes location={location}>
           <Route path="/" element={<ListPage />} />

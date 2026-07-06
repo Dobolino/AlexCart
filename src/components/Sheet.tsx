@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 
@@ -8,7 +9,7 @@ interface SheetProps {
 }
 
 export function Sheet({ onClose, children }: SheetProps) {
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-30 flex items-end"
       style={{ background: 'rgba(0,0,0,0.4)' }}
@@ -37,6 +38,7 @@ export function Sheet({ onClose, children }: SheetProps) {
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

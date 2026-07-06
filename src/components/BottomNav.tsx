@@ -13,7 +13,7 @@ const TABS = [
 export function BottomNav() {
   return (
     <nav
-      className="glass fixed inset-x-0 bottom-0 z-20 flex justify-around border-t"
+      className="glass relative z-20 flex flex-none justify-around border-t"
       style={{
         background: 'var(--nav-glass)',
         borderColor: 'var(--glass-border)',

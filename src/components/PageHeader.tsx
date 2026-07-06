@@ -11,7 +11,7 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
   const Title = onTitleClick ? 'button' : 'div'
   return (
     <header
-      className="glass sticky top-0 z-20 flex items-center justify-between border-b px-4"
+      className="glass relative z-20 flex flex-none items-center justify-between border-b px-4"
       style={{
         paddingTop: 'calc(12px + var(--safe-top))',
         paddingBottom: '12px',

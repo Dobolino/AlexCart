@@ -92,10 +92,16 @@ body {
   overscroll-behavior-y: contain;
 }
 
+/* Feste Höhe statt min-height + normale Flex-Reihenfolge (Header/Main/Nav) ohne
+   position: sticky/fixed – umgeht zwei iOS-Safari-Bugs: sticky bricht innerhalb
+   eines von framer-motion transformierten Vorfahren, und fixed-Elemente werden
+   beim allerersten Laden manchmal falsch positioniert, bis ein Scroll-Event
+   ein Neu-Layout erzwingt. */
 .app-shell {
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* ---------- Glass-Materialien ---------- */

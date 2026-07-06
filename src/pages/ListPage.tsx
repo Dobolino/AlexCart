@@ -45,7 +45,7 @@ export function ListPage() {
         onTitleClick={() => setSwitcherOpen(true)}
       />
 
-      <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(96px + var(--safe-bottom))' }}>
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
         {filteredItems.length > 0 && (
           <div
             className="glass-card mb-3.5 flex items-center justify-between gap-2.5 px-3.5 py-3 text-[13px]"
@@ -124,8 +124,7 @@ export function ListPage() {
       </main>
 
       <button
-        className="btn-primary tap-scale fixed right-4.5 z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
-        style={{ bottom: 'calc(90px + var(--safe-bottom))' }}
+        className="btn-primary tap-scale absolute right-4.5 bottom-5 z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
         onClick={() => setAddOpen(true)}
         aria-label="Artikel hinzufügen"
       >
@@ -181,8 +180,8 @@ export function ListPage() {
 
       {toast && (
         <div
-          className="glass fixed left-1/2 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold"
-          style={{ bottom: 'calc(100px + var(--safe-bottom))', color: 'var(--text)' }}
+          className="glass absolute left-1/2 bottom-24 z-40 -translate-x-1/2 rounded-full px-4.5 py-2.5 text-[13px] font-semibold"
+          style={{ color: 'var(--text)' }}
         >
           {toast}
         </div>

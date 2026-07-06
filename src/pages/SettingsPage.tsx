@@ -25,7 +25,7 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Einstellungen" subtitle="Design, Produkte & Daten" />
-      <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(90px + var(--safe-bottom))' }}>
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-6">
         <div
           className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
           style={{ color: 'var(--category-fg)' }}

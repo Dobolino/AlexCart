@@ -47,7 +47,7 @@ export function CalculatorPage() {
   return (
     <>
       <PageHeader title="Rechner" subtitle="Preise beim Einkaufen summieren" />
-      <main className="flex-1 px-3 pt-3" style={{ paddingBottom: 'calc(90px + var(--safe-bottom))' }}>
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-6">
         <div
           className="mb-3 flex items-center justify-between rounded-3xl px-5 py-5"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
