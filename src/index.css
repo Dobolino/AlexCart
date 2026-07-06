@@ -54,6 +54,18 @@
   --cat-drinks-fg: #0a5dc2;
   --cat-other-bg: rgba(120, 120, 128, 0.14);
   --cat-other-fg: #5b5b60;
+  --cat-asian-bg: rgba(255, 149, 0, 0.15);
+  --cat-asian-fg: #b35900;
+  --cat-protein-bg: rgba(0, 150, 136, 0.14);
+  --cat-protein-fg: #00695c;
+  --cat-sweets-bg: rgba(199, 60, 158, 0.14);
+  --cat-sweets-fg: #a3227d;
+  --cat-household-bg: rgba(90, 120, 150, 0.15);
+  --cat-household-fg: #3d5266;
+  --cat-drugstore-bg: rgba(214, 90, 140, 0.14);
+  --cat-drugstore-fg: #a3315c;
+  --cat-pets-bg: rgba(160, 110, 60, 0.16);
+  --cat-pets-fg: #7a4f1e;
 }
 
 [data-theme='dark'] {
@@ -97,6 +109,18 @@
   --cat-drinks-fg: #6ab6ff;
   --cat-other-bg: rgba(142, 142, 147, 0.18);
   --cat-other-fg: #aeaeb2;
+  --cat-asian-bg: rgba(255, 159, 10, 0.2);
+  --cat-asian-fg: #ffb454;
+  --cat-protein-bg: rgba(45, 212, 191, 0.2);
+  --cat-protein-fg: #5eead4;
+  --cat-sweets-bg: rgba(240, 100, 200, 0.2);
+  --cat-sweets-fg: #f78fd6;
+  --cat-household-bg: rgba(140, 170, 200, 0.2);
+  --cat-household-fg: #a8c2d9;
+  --cat-drugstore-bg: rgba(244, 114, 182, 0.2);
+  --cat-drugstore-fg: #f9a8d4;
+  --cat-pets-bg: rgba(210, 160, 106, 0.2);
+  --cat-pets-fg: #e0b888;
 }
 
 * {

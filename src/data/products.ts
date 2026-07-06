@@ -12,7 +12,13 @@ export const CATEGORIES: string[] = [
   "Brot & Backwaren",
   "Tiefkühl",
   "Getränke",
-  "Sonstiges"
+  "Sonstiges",
+  "Asiatisch & Indisch",
+  "Protein & Health",
+  "Süßes & Snacks",
+  "Haushalt & Reinigung",
+  "Drogerie & Kosmetik",
+  "Tierbedarf"
 ]
 
 export const PRODUCTS: Product[] = [
@@ -770,5 +776,1295 @@ export const PRODUCTS: Product[] = [
     "name": "Schokolade",
     "category": "Sonstiges",
     "icon": "schokolade"
+  },
+  {
+    "name": "Blumenkohl",
+    "category": "Früchte & Gemüse",
+    "icon": "blumenkohl"
+  },
+  {
+    "name": "Rosenkohl",
+    "category": "Früchte & Gemüse",
+    "icon": "rosenkohl"
+  },
+  {
+    "name": "Spargel",
+    "category": "Früchte & Gemüse",
+    "icon": "spargel"
+  },
+  {
+    "name": "Radieschen",
+    "category": "Früchte & Gemüse",
+    "icon": "radieschen"
+  },
+  {
+    "name": "Rucola",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Sellerie",
+    "category": "Früchte & Gemüse",
+    "icon": "sellerie"
+  },
+  {
+    "name": "Fenchel",
+    "category": "Früchte & Gemüse",
+    "icon": "fenchel"
+  },
+  {
+    "name": "Kürbis",
+    "category": "Früchte & Gemüse",
+    "icon": "kuerbis"
+  },
+  {
+    "name": "Süßkartoffel",
+    "category": "Früchte & Gemüse",
+    "icon": "kartoffel"
+  },
+  {
+    "name": "Pastinake",
+    "category": "Früchte & Gemüse",
+    "icon": "pastinake"
+  },
+  {
+    "name": "Rhabarber",
+    "category": "Früchte & Gemüse",
+    "icon": "rhabarber"
+  },
+  {
+    "name": "Melone",
+    "category": "Früchte & Gemüse",
+    "icon": "melone"
+  },
+  {
+    "name": "Wassermelone",
+    "category": "Früchte & Gemüse",
+    "icon": "wassermelone"
+  },
+  {
+    "name": "Ananas",
+    "category": "Früchte & Gemüse",
+    "icon": "ananas"
+  },
+  {
+    "name": "Mango",
+    "category": "Früchte & Gemüse",
+    "icon": "mango"
+  },
+  {
+    "name": "Pfirsich",
+    "category": "Früchte & Gemüse",
+    "icon": "pfirsich"
+  },
+  {
+    "name": "Nektarine",
+    "category": "Früchte & Gemüse",
+    "icon": "pfirsich"
+  },
+  {
+    "name": "Pflaumen",
+    "category": "Früchte & Gemüse",
+    "icon": "pflaume"
+  },
+  {
+    "name": "Aprikosen",
+    "category": "Früchte & Gemüse",
+    "icon": "aprikose"
+  },
+  {
+    "name": "Heidelbeeren",
+    "category": "Früchte & Gemüse",
+    "icon": "heidelbeere"
+  },
+  {
+    "name": "Himbeeren",
+    "category": "Früchte & Gemüse",
+    "icon": "himbeere"
+  },
+  {
+    "name": "Brombeeren",
+    "category": "Früchte & Gemüse",
+    "icon": "himbeere"
+  },
+  {
+    "name": "Granatapfel",
+    "category": "Früchte & Gemüse",
+    "icon": "granatapfel"
+  },
+  {
+    "name": "Feigen",
+    "category": "Früchte & Gemüse",
+    "icon": "feige"
+  },
+  {
+    "name": "Datteln",
+    "category": "Früchte & Gemüse",
+    "icon": "dattel"
+  },
+  {
+    "name": "Chicorée",
+    "category": "Früchte & Gemüse",
+    "icon": "salat"
+  },
+  {
+    "name": "Rotkohl",
+    "category": "Früchte & Gemüse",
+    "icon": "kohl"
+  },
+  {
+    "name": "Weißkohl",
+    "category": "Früchte & Gemüse",
+    "icon": "kohl"
+  },
+  {
+    "name": "Wirsing",
+    "category": "Früchte & Gemüse",
+    "icon": "kohl"
+  },
+  {
+    "name": "Kohlrabi",
+    "category": "Früchte & Gemüse",
+    "icon": "kohl"
+  },
+  {
+    "name": "Petersilie",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Basilikum",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Schnittlauch",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Minze",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Koriander",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Dill",
+    "category": "Früchte & Gemüse",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Skyr",
+    "category": "Milch & Käse",
+    "icon": "joghurt"
+  },
+  {
+    "name": "Buttermilch",
+    "category": "Milch & Käse",
+    "icon": "milch"
+  },
+  {
+    "name": "Kondensmilch",
+    "category": "Milch & Käse",
+    "icon": "milch"
+  },
+  {
+    "name": "Kefir",
+    "category": "Milch & Käse",
+    "icon": "joghurt"
+  },
+  {
+    "name": "Ricotta",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Halloumi",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Ziegenkäse",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Blauschimmelkäse",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Camembert",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Brie",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Hüttenkäse",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Schlagsahne",
+    "category": "Milch & Käse",
+    "icon": "sahne"
+  },
+  {
+    "name": "Kaffeesahne",
+    "category": "Milch & Käse",
+    "icon": "sahne"
+  },
+  {
+    "name": "Margarine",
+    "category": "Milch & Käse",
+    "icon": "butter"
+  },
+  {
+    "name": "Puddingcreme",
+    "category": "Milch & Käse",
+    "icon": "joghurt"
+  },
+  {
+    "name": "Rinderfilet",
+    "category": "Fleisch & Fisch",
+    "icon": "fleisch"
+  },
+  {
+    "name": "Rumpsteak",
+    "category": "Fleisch & Fisch",
+    "icon": "fleisch"
+  },
+  {
+    "name": "Entenbrust",
+    "category": "Fleisch & Fisch",
+    "icon": "huhn"
+  },
+  {
+    "name": "Truthahn",
+    "category": "Fleisch & Fisch",
+    "icon": "huhn"
+  },
+  {
+    "name": "Lammfleisch",
+    "category": "Fleisch & Fisch",
+    "icon": "fleisch"
+  },
+  {
+    "name": "Kalbfleisch",
+    "category": "Fleisch & Fisch",
+    "icon": "fleisch"
+  },
+  {
+    "name": "Leberkäse",
+    "category": "Fleisch & Fisch",
+    "icon": "wurst"
+  },
+  {
+    "name": "Mortadella",
+    "category": "Fleisch & Fisch",
+    "icon": "wurst"
+  },
+  {
+    "name": "Kabeljau",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Seelachs",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Scholle",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Zander",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Hering",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Makrele",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Miesmuscheln",
+    "category": "Fleisch & Fisch",
+    "icon": "muschel"
+  },
+  {
+    "name": "Tintenfisch",
+    "category": "Fleisch & Fisch",
+    "icon": "tintenfisch"
+  },
+  {
+    "name": "Surimi",
+    "category": "Fleisch & Fisch",
+    "icon": "garnelen"
+  },
+  {
+    "name": "Jasminreis",
+    "category": "Getreide & Beilagen",
+    "icon": "reis"
+  },
+  {
+    "name": "Wildreis",
+    "category": "Getreide & Beilagen",
+    "icon": "reis"
+  },
+  {
+    "name": "Grieß",
+    "category": "Getreide & Beilagen",
+    "icon": "getreide"
+  },
+  {
+    "name": "Sesam",
+    "category": "Getreide & Beilagen",
+    "icon": "samen"
+  },
+  {
+    "name": "Chiasamen",
+    "category": "Getreide & Beilagen",
+    "icon": "samen"
+  },
+  {
+    "name": "Leinsamen",
+    "category": "Getreide & Beilagen",
+    "icon": "samen"
+  },
+  {
+    "name": "Sonnenblumenkerne",
+    "category": "Getreide & Beilagen",
+    "icon": "samen"
+  },
+  {
+    "name": "Kürbiskerne",
+    "category": "Getreide & Beilagen",
+    "icon": "samen"
+  },
+  {
+    "name": "Cornflakes",
+    "category": "Getreide & Beilagen",
+    "icon": "mueesli"
+  },
+  {
+    "name": "Müsli",
+    "category": "Getreide & Beilagen",
+    "icon": "mueesli"
+  },
+  {
+    "name": "Gnocchi",
+    "category": "Getreide & Beilagen",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Ravioli",
+    "category": "Getreide & Beilagen",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Maccheroni",
+    "category": "Getreide & Beilagen",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Farfalle",
+    "category": "Getreide & Beilagen",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Kartoffelknödel",
+    "category": "Getreide & Beilagen",
+    "icon": "kartoffel"
+  },
+  {
+    "name": "Roggenbrot",
+    "category": "Brot & Backwaren",
+    "icon": "brot"
+  },
+  {
+    "name": "Sauerteigbrot",
+    "category": "Brot & Backwaren",
+    "icon": "brot"
+  },
+  {
+    "name": "Fladenbrot",
+    "category": "Brot & Backwaren",
+    "icon": "brot"
+  },
+  {
+    "name": "Naan",
+    "category": "Brot & Backwaren",
+    "icon": "brot"
+  },
+  {
+    "name": "Pita",
+    "category": "Brot & Backwaren",
+    "icon": "brot"
+  },
+  {
+    "name": "Bagel",
+    "category": "Brot & Backwaren",
+    "icon": "bagel"
+  },
+  {
+    "name": "Muffins",
+    "category": "Brot & Backwaren",
+    "icon": "muffin"
+  },
+  {
+    "name": "Kekse",
+    "category": "Brot & Backwaren",
+    "icon": "kekse"
+  },
+  {
+    "name": "Zwieback",
+    "category": "Brot & Backwaren",
+    "icon": "broetchen"
+  },
+  {
+    "name": "TK-Kräuter",
+    "category": "Tiefkühl",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "TK-Pommes-Ecken",
+    "category": "Tiefkühl",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "TK-Fertiggericht",
+    "category": "Tiefkühl",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "TK-Croissants",
+    "category": "Tiefkühl",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "TK-Blätterteig",
+    "category": "Tiefkühl",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "TK-Gemüsemischung",
+    "category": "Tiefkühl",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "Apfelschorle",
+    "category": "Getränke",
+    "icon": "saft"
+  },
+  {
+    "name": "Traubensaft",
+    "category": "Getränke",
+    "icon": "saft"
+  },
+  {
+    "name": "Eistee",
+    "category": "Getränke",
+    "icon": "tee"
+  },
+  {
+    "name": "Sekt",
+    "category": "Getränke",
+    "icon": "sekt"
+  },
+  {
+    "name": "Prosecco",
+    "category": "Getränke",
+    "icon": "sekt"
+  },
+  {
+    "name": "Whisky",
+    "category": "Getränke",
+    "icon": "spirituose"
+  },
+  {
+    "name": "Wodka",
+    "category": "Getränke",
+    "icon": "spirituose"
+  },
+  {
+    "name": "Gin",
+    "category": "Getränke",
+    "icon": "spirituose"
+  },
+  {
+    "name": "Rum",
+    "category": "Getränke",
+    "icon": "spirituose"
+  },
+  {
+    "name": "Alkoholfreies Bier",
+    "category": "Getränke",
+    "icon": "bier"
+  },
+  {
+    "name": "Kokoswasser",
+    "category": "Getränke",
+    "icon": "wasser"
+  },
+  {
+    "name": "Milchshake",
+    "category": "Getränke",
+    "icon": "milchshake"
+  },
+  {
+    "name": "Smoothie",
+    "category": "Getränke",
+    "icon": "smoothie"
+  },
+  {
+    "name": "Currypaste",
+    "category": "Sonstiges",
+    "icon": "wuerzpaste"
+  },
+  {
+    "name": "Balsamico",
+    "category": "Sonstiges",
+    "icon": "essig"
+  },
+  {
+    "name": "Chilisauce",
+    "category": "Sonstiges",
+    "icon": "sauce"
+  },
+  {
+    "name": "Barbecue-Sauce",
+    "category": "Sonstiges",
+    "icon": "sauce"
+  },
+  {
+    "name": "Pesto",
+    "category": "Sonstiges",
+    "icon": "sauce"
+  },
+  {
+    "name": "Hummus",
+    "category": "Sonstiges",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Erdnussbutter",
+    "category": "Sonstiges",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Nutella",
+    "category": "Sonstiges",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Marmelade",
+    "category": "Sonstiges",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Ahornsirup",
+    "category": "Sonstiges",
+    "icon": "sirup"
+  },
+  {
+    "name": "Hefe",
+    "category": "Sonstiges",
+    "icon": "backzutat"
+  },
+  {
+    "name": "Gelatine",
+    "category": "Sonstiges",
+    "icon": "backzutat"
+  },
+  {
+    "name": "Kokosraspeln",
+    "category": "Sonstiges",
+    "icon": "backzutat"
+  },
+  {
+    "name": "Trockenfrüchte",
+    "category": "Sonstiges",
+    "icon": "trockenfrucht"
+  },
+  {
+    "name": "Rosinen",
+    "category": "Sonstiges",
+    "icon": "trockenfrucht"
+  },
+  {
+    "name": "Oliven",
+    "category": "Sonstiges",
+    "icon": "dose"
+  },
+  {
+    "name": "Kapern",
+    "category": "Sonstiges",
+    "icon": "dose"
+  },
+  {
+    "name": "Essiggurken",
+    "category": "Sonstiges",
+    "icon": "dose"
+  },
+  {
+    "name": "Sauerkraut",
+    "category": "Sonstiges",
+    "icon": "dose"
+  },
+  {
+    "name": "Kimchi",
+    "category": "Sonstiges",
+    "icon": "dose"
+  },
+  {
+    "name": "Gummibärchen",
+    "category": "Süßes & Snacks",
+    "icon": "suessigkeit"
+  },
+  {
+    "name": "Chips",
+    "category": "Süßes & Snacks",
+    "icon": "chips"
+  },
+  {
+    "name": "Salzstangen",
+    "category": "Süßes & Snacks",
+    "icon": "chips"
+  },
+  {
+    "name": "Popcorn",
+    "category": "Süßes & Snacks",
+    "icon": "chips"
+  },
+  {
+    "name": "Kekse süß",
+    "category": "Süßes & Snacks",
+    "icon": "kekse"
+  },
+  {
+    "name": "Waffeln süß",
+    "category": "Süßes & Snacks",
+    "icon": "muffin"
+  },
+  {
+    "name": "Müsliriegel",
+    "category": "Süßes & Snacks",
+    "icon": "riegel"
+  },
+  {
+    "name": "Bonbons",
+    "category": "Süßes & Snacks",
+    "icon": "suessigkeit"
+  },
+  {
+    "name": "Lakritz",
+    "category": "Süßes & Snacks",
+    "icon": "suessigkeit"
+  },
+  {
+    "name": "Eis am Stiel",
+    "category": "Süßes & Snacks",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "Spülmittel",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "Waschmittel",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "Weichspüler",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "Allzweckreiniger",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "WC-Reiniger",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "Glasreiniger",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "Küchenrolle",
+    "category": "Haushalt & Reinigung",
+    "icon": "papier"
+  },
+  {
+    "name": "Toilettenpapier",
+    "category": "Haushalt & Reinigung",
+    "icon": "papier"
+  },
+  {
+    "name": "Taschentücher",
+    "category": "Haushalt & Reinigung",
+    "icon": "papier"
+  },
+  {
+    "name": "Müllbeutel",
+    "category": "Haushalt & Reinigung",
+    "icon": "beutel"
+  },
+  {
+    "name": "Alufolie",
+    "category": "Haushalt & Reinigung",
+    "icon": "folie"
+  },
+  {
+    "name": "Frischhaltefolie",
+    "category": "Haushalt & Reinigung",
+    "icon": "folie"
+  },
+  {
+    "name": "Backpapier",
+    "category": "Haushalt & Reinigung",
+    "icon": "folie"
+  },
+  {
+    "name": "Schwämme",
+    "category": "Haushalt & Reinigung",
+    "icon": "schwamm"
+  },
+  {
+    "name": "Batterien",
+    "category": "Haushalt & Reinigung",
+    "icon": "batterie"
+  },
+  {
+    "name": "Kerzen",
+    "category": "Haushalt & Reinigung",
+    "icon": "kerze"
+  },
+  {
+    "name": "Streichhölzer",
+    "category": "Haushalt & Reinigung",
+    "icon": "kerze"
+  },
+  {
+    "name": "Geschirrspültabs",
+    "category": "Haushalt & Reinigung",
+    "icon": "reiniger"
+  },
+  {
+    "name": "Zahnpasta",
+    "category": "Drogerie & Kosmetik",
+    "icon": "zahnpflege"
+  },
+  {
+    "name": "Zahnbürste",
+    "category": "Drogerie & Kosmetik",
+    "icon": "zahnpflege"
+  },
+  {
+    "name": "Duschgel",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Shampoo",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Spülung (Haar)",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Deo",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Rasierer",
+    "category": "Drogerie & Kosmetik",
+    "icon": "rasur"
+  },
+  {
+    "name": "Rasierschaum",
+    "category": "Drogerie & Kosmetik",
+    "icon": "rasur"
+  },
+  {
+    "name": "Handcreme",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Sonnencreme",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Wattepads",
+    "category": "Drogerie & Kosmetik",
+    "icon": "hygiene"
+  },
+  {
+    "name": "Binden/Tampons",
+    "category": "Drogerie & Kosmetik",
+    "icon": "hygiene"
+  },
+  {
+    "name": "Seife",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Pflaster",
+    "category": "Drogerie & Kosmetik",
+    "icon": "erstehilfe"
+  },
+  {
+    "name": "Schmerztabletten",
+    "category": "Drogerie & Kosmetik",
+    "icon": "medikament"
+  },
+  {
+    "name": "Hundefutter trocken",
+    "category": "Tierbedarf",
+    "icon": "hundefutter"
+  },
+  {
+    "name": "Hundefutter nass",
+    "category": "Tierbedarf",
+    "icon": "hundefutter"
+  },
+  {
+    "name": "Katzenfutter trocken",
+    "category": "Tierbedarf",
+    "icon": "katzenfutter"
+  },
+  {
+    "name": "Katzenfutter nass",
+    "category": "Tierbedarf",
+    "icon": "katzenfutter"
+  },
+  {
+    "name": "Katzenstreu",
+    "category": "Tierbedarf",
+    "icon": "katzenstreu"
+  },
+  {
+    "name": "Hundeleckerli",
+    "category": "Tierbedarf",
+    "icon": "tierleckerli"
+  },
+  {
+    "name": "Katzenleckerli",
+    "category": "Tierbedarf",
+    "icon": "tierleckerli"
+  },
+  {
+    "name": "Vogelfutter",
+    "category": "Tierbedarf",
+    "icon": "voegelfutter"
+  },
+  {
+    "name": "Garam Masala",
+    "category": "Asiatisch & Indisch",
+    "icon": "gewuerzmischung"
+  },
+  {
+    "name": "Kurkuma",
+    "category": "Asiatisch & Indisch",
+    "icon": "gewuerzmischung"
+  },
+  {
+    "name": "Kreuzkümmel",
+    "category": "Asiatisch & Indisch",
+    "icon": "gewuerzmischung"
+  },
+  {
+    "name": "Currypulver",
+    "category": "Asiatisch & Indisch",
+    "icon": "gewuerzmischung"
+  },
+  {
+    "name": "Reisessig",
+    "category": "Asiatisch & Indisch",
+    "icon": "essig"
+  },
+  {
+    "name": "Sesamöl",
+    "category": "Asiatisch & Indisch",
+    "icon": "ol"
+  },
+  {
+    "name": "Sojasprossen",
+    "category": "Asiatisch & Indisch",
+    "icon": "sprossen"
+  },
+  {
+    "name": "Miso-Paste",
+    "category": "Asiatisch & Indisch",
+    "icon": "wuerzpaste"
+  },
+  {
+    "name": "Nori-Blätter",
+    "category": "Asiatisch & Indisch",
+    "icon": "nori"
+  },
+  {
+    "name": "Wasabi",
+    "category": "Asiatisch & Indisch",
+    "icon": "wuerzpaste"
+  },
+  {
+    "name": "Sriracha",
+    "category": "Asiatisch & Indisch",
+    "icon": "sauce"
+  },
+  {
+    "name": "Fischsauce",
+    "category": "Asiatisch & Indisch",
+    "icon": "sauce"
+  },
+  {
+    "name": "Austernsauce",
+    "category": "Asiatisch & Indisch",
+    "icon": "sauce"
+  },
+  {
+    "name": "Tofu",
+    "category": "Asiatisch & Indisch",
+    "icon": "tofu"
+  },
+  {
+    "name": "Tempeh",
+    "category": "Asiatisch & Indisch",
+    "icon": "tofu"
+  },
+  {
+    "name": "Edamame",
+    "category": "Asiatisch & Indisch",
+    "icon": "edamame"
+  },
+  {
+    "name": "Ramen-Nudeln",
+    "category": "Asiatisch & Indisch",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Udon-Nudeln",
+    "category": "Asiatisch & Indisch",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Glasnudeln",
+    "category": "Asiatisch & Indisch",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Reispapier",
+    "category": "Asiatisch & Indisch",
+    "icon": "reispapier"
+  },
+  {
+    "name": "Currybutter",
+    "category": "Asiatisch & Indisch",
+    "icon": "butter"
+  },
+  {
+    "name": "Kichererbsen-Dal",
+    "category": "Asiatisch & Indisch",
+    "icon": "linsen"
+  },
+  {
+    "name": "Mango-Chutney",
+    "category": "Asiatisch & Indisch",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Papadum",
+    "category": "Asiatisch & Indisch",
+    "icon": "kekse"
+  },
+  {
+    "name": "Sambal Oelek",
+    "category": "Asiatisch & Indisch",
+    "icon": "sauce"
+  },
+  {
+    "name": "Limettenblätter",
+    "category": "Asiatisch & Indisch",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Zitronengras",
+    "category": "Asiatisch & Indisch",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Thai-Basilikum",
+    "category": "Asiatisch & Indisch",
+    "icon": "kraeuter"
+  },
+  {
+    "name": "Chiliöl",
+    "category": "Asiatisch & Indisch",
+    "icon": "ol"
+  },
+  {
+    "name": "Frühlingsrollen (TK)",
+    "category": "Asiatisch & Indisch",
+    "icon": "tiefkuehl"
+  },
+  {
+    "name": "Sushi-Reis",
+    "category": "Asiatisch & Indisch",
+    "icon": "reis"
+  },
+  {
+    "name": "Nori-Snack",
+    "category": "Asiatisch & Indisch",
+    "icon": "nori"
+  },
+  {
+    "name": "Proteinpulver",
+    "category": "Protein & Health",
+    "icon": "proteinpulver"
+  },
+  {
+    "name": "Proteinriegel",
+    "category": "Protein & Health",
+    "icon": "riegel"
+  },
+  {
+    "name": "Linsenchips",
+    "category": "Protein & Health",
+    "icon": "chips"
+  },
+  {
+    "name": "Kichererbsenchips",
+    "category": "Protein & Health",
+    "icon": "chips"
+  },
+  {
+    "name": "Erbsenprotein-Snack",
+    "category": "Protein & Health",
+    "icon": "chips"
+  },
+  {
+    "name": "Magerquark",
+    "category": "Protein & Health",
+    "icon": "joghurt"
+  },
+  {
+    "name": "Eiklar (flüssig)",
+    "category": "Protein & Health",
+    "icon": "ei"
+  },
+  {
+    "name": "Chiapudding",
+    "category": "Protein & Health",
+    "icon": "samen"
+  },
+  {
+    "name": "Proteinshake (fertig)",
+    "category": "Protein & Health",
+    "icon": "milchshake"
+  },
+  {
+    "name": "BCAA-Kapseln",
+    "category": "Protein & Health",
+    "icon": "medikament"
+  },
+  {
+    "name": "Kreatin",
+    "category": "Protein & Health",
+    "icon": "medikament"
+  },
+  {
+    "name": "Mandelmus",
+    "category": "Protein & Health",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Cashewmus",
+    "category": "Protein & Health",
+    "icon": "aufstrich"
+  },
+  {
+    "name": "Linsen-Pasta",
+    "category": "Protein & Health",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Kichererbsen-Pasta",
+    "category": "Protein & Health",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Sojajoghurt",
+    "category": "Protein & Health",
+    "icon": "joghurt"
+  },
+  {
+    "name": "Sojamilch",
+    "category": "Protein & Health",
+    "icon": "milch"
+  },
+  {
+    "name": "Multivitamintabletten",
+    "category": "Protein & Health",
+    "icon": "medikament"
+  },
+  {
+    "name": "Omega-3-Kapseln",
+    "category": "Protein & Health",
+    "icon": "medikament"
+  },
+  {
+    "name": "Elektrolytpulver",
+    "category": "Protein & Health",
+    "icon": "medikament"
+  },
+  {
+    "name": "Magnesiumtabletten",
+    "category": "Protein & Health",
+    "icon": "medikament"
+  },
+  {
+    "name": "Rote Zwiebeln",
+    "category": "Früchte & Gemüse",
+    "icon": "zwiebel"
+  },
+  {
+    "name": "Schalotten",
+    "category": "Früchte & Gemüse",
+    "icon": "zwiebel"
+  },
+  {
+    "name": "Süße Kartoffeln (Baby)",
+    "category": "Früchte & Gemüse",
+    "icon": "kartoffel"
+  },
+  {
+    "name": "Rucola-Salat",
+    "category": "Früchte & Gemüse",
+    "icon": "salat"
+  },
+  {
+    "name": "Feldsalat",
+    "category": "Früchte & Gemüse",
+    "icon": "salat"
+  },
+  {
+    "name": "Eisbergsalat",
+    "category": "Früchte & Gemüse",
+    "icon": "salat"
+  },
+  {
+    "name": "Physalis",
+    "category": "Früchte & Gemüse",
+    "icon": "beere"
+  },
+  {
+    "name": "Wildschweinfleisch",
+    "category": "Fleisch & Fisch",
+    "icon": "fleisch"
+  },
+  {
+    "name": "Pouletgeschnetzeltes",
+    "category": "Fleisch & Fisch",
+    "icon": "huhn"
+  },
+  {
+    "name": "Räucherlachs",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Sashimi-Thunfisch",
+    "category": "Fleisch & Fisch",
+    "icon": "fisch"
+  },
+  {
+    "name": "Kombucha",
+    "category": "Getränke",
+    "icon": "saft"
+  },
+  {
+    "name": "Isotonisches Getränk",
+    "category": "Getränke",
+    "icon": "getraenk"
+  },
+  {
+    "name": "Kokosnusswasser mit Frucht",
+    "category": "Getränke",
+    "icon": "wasser"
+  },
+  {
+    "name": "Senfkörner",
+    "category": "Sonstiges",
+    "icon": "gewuerz"
+  },
+  {
+    "name": "Vanilleschote",
+    "category": "Sonstiges",
+    "icon": "backzutat"
+  },
+  {
+    "name": "Speisestärke",
+    "category": "Sonstiges",
+    "icon": "mehl"
+  },
+  {
+    "name": "Spülbürste",
+    "category": "Haushalt & Reinigung",
+    "icon": "schwamm"
+  },
+  {
+    "name": "Gefrierbeutel",
+    "category": "Haushalt & Reinigung",
+    "icon": "beutel"
+  },
+  {
+    "name": "Nagelfeile",
+    "category": "Drogerie & Kosmetik",
+    "icon": "pflege"
+  },
+  {
+    "name": "Wattestäbchen",
+    "category": "Drogerie & Kosmetik",
+    "icon": "hygiene"
+  },
+  {
+    "name": "Kauknochen",
+    "category": "Tierbedarf",
+    "icon": "tierleckerli"
+  },
+  {
+    "name": "Fischfutter",
+    "category": "Tierbedarf",
+    "icon": "voegelfutter"
   }
 ]

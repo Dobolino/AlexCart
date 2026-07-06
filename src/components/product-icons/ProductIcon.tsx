@@ -305,6 +305,211 @@ function LucideNut({ size, className }: SvgProps) {
   )
 }
 
+function LucideBattery({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M 22 14 L 22 10" />
+      <rect x="2" y="6" width="16" height="12" rx="2" />
+    </LucideWrap>
+  )
+}
+
+function LucideBandage({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M10 10.01h.01" />
+      <path d="M10 14.01h.01" />
+      <path d="M14 10.01h.01" />
+      <path d="M14 14.01h.01" />
+      <path d="M18 6v12" />
+      <path d="M6 6v12" />
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+    </LucideWrap>
+  )
+}
+
+function LucideDog({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M11.25 16.25h1.5L12 17z" />
+      <path d="M16 14v.5" />
+      <path d="M4.42 11.247A13.152 13.152 0 0 0 4 14.556C4 18.728 7.582 21 12 21s8-2.272 8-6.444a11.702 11.702 0 0 0-.493-3.309" />
+      <path d="M8 14v.5" />
+      <path d="M8.5 8.5c-.384 1.05-1.083 2.028-2.344 2.5-1.931.722-3.576-.297-3.656-1-.113-.994 1.177-6.53 4-7 1.923-.321 3.651.845 3.651 2.235A7.497 7.497 0 0 1 14 5.277c0-1.39 1.844-2.598 3.767-2.277 2.823.47 4.113 6.006 4 7-.08.703-1.725 1.722-3.656 1-1.261-.472-1.855-1.45-2.239-2.5" />
+    </LucideWrap>
+  )
+}
+
+function LucideCat({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z" />
+      <path d="M8 14v.5" />
+      <path d="M16 14v.5" />
+      <path d="M11.25 16.25h1.5L12 17l-.75-.75Z" />
+    </LucideWrap>
+  )
+}
+
+function LucidePawPrint({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <circle cx="11" cy="4" r="2" />
+      <circle cx="18" cy="8" r="2" />
+      <circle cx="20" cy="16" r="2" />
+      <path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z" />
+    </LucideWrap>
+  )
+}
+
+function LucidePill({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
+      <path d="m8.5 8.5 7 7" />
+    </LucideWrap>
+  )
+}
+
+function LucideDumbbell({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" />
+      <path d="m2.5 21.5 1.4-1.4" />
+      <path d="m20.1 3.9 1.4-1.4" />
+      <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" />
+      <path d="m9.6 14.4 4.8-4.8" />
+    </LucideWrap>
+  )
+}
+
+function LucideSprayCan({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M3 3h.01" />
+      <path d="M7 5h.01" />
+      <path d="M11 7h.01" />
+      <path d="M3 7h.01" />
+      <path d="M7 9h.01" />
+      <path d="M3 11h.01" />
+      <rect width="4" height="4" x="15" y="5" />
+      <path d="m19 9 2 2v10c0 .6-.4 1-1 1h-6c-.6 0-1-.4-1-1V11l2-2" />
+      <path d="m13 14 8-2" />
+      <path d="m13 19 8-2" />
+    </LucideWrap>
+  )
+}
+
+function LucideShell({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44" />
+    </LucideWrap>
+  )
+}
+
+function LucideBean({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M10.165 6.598C9.954 7.478 9.64 8.36 9 9c-.64.64-1.521.954-2.402 1.165A6 6 0 0 0 8 22c7.732 0 14-6.268 14-14a6 6 0 0 0-11.835-1.402Z" />
+      <path d="M5.341 10.62a4 4 0 1 0 5.279-5.28" />
+    </LucideWrap>
+  )
+}
+
+function LucideSprout({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+      <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+      <path d="M5 21h14" />
+    </LucideWrap>
+  )
+}
+
+function LucideMartini({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M12 12 4.207 4.207A.707.707 0 0 1 4.707 3h14.586a.707.707 0 0 1 .5 1.207z" />
+      <path d="M12 12v10" />
+      <path d="M7 22h10" />
+    </LucideWrap>
+  )
+}
+
+function LucideBottleWine({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M10 3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a6 6 0 0 0 1.2 3.6l.6.8A6 6 0 0 1 17 13v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-8a6 6 0 0 1 1.2-3.6l.6-.8A6 6 0 0 0 10 5z" />
+      <path d="M17 13h-4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h4" />
+    </LucideWrap>
+  )
+}
+
+function LucidePaperBag({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M5.364 3.848C4 6 3 9.652 3 12.652V19a2 2 0 002 2h14a2 2 0 002-2v-5c0-2.334-1.816-4.668-2.622-7.002" />
+      <path d="M7 3h11.379a2 2 0 011.789 1.106l.723 1.447A1 1 0 0119.997 7h-8.525a2 2 0 01-1.789-1.106L8.79 4.105a2 2 0 10-3.579 1.789l2.261 4.522A5 5 0 018 12.652V21" />
+    </LucideWrap>
+  )
+}
+
+function LucideScroll({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M19 17V5a2 2 0 0 0-2-2H4" />
+      <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+    </LucideWrap>
+  )
+}
+
+function LucideLeaf({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+    </LucideWrap>
+  )
+}
+
+function LucideCookie({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+      <path d="M8.5 8.5v.01" />
+      <path d="M16 15.5v.01" />
+      <path d="M12 12v.01" />
+      <path d="M11 17v.01" />
+      <path d="M7 14v.01" />
+    </LucideWrap>
+  )
+}
+
+function LucideBird({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M16 7h.01" />
+      <path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20" />
+      <path d="m20 7 2 .5-2 .5" />
+      <path d="M10 18v3" />
+      <path d="M14 17.75V21" />
+      <path d="M7 18a6 6 0 0 0 3.84-10.61" />
+    </LucideWrap>
+  )
+}
+
+function LucidePopcorn({ size, className }: SvgProps) {
+  return (
+    <LucideWrap size={size} className={className}>
+      <path d="M18 8a2 2 0 0 0 0-4 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0 0 4" />
+      <path d="M10 22 9 8" />
+      <path d="m14 22 1-14" />
+      <path d="M20 8c.5 0 .9.4.8 1l-2.6 12c-.1.5-.7 1-1.2 1H7c-.6 0-1.1-.4-1.2-1L3.2 9c-.1-.6.3-1 .8-1Z" />
+    </LucideWrap>
+  )
+}
+
 function Tomato({ size, className }: SvgProps) {
   return (
     <SvgWrap size={size} className={className}>
@@ -602,6 +807,75 @@ const ICON_MAP: Record<string, (props: SvgProps) => ReactElement> = {
   nuss: LucideNut,
   dose: Can,
   schokolade: Box,
+  ananas: GenericProduce,
+  aprikose: Apple,
+  aufstrich: Jar,
+  backzutat: Box,
+  bagel: Bread,
+  batterie: LucideBattery,
+  beutel: LucidePaperBag,
+  blumenkohl: LucideBroccoli,
+  chips: LucidePopcorn,
+  dattel: Berries,
+  edamame: LucideBean,
+  erstehilfe: LucideBandage,
+  feige: Berries,
+  fenchel: Onion,
+  folie: LucideScroll,
+  granatapfel: Apple,
+  gewuerzmischung: Spice,
+  heidelbeere: Berries,
+  himbeere: Berries,
+  hundefutter: LucideDog,
+  hygiene: Box,
+  katzenfutter: LucideCat,
+  katzenstreu: LucidePawPrint,
+  kekse: LucideCookie,
+  kerze: Box,
+  kohl: LucideLeafyGreen,
+  kraeuter: LucideLeafyGreen,
+  kuerbis: GenericProduce,
+  mango: Apple,
+  medikament: LucidePill,
+  melone: Citrus,
+  milchshake: LucideCupSoda,
+  mueesli: Rice,
+  muffin: Bread,
+  muschel: LucideShell,
+  nori: LucideLeaf,
+  papier: LucideScroll,
+  pastinake: LucideCarrot,
+  pfirsich: Apple,
+  pflaume: Apple,
+  pflege: Jar,
+  proteinpulver: LucideDumbbell,
+  radieschen: Onion,
+  rasur: Box,
+  reiniger: LucideSprayCan,
+  reispapier: LucideScroll,
+  rhabarber: Cucumber,
+  riegel: Box,
+  rosenkohl: LucideSprout,
+  sahne: Milk,
+  samen: Rice,
+  sauce: Jar,
+  schwamm: Box,
+  sekt: LucideBottleWine,
+  sellerie: Cucumber,
+  sirup: Bottle,
+  smoothie: LucideCupSoda,
+  spargel: Corn,
+  spirituose: LucideMartini,
+  sprossen: LucideSprout,
+  suessigkeit: Box,
+  tierleckerli: LucidePawPrint,
+  tintenfisch: LucideFish,
+  tofu: Box,
+  trockenfrucht: Berries,
+  voegelfutter: LucideBird,
+  wassermelone: Citrus,
+  wuerzpaste: Jar,
+  zahnpflege: Box,
   default: GenericProduce,
 }
 
