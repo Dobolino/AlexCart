@@ -37,6 +37,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Take control of open tabs immediately on update instead of waiting for a
+        // second reload - during active development a stale SW can otherwise keep
+        // serving an old, broken bundle indefinitely on an installed PWA.
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ],
