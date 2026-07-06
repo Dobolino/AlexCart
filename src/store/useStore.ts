@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
 import { todayKey } from '@/utils/date'
@@ -20,6 +20,31 @@ import type {
 
 const STORE_VERSION = 2
 const STORE_NAME = 'alexshop-store'
+
+/** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
+const safeStorage = {
+  getItem: (name: string): string | null => {
+    try {
+      return localStorage.getItem(name)
+    } catch {
+      return null
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    try {
+      localStorage.setItem(name, value)
+    } catch {
+      /* quota / private mode */
+    }
+  },
+  removeItem: (name: string): void => {
+    try {
+      localStorage.removeItem(name)
+    } catch {
+      /* ignore */
+    }
+  },
+}
 
 function defaultSettings(): AppSettings {
   return { theme: 'system', listViewMode: 'tiles', hasSeenOnboarding: false }
@@ -397,12 +422,23 @@ export const useStore = create<AppState>()(
     {
       name: STORE_NAME,
       version: STORE_VERSION,
+      storage: createJSONStorage(() => safeStorage),
+      skipHydration: true,
       migrate: (persisted, version) => {
-        const state = persisted as Partial<AppState>
-        if (version < 2) {
-          state.settings = { ...defaultSettings(), ...(state.settings as Partial<AppSettings>) }
+        try {
+          const state = (persisted as Partial<AppState>) ?? {}
+          if (version < 2) {
+            state.settings = {
+              ...defaultSettings(),
+              ...(state.settings as Partial<AppSettings>),
+              hasSeenOnboarding: true,
+            }
+          }
+          return state as AppState
+        } catch (err) {
+          console.error('AlexShop: Store-Migration fehlgeschlagen', err)
+          return { settings: defaultSettings() } as AppState
         }
-        return state as AppState
       },
       partialize: (state) => ({
         lists: state.lists,
