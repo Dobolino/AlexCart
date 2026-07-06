@@ -28,6 +28,7 @@ export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onTog
   const [menuOpen, setMenuOpen] = useState(false)
   const start = useRef({ x: 0, y: 0 })
   const horizontalConfirmed = useRef(false)
+  const suppressClickRef = useRef(false)
 
   const iconKey = getIconKey(item.name, item.category)
   const svgPath = getIconSvgPath(iconKey)
@@ -64,9 +65,21 @@ export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onTog
   function handlePointerUp() {
     if (!dragging) return
     setDragging(false)
-    const shouldToggle = horizontalConfirmed.current && dragX > SWIPE_TRIGGER
+    const wasHorizontal = horizontalConfirmed.current
+    const shouldToggle = wasHorizontal && dragX > SWIPE_TRIGGER
     setDragX(0)
+    // Nach horizontalem Wisch feuert iOS/Safari oft noch ein click – das würde
+    // den Artikel direkt wieder als offen markieren (Doppel-Toggle).
+    if (wasHorizontal) suppressClickRef.current = true
     if (shouldToggle) handleToggle()
+  }
+
+  function handleClick() {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    handleToggle()
   }
 
   return (
@@ -92,7 +105,7 @@ export function ItemRow({ item, onToggle, onDelete, onEdit, onAddToPantry, onTog
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onClick={handleToggle}
+        onClick={handleClick}
       >
         <div
           className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
