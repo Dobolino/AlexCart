@@ -5,10 +5,17 @@ on:
     branches:
       - main
       - claude/alexshop-pwa-build-8ecx2c
+    paths-ignore:
+      - 'assets/**'
+      - 'icons/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'workbox-*.js'
+      - 'manifest.webmanifest'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -38,8 +45,20 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Build
-        run: npm run build
+      - name: Build and publish to repo root (legacy Pages)
+        run: npm run publish:pages
+
+      - name: Commit built PWA for legacy GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html assets icons sw.js workbox-*.js manifest.webmanifest
+          if git diff --staged --quiet; then
+            echo "No publish changes to commit."
+          else
+            git commit -m "chore: publish built PWA to repo root [skip ci]"
+            git push
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
