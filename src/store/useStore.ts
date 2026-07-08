@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
+import { applyImportMode } from '@/utils/mergeList'
 import { todayKey } from '@/utils/date'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
@@ -16,6 +17,7 @@ import type {
   ShoppingItem,
   ShoppingList,
   Theme,
+  ImportMode,
 } from '@/types'
 
 const STORE_VERSION = 2
@@ -111,7 +113,10 @@ interface AppState {
   activeList: () => ShoppingList | undefined
   filteredForActiveList: () => ShoppingItem[]
 
-  importIntoActiveList: (text: string) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number }
+  importIntoActiveList: (
+    text: string,
+    mode?: ImportMode
+  ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
   updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note'>>) => void
   toggleItemDone: (itemId: string) => void
@@ -122,6 +127,7 @@ interface AppState {
   clearFilteredNote: () => void
   reorderItemsInCategory: (category: string, orderedIds: string[]) => void
   reorderDoneItems: (orderedIds: string[]) => void
+  clearDoneItems: () => void
 
   createList: (name: string) => void
   switchList: (listId: string) => void
@@ -170,15 +176,21 @@ export const useStore = create<AppState>()(
         return get().filtered.find((f) => f.listId === list.id)?.items ?? EMPTY_ITEMS
       },
 
-      importIntoActiveList: (text) => {
+      importIntoActiveList: (text, mode = 'replace') => {
         const list = get().activeList()
         if (!list) return { ok: false, error: 'Keine aktive Liste.' }
         const result = importFromJSON(text, get().pantry)
         if (!result.ok || !result.kept) return { ok: false, error: result.error }
 
+        const mergedItems = applyImportMode(list.items, result.kept, mode)
+        const openBefore = list.items.filter((i) => !i.done).length
+        const openAfter = mergedItems.filter((i) => !i.done).length
+
         set((state) => ({
           lists: state.lists.map((l) =>
-            l.id === list.id ? { ...l, weekLabel: result.weekLabel || l.weekLabel, items: result.kept! } : l
+            l.id === list.id
+              ? { ...l, weekLabel: result.weekLabel || l.weekLabel, items: mergedItems }
+              : l
           ),
           filtered: [
             ...state.filtered.filter((f) => f.listId !== list.id),
@@ -187,10 +199,15 @@ export const useStore = create<AppState>()(
           stats: {
             ...state.stats,
             importsCount: state.stats.importsCount + 1,
-            itemsAddedTotal: state.stats.itemsAddedTotal + result.kept!.length,
+            itemsAddedTotal: state.stats.itemsAddedTotal + Math.max(0, openAfter - openBefore),
           },
         }))
-        return { ok: true, keptCount: result.kept.length, filteredCount: result.filtered?.length ?? 0 }
+        return {
+          ok: true,
+          keptCount: result.kept.length,
+          filteredCount: result.filtered?.length ?? 0,
+          addedCount: Math.max(0, openAfter - openBefore),
+        }
       },
 
       addItemToActiveList: (item) => {
@@ -256,16 +273,31 @@ export const useStore = create<AppState>()(
         if (!item) return
         const nowDone = !item.done
 
-        set((state) => ({
-          lists: state.lists.map((l) =>
-            l.id !== list.id
-              ? l
-              : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: nowDone } : i)) }
-          ),
-          purchaseLog: nowDone
-            ? [...state.purchaseLog, { name: item.name, category: item.category, date: todayKey() }]
-            : state.purchaseLog,
-        }))
+        set((state) => {
+          let purchaseLog = state.purchaseLog
+          if (nowDone) {
+            purchaseLog = [...purchaseLog, { name: item.name, category: item.category, date: todayKey() }]
+          } else {
+            let idx = -1
+            for (let i = purchaseLog.length - 1; i >= 0; i--) {
+              const e = purchaseLog[i]!
+              if (e.name === item.name && e.category === item.category && e.date === todayKey()) {
+                idx = i
+                break
+              }
+            }
+            if (idx >= 0) purchaseLog = purchaseLog.filter((_, i) => i !== idx)
+          }
+
+          return {
+            lists: state.lists.map((l) =>
+              l.id !== list.id
+                ? l
+                : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: nowDone } : i)) }
+            ),
+            purchaseLog,
+          }
+        })
       },
 
       deleteItem: (itemId) => {
@@ -321,6 +353,15 @@ export const useStore = create<AppState>()(
         const newItems = list.items.map((item) => (item.done ? reorderedDone[di++]! : item))
         set((state) => ({
           lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: newItems })),
+        }))
+      },
+      clearDoneItems: () => {
+        const list = get().activeList()
+        if (!list) return
+        set((state) => ({
+          lists: state.lists.map((l) =>
+            l.id !== list.id ? l : { ...l, items: l.items.filter((i) => !i.done) }
+          ),
         }))
       },
       reorderItemsInCategory: (category, orderedIds) => {
