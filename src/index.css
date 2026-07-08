@@ -11,10 +11,9 @@
   --radius-pill: 999px;
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --blur-glass: blur(24px) saturate(180%);
-  --nav-pill-height: 54px;
-  --nav-shell-pad-y: 8px;
-  --nav-scroll-padding: calc(var(--nav-pill-height) + var(--nav-shell-pad-y) * 2 + var(--safe-bottom) + 16px);
-  --blur-nav: blur(48px) saturate(200%);
+  --nav-pill-height: 50px;
+  --nav-scroll-padding: calc(var(--nav-pill-height) + var(--safe-bottom) + 12px);
+  --blur-nav: blur(56px) saturate(220%);
 }
 
 [data-theme='light'] {
@@ -38,11 +37,11 @@
   --chip-fg: #1b1f27;
   --done-bg: #f4f4f7;
   --nav-glass: rgba(255, 255, 255, 0.55);
-  --nav-liquid-bg: rgba(255, 255, 255, 0.72);
-  --nav-liquid-border: rgba(0, 0, 0, 0.08);
+  --nav-liquid-bg: rgba(255, 255, 255, 0.45);
+  --nav-liquid-border: rgba(0, 0, 0, 0.06);
   --nav-liquid-highlight: rgba(255, 255, 255, 0.85);
-  --nav-liquid-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  --nav-dock-bg: rgba(242, 242, 247, 0.55);
+  --nav-liquid-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --nav-dock-bg: rgba(242, 242, 247, 0.35);
   --progress-track: rgba(0, 0, 0, 0.08);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.04);
 
@@ -98,11 +97,11 @@
   --chip-fg: rgba(255, 255, 255, 0.9);
   --done-bg: #232326;
   --nav-glass: rgba(28, 28, 30, 0.45);
-  --nav-liquid-bg: rgba(36, 36, 40, 0.62);
-  --nav-liquid-border: rgba(255, 255, 255, 0.12);
+  --nav-liquid-bg: rgba(28, 28, 32, 0.42);
+  --nav-liquid-border: rgba(255, 255, 255, 0.1);
   --nav-liquid-highlight: rgba(255, 255, 255, 0.1);
-  --nav-liquid-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  --nav-dock-bg: rgba(0, 0, 0, 0.42);
+  --nav-liquid-shadow: 0 -4px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --nav-dock-bg: rgba(0, 0, 0, 0.28);
   --progress-track: rgba(255, 255, 255, 0.12);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
 
@@ -237,37 +236,44 @@ h3,
   box-shadow: var(--shadow-card);
 }
 
-/* Schwebende Liquid-Glass-Navigation – Inhalt scrollt dahinter */
+/* Liquid-Glass-Tab-Bar – bis zum unteren Rand, Inhalt scrollt dahinter */
 .nav-liquid-shell {
   position: fixed;
   z-index: 30;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: var(--nav-shell-pad-y) calc(12px + var(--safe-right)) var(--safe-bottom) calc(12px + var(--safe-left));
-  background: linear-gradient(to top, var(--nav-dock-bg) 55%, transparent 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 0 calc(10px + var(--safe-right)) 0 calc(10px + var(--safe-left));
+  min-height: calc(var(--nav-pill-height) + var(--safe-bottom));
+  background: linear-gradient(to top, var(--nav-dock-bg) 0%, transparent 85%);
   -webkit-backdrop-filter: var(--blur-nav);
   backdrop-filter: var(--blur-nav);
   border-top: 1px solid var(--nav-liquid-border);
   pointer-events: none;
+  transform: translateZ(0);
 }
 
 .nav-liquid {
   position: relative;
-  margin: 0 auto;
-  height: var(--nav-pill-height);
+  width: 100%;
   max-width: 520px;
+  margin: 0 auto;
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  padding: 4px 6px;
-  border-radius: 22px;
+  padding: 6px 6px calc(6px + var(--safe-bottom));
+  min-height: calc(var(--nav-pill-height) + var(--safe-bottom));
+  border-radius: 20px 20px 0 0;
   background: var(--nav-liquid-bg);
   border: 1px solid var(--nav-liquid-border);
+  border-bottom: none;
   box-shadow: var(--nav-liquid-shadow);
   -webkit-backdrop-filter: var(--blur-nav);
   backdrop-filter: var(--blur-nav);
   pointer-events: auto;
+  transform: translateZ(0);
 }
 
 .nav-liquid-tab {
@@ -320,15 +326,17 @@ h3,
   color: var(--accent);
 }
 
-/* Content scrollt unter der Tab-Bar; scroll-padding hält letzte Zeile bedienbar */
+/* Content scrollt unter der Tab-Bar; padding-bottom erweitert die Scrollweite */
 .scroll-behind-nav {
-  padding-bottom: 0 !important;
+  padding-bottom: var(--nav-scroll-padding) !important;
   scroll-padding-bottom: var(--nav-scroll-padding);
+  -webkit-overflow-scrolling: touch;
 }
 
 .scroll-behind-nav-fab {
-  padding-bottom: 0 !important;
+  padding-bottom: calc(var(--nav-scroll-padding) + 64px) !important;
   scroll-padding-bottom: calc(var(--nav-scroll-padding) + 64px);
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ---------- Buttons ---------- */
