@@ -21,7 +21,7 @@ export function EditPantrySheet({ item, onClose }: EditPantrySheetProps) {
 
   const currentParsed = parseAmount(item.amount)
   const minParsed = parseAmount(item.minAmount)
-  const fallbackUnit = getDefaultUnit(getIconKey(item.name, item.category))
+  const fallbackUnit = getDefaultUnit(getIconKey(item.name, item.category), item.category)
 
   const [name, setName] = useState(item.name)
   const [category, setCategory] = useState(item.category)

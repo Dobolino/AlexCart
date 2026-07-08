@@ -7,9 +7,10 @@ interface MoneyNumpadProps {
   onChange: (cents: number) => void
   currency: Currency
   compact?: boolean
+  label?: string
 }
 
-export function MoneyNumpad({ cents, onChange, currency, compact = false }: MoneyNumpadProps) {
+export function MoneyNumpad({ cents, onChange, currency, compact = false, label }: MoneyNumpadProps) {
   const amount = centsToAmount(cents) ?? 0
 
   function pressKey(key: string) {
@@ -18,6 +19,11 @@ export function MoneyNumpad({ cents, onChange, currency, compact = false }: Mone
 
   return (
     <>
+      {label && (
+        <div className="mb-1.5 px-1 text-[13px] font-bold" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </div>
+      )}
       <div
         className="card-surface mb-3 flex items-center justify-end gap-2 px-5 py-4 font-bold tabular-nums"
         style={{ color: 'var(--text)', minHeight: compact ? 56 : 64, fontSize: compact ? 24 : 26 }}

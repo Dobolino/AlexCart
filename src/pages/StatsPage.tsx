@@ -38,7 +38,7 @@ export function StatsPage() {
   return (
     <>
       <PageHeader title="Statistik" subtitle="Deine Einkaufsgewohnheiten" />
-      <main className="pb-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+      <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div className="mb-2.5 grid grid-cols-3 gap-2.5">
           <StatTile value={stats.listsCreated} label="Listen erstellt" />
           <StatTile value={purchaseLog.length} label="Produkte gekauft" />

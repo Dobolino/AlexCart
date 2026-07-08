@@ -11,10 +11,10 @@
   --radius-pill: 999px;
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --blur-glass: blur(24px) saturate(180%);
-  --nav-float-height: 58px;
-  --nav-float-margin: 10px;
-  --nav-float-inset: calc(var(--nav-float-height) + var(--nav-float-margin) + var(--safe-bottom));
-  --blur-nav: blur(40px) saturate(200%);
+  --nav-pill-height: 54px;
+  --nav-shell-pad-y: 8px;
+  --nav-scroll-padding: calc(var(--nav-pill-height) + var(--nav-shell-pad-y) * 2 + var(--safe-bottom) + 16px);
+  --blur-nav: blur(48px) saturate(200%);
 }
 
 [data-theme='light'] {
@@ -38,10 +38,11 @@
   --chip-fg: #1b1f27;
   --done-bg: #f4f4f7;
   --nav-glass: rgba(255, 255, 255, 0.55);
-  --nav-liquid-bg: rgba(255, 255, 255, 0.62);
+  --nav-liquid-bg: rgba(255, 255, 255, 0.72);
   --nav-liquid-border: rgba(0, 0, 0, 0.08);
   --nav-liquid-highlight: rgba(255, 255, 255, 0.85);
   --nav-liquid-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --nav-dock-bg: rgba(242, 242, 247, 0.55);
   --progress-track: rgba(0, 0, 0, 0.08);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.04);
 
@@ -97,10 +98,11 @@
   --chip-fg: rgba(255, 255, 255, 0.9);
   --done-bg: #232326;
   --nav-glass: rgba(28, 28, 30, 0.45);
-  --nav-liquid-bg: rgba(36, 36, 40, 0.52);
-  --nav-liquid-border: rgba(255, 255, 255, 0.14);
+  --nav-liquid-bg: rgba(36, 36, 40, 0.62);
+  --nav-liquid-border: rgba(255, 255, 255, 0.12);
   --nav-liquid-highlight: rgba(255, 255, 255, 0.1);
   --nav-liquid-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --nav-dock-bg: rgba(0, 0, 0, 0.42);
   --progress-track: rgba(255, 255, 255, 0.12);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
 
@@ -235,24 +237,37 @@ h3,
   box-shadow: var(--shadow-card);
 }
 
-/* Schwebende Liquid-Glass-Navigation (Inhalt scrollt dahinter) */
-.nav-liquid {
+/* Schwebende Liquid-Glass-Navigation – Inhalt scrollt dahinter */
+.nav-liquid-shell {
   position: fixed;
   z-index: 30;
-  left: calc(14px + var(--safe-left));
-  right: calc(14px + var(--safe-right));
-  bottom: calc(var(--nav-float-margin) + var(--safe-bottom));
-  height: var(--nav-float-height);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--nav-shell-pad-y) calc(12px + var(--safe-right)) var(--safe-bottom) calc(12px + var(--safe-left));
+  background: linear-gradient(to top, var(--nav-dock-bg) 55%, transparent 100%);
+  -webkit-backdrop-filter: var(--blur-nav);
+  backdrop-filter: var(--blur-nav);
+  border-top: 1px solid var(--nav-liquid-border);
+  pointer-events: none;
+}
+
+.nav-liquid {
+  position: relative;
+  margin: 0 auto;
+  height: var(--nav-pill-height);
+  max-width: 520px;
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  padding: 6px 8px;
+  padding: 4px 6px;
   border-radius: 22px;
   background: var(--nav-liquid-bg);
   border: 1px solid var(--nav-liquid-border);
   box-shadow: var(--nav-liquid-shadow);
   -webkit-backdrop-filter: var(--blur-nav);
   backdrop-filter: var(--blur-nav);
+  pointer-events: auto;
 }
 
 .nav-liquid-tab {
@@ -295,21 +310,25 @@ h3,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 .nav-liquid-label-active {
   color: var(--accent);
 }
 
-.pb-nav {
-  padding-bottom: calc(var(--nav-float-inset) + 8px) !important;
+/* Content scrollt unter der Tab-Bar; scroll-padding hält letzte Zeile bedienbar */
+.scroll-behind-nav {
+  padding-bottom: 0 !important;
+  scroll-padding-bottom: var(--nav-scroll-padding);
 }
 
-.pb-nav-fab {
-  padding-bottom: calc(var(--nav-float-inset) + 80px) !important;
+.scroll-behind-nav-fab {
+  padding-bottom: 0 !important;
+  scroll-padding-bottom: calc(var(--nav-scroll-padding) + 64px);
 }
 
 /* ---------- Buttons ---------- */

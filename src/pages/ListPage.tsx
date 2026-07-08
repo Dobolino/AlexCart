@@ -239,7 +239,7 @@ export function ListPage() {
       {budget && <BudgetBar progress={budget} currency={currency} />}
       <InstallPrompt />
 
-      <main className="pb-nav-fab flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3">
+      <main className="scroll-behind-nav-fab flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3">
         {filteredItems.length > 0 && (
           <div
             className="glass-card mb-3.5 flex items-center justify-between gap-2.5 px-3.5 py-3 text-[13px]"
@@ -342,7 +342,7 @@ export function ListPage() {
           className="btn-primary tap-scale fixed z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
           style={{
             right: 'calc(18px + var(--safe-right))',
-            bottom: 'calc(var(--nav-float-inset) + 12px)',
+            bottom: 'calc(var(--nav-scroll-padding) + 8px)',
           }}
           onClick={() => setAddOpen(true)}
           aria-label="Artikel hinzufügen"
@@ -427,7 +427,7 @@ export function ListPage() {
             className="glass fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-2.5 pl-4 pr-2 text-[13px] font-semibold"
             style={{
               color: 'var(--text)',
-              bottom: 'calc(var(--nav-float-inset) + 28px)',
+              bottom: 'calc(var(--nav-scroll-padding) + 72px)',
             }}
           >
             <span className="min-w-0 truncate">{toast.message}</span>

@@ -134,6 +134,22 @@ const DEFAULT_UNIT_BY_ICON: Record<string, string> = {
   sahne: 'Becher',
 }
 
-export function getDefaultUnit(iconKey: string): string {
-  return DEFAULT_UNIT_BY_ICON[iconKey] ?? DEFAULT_UNIT
+export function getDefaultUnitForCategory(category: string): string {
+  if (category === 'Getränke' || category === 'Milch & Käse') return 'l'
+  if (category === 'Brot & Backwaren' || category === 'Früchte & Gemüse') return 'Stück'
+  if (category === 'Tiefkühl' || category === 'Getreide & Beilagen') return 'Packung'
+  if (category === 'Fleisch & Fisch') return 'g'
+  if (
+    category === 'Haushalt & Reinigung' ||
+    category === 'Drogerie & Kosmetik' ||
+    category === 'Tierbedarf' ||
+    category === 'Süßes & Snacks'
+  ) {
+    return 'Packung'
+  }
+  return DEFAULT_UNIT
+}
+
+export function getDefaultUnit(iconKey: string, category?: string): string {
+  return DEFAULT_UNIT_BY_ICON[iconKey] ?? (category ? getDefaultUnitForCategory(category) : DEFAULT_UNIT)
 }
