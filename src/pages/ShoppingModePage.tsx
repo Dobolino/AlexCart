@@ -8,6 +8,8 @@ import { hapticSuccess } from '@/utils/haptics'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
+import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
+import type { ShoppingItem } from '@/types'
 
 export function ShoppingModePage() {
   const navigate = useNavigate()
@@ -16,8 +18,11 @@ export function ShoppingModePage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
+  const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const currency = useStore((s) => s.settings.currency)
-  const [lastCheckedId, setLastCheckedId] = useState<string | null>(null)
+  const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
+  const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
+  const [sessionTotal, setSessionTotal] = useState(0)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   if (!list) return null
@@ -31,18 +36,44 @@ export function ShoppingModePage() {
   const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog), calculatorTotal)
   const budget = weeklyBudget > 0 ? budgetProgress(budgetSpend, weeklyBudget) : null
 
-  function handleCheck(id: string) {
-    hapticSuccess()
-    toggleItemDone(id)
-    setLastCheckedId(id)
+  function armUndo(next: { id: string; price?: number }) {
+    setLastChecked(next)
     if (undoTimer.current) clearTimeout(undoTimer.current)
-    undoTimer.current = setTimeout(() => setLastCheckedId(null), 4000)
+    undoTimer.current = setTimeout(() => setLastChecked(null), 4000)
+  }
+
+  function handleCheck(item: ShoppingItem) {
+    if (askPriceOnCheckoff) {
+      setPriceSheetItem(item)
+      return
+    }
+    hapticSuccess()
+    toggleItemDone(item.id)
+    armUndo({ id: item.id })
+  }
+
+  function handlePriceSave(price: number) {
+    if (!priceSheetItem) return
+    hapticSuccess()
+    toggleItemDone(priceSheetItem.id, price)
+    setSessionTotal((t) => t + price)
+    armUndo({ id: priceSheetItem.id, price })
+    setPriceSheetItem(null)
+  }
+
+  function handlePriceSkip() {
+    if (!priceSheetItem) return
+    hapticSuccess()
+    toggleItemDone(priceSheetItem.id)
+    armUndo({ id: priceSheetItem.id })
+    setPriceSheetItem(null)
   }
 
   function handleUndo() {
-    if (!lastCheckedId) return
-    toggleItemDone(lastCheckedId)
-    setLastCheckedId(null)
+    if (!lastChecked) return
+    toggleItemDone(lastChecked.id)
+    if (lastChecked.price) setSessionTotal((t) => Math.max(0, t - lastChecked.price!))
+    setLastChecked(null)
     if (undoTimer.current) clearTimeout(undoTimer.current)
   }
 
@@ -69,10 +100,14 @@ export function ShoppingModePage() {
           <div className="truncate text-[17px] font-extrabold">{list.name}</div>
           <div className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {doneCount} von {totalCount || doneCount} erledigt
-            {budget ? ` · ${formatMoney(budgetSpend, currency)} / ${formatMoney(budget.budget, currency)}` : ''}
+            {budget
+              ? ` · ${formatMoney(budgetSpend, currency)} / ${formatMoney(budget.budget, currency)}`
+              : sessionTotal > 0
+                ? ` · ${formatMoney(sessionTotal, currency)}`
+                : ''}
           </div>
         </div>
-        {lastCheckedId ? (
+        {lastChecked ? (
           <button
             className="tap-scale flex h-10 items-center justify-center rounded-full px-3 text-[12px] font-bold"
             style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
@@ -106,7 +141,11 @@ export function ShoppingModePage() {
             <h2 className="mb-2 text-[22px] font-extrabold">Einkauf abgeschlossen!</h2>
             <p className="mb-6 text-[15px]" style={{ color: 'var(--text-muted)' }}>
               {doneCount > 0 ? `${doneCount} Artikel erledigt.` : 'Keine offenen Artikel mehr.'}
-              {budget ? ` Summe: ${formatMoney(budgetSpend, currency)}.` : ''}
+              {budget
+                ? ` Summe: ${formatMoney(budgetSpend, currency)}.`
+                : sessionTotal > 0
+                  ? ` Summe: ${formatMoney(sessionTotal, currency)}.`
+                  : ''}
             </p>
             <button className="btn-primary tap-scale rounded-full px-8 py-3.5 text-[15px]" onClick={() => navigate('/')}>
               Zurück zur Liste
@@ -124,7 +163,7 @@ export function ShoppingModePage() {
                     key={item.id}
                     className="tap-scale flex min-h-[72px] items-center gap-3 rounded-2xl px-4 py-4 text-left shadow-sm"
                     style={{ background: 'var(--surface)' }}
-                    onClick={() => handleCheck(item.id)}
+                    onClick={() => handleCheck(item)}
                   >
                     <span
                       className="flex h-11 w-11 flex-none items-center justify-center rounded-full border-2"
@@ -156,7 +195,7 @@ export function ShoppingModePage() {
         )}
       </main>
 
-      {openItems.length > 0 && !lastCheckedId && (
+      {openItems.length > 0 && !lastChecked && (
         <FloatingPortal>
           <div
             className="glass fixed left-1/2 z-20 -translate-x-1/2 rounded-full px-4 py-2 text-[12px] font-semibold"
@@ -168,6 +207,16 @@ export function ShoppingModePage() {
             Tippen zum Abhaken
           </div>
         </FloatingPortal>
+      )}
+
+      {priceSheetItem && (
+        <CheckoffPriceSheet
+          item={priceSheetItem}
+          currency={currency}
+          onClose={() => setPriceSheetItem(null)}
+          onSave={handlePriceSave}
+          onSkip={handlePriceSkip}
+        />
       )}
     </div>
   )
