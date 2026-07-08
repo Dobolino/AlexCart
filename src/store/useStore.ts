@@ -4,6 +4,7 @@ import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
 import { applyImportMode } from '@/utils/mergeList'
 import { buildRepeatCandidates, candidatesToItems } from '@/utils/repeatWeek'
+import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { normalizeCategory } from '@/utils/icon'
@@ -22,7 +23,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 4
+const STORE_VERSION = 5
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -144,7 +145,8 @@ interface AppState {
   renameList: (listId: string, name: string) => void
   deleteList: (listId: string) => void
 
-  addPantryItem: (name: string, category: string) => void
+  addPantryItem: (name: string, category: string, amount?: string, minAmount?: string) => void
+  updatePantryItem: (id: string, patch: Partial<Pick<PantryItem, 'name' | 'category' | 'amount' | 'minAmount'>>) => void
   removePantryItem: (id: string) => void
 
   addCustomProduct: (input: { name: string; category: string; amount: string; note?: string }) => CustomProduct
@@ -343,6 +345,7 @@ export const useStore = create<AppState>()(
                 : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: nowDone } : i)) }
             ),
             purchaseLog,
+            pantry: nowDone ? replenishPantryItem(state.pantry, item) : state.pantry,
           }
         })
       },
@@ -465,11 +468,36 @@ export const useStore = create<AppState>()(
           return { lists, activeListId, filtered: state.filtered.filter((f) => f.listId !== listId) }
         }),
 
-      addPantryItem: (name, category) => {
+      addPantryItem: (name, category, amount, minAmount) => {
         const trimmed = name.trim()
         if (!trimmed) return
-        set((state) => ({ pantry: [...state.pantry, { id: uid(), name: trimmed, category }] }))
+        set((state) => ({
+          pantry: [
+            ...state.pantry,
+            {
+              id: uid(),
+              name: trimmed,
+              category: normalizeCategory(category),
+              amount: amount?.trim() || undefined,
+              minAmount: minAmount?.trim() || undefined,
+            },
+          ],
+        }))
       },
+      updatePantryItem: (id, patch) =>
+        set((state) => ({
+          pantry: state.pantry.map((item) =>
+            item.id !== id
+              ? item
+              : {
+                  ...item,
+                  ...(patch.name !== undefined ? { name: patch.name.trim() || item.name } : {}),
+                  ...(patch.category !== undefined ? { category: normalizeCategory(patch.category) } : {}),
+                  ...(patch.amount !== undefined ? { amount: patch.amount.trim() || undefined } : {}),
+                  ...(patch.minAmount !== undefined ? { minAmount: patch.minAmount.trim() || undefined } : {}),
+                }
+          ),
+        })),
       removePantryItem: (id) => set((state) => ({ pantry: state.pantry.filter((p) => p.id !== id) })),
 
       addCustomProduct: (input) => {
@@ -562,6 +590,13 @@ export const useStore = create<AppState>()(
               ...(state.settings as Partial<AppSettings>),
               weeklyBudget: 0,
             }
+          }
+          if (version < 5 && Array.isArray(state.pantry)) {
+            state.pantry = state.pantry.map((item) => ({
+              ...item,
+              amount: item.amount || undefined,
+              minAmount: item.minAmount || undefined,
+            }))
           }
           return state as AppState
         } catch (err) {

@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
-import { getIconKey } from '@/utils/icon'
-import { ProductIcon } from '@/components/product-icons/ProductIcon'
-import { getCategoryColor } from '@/utils/categoryColor'
+import { isLowStock } from '@/utils/pantry'
+import { joinAmount } from '@/utils/amount'
 import { CATEGORIES } from '@/data/products'
+import { UNITS, DEFAULT_UNIT } from '@/constants/units'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
+import { EditPantrySheet } from '@/components/EditPantrySheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
+import type { PantryItem } from '@/types'
 
 export function PantryPage() {
   const pantry = useStore((s) => s.pantry)
@@ -16,52 +18,93 @@ export function PantryPage() {
   const removePantryItem = useStore((s) => s.removePantryItem)
   const [name, setName] = useState('')
   const [category, setCategory] = useState(CATEGORIES[0])
+  const [amountValue, setAmountValue] = useState('')
+  const [amountUnit, setAmountUnit] = useState(DEFAULT_UNIT)
+  const [minValue, setMinValue] = useState('')
+  const [minUnit, setMinUnit] = useState(DEFAULT_UNIT)
+  const [editing, setEditing] = useState<PantryItem | null>(null)
 
   const groups = groupByCategory(pantry)
 
+  function handleAdd() {
+    if (!name.trim()) return
+    addPantryItem(
+      name,
+      category,
+      joinAmount(amountValue, amountUnit),
+      joinAmount(minValue, minUnit)
+    )
+    setName('')
+    setAmountValue('')
+    setMinValue('')
+  }
+
   return (
     <>
-      <PageHeader title="Vorrat" subtitle="Immer vorrätige Artikel" />
+      <PageHeader title="Vorrat" subtitle="Bestand & Mindestmengen" />
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-6">
-        <div className="mb-4 flex flex-col gap-2">
+        <div className="card-surface mb-4 px-3.5 py-3.5">
+          <div className="mb-2 text-[13px] font-bold">Neuer Vorrat-Artikel</div>
           <input
             type="text"
-            className="input w-full min-w-0"
-            placeholder="z.B. Reis"
+            className="input mb-2 w-full min-w-0"
+            placeholder="z.B. Milch"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <div className="flex gap-2">
-            <select
-              className="input min-w-0 flex-1"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+          <select
+            className="input mb-2 w-full min-w-0"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <input
+              className="input w-full"
+              inputMode="decimal"
+              placeholder="Bestand"
+              value={amountValue}
+              onChange={(e) => setAmountValue(e.target.value)}
+            />
+            <select className="input w-full" value={amountUnit} onChange={(e) => setAmountUnit(e.target.value)}>
+              {UNITS.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
                 </option>
               ))}
             </select>
-            <button
-              className="btn-primary tap-scale flex-none rounded-xl px-5 text-xl"
-              aria-label="Zum Vorrat hinzufügen"
-              onClick={() => {
-                if (!name.trim()) return
-                addPantryItem(name, category)
-                setName('')
-              }}
-            >
-              <Icon path={ICON_PATHS.plus} size={18} />
-            </button>
           </div>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <input
+              className="input w-full"
+              inputMode="decimal"
+              placeholder="Minimum"
+              value={minValue}
+              onChange={(e) => setMinValue(e.target.value)}
+            />
+            <select className="input w-full" value={minUnit} onChange={(e) => setMinUnit(e.target.value)}>
+              {UNITS.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="btn-primary tap-scale w-full py-3 text-[14px]" onClick={handleAdd}>
+            Hinzufügen
+          </button>
         </div>
 
         {!pantry.length ? (
           <EmptyState
             icon={ICON_PATHS.pantry}
             title="Vorrats-Liste ist leer"
-            hint="Füge Artikel hinzu, die du immer zuhause hast – sie werden bei Importen automatisch rausgefiltert."
+            hint="Lege Artikel mit Bestand und Mindestmenge an – bei Unterschreitung schlägt die App Nachkauf vor."
           />
         ) : (
           groups.map((g) => (
@@ -74,25 +117,33 @@ export function PantryPage() {
               </div>
               <div className="card-surface">
                 {g.items.map((item) => {
-                  const iconKey = getIconKey(item.name, item.category)
-                  const color = getCategoryColor(item.category)
+                  const low = isLowStock(item)
                   return (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between border-b px-3.5 py-3"
+                      className="flex items-center justify-between gap-3 border-b px-3.5 py-3.5 last:border-b-0"
                       style={{ borderColor: 'var(--border)' }}
                     >
-                      <span className="flex items-center gap-2.5 text-[15px] font-semibold">
-                        <span
-                          className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
-                          style={{ background: color.bg, color: color.fg }}
-                        >
-                          <ProductIcon iconKey={iconKey} size={18} />
-                        </span>
-                        {item.name}
-                      </span>
                       <button
-                        className="tap-scale"
+                        className="tap-scale min-w-0 flex-1 text-left"
+                        onClick={() => setEditing(item)}
+                      >
+                        <span className="block truncate text-[15px] font-semibold">{item.name}</span>
+                        <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          {item.amount ? `Bestand: ${item.amount}` : 'Kein Bestand erfasst'}
+                          {item.minAmount ? ` · min ${item.minAmount}` : ''}
+                        </span>
+                      </button>
+                      {low && (
+                        <span
+                          className="flex-none rounded-full px-2 py-0.5 text-[11px] font-bold"
+                          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                        >
+                          Nachkauf
+                        </span>
+                      )}
+                      <button
+                        className="tap-scale flex-none p-1"
                         style={{ color: 'var(--danger)' }}
                         onClick={() => removePantryItem(item.id)}
                         aria-label={`${item.name} entfernen`}
@@ -107,6 +158,8 @@ export function PantryPage() {
           ))
         )}
       </main>
+
+      {editing && <EditPantrySheet item={editing} onClose={() => setEditing(null)} />}
     </>
   )
 }

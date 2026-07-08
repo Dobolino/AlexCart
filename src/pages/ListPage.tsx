@@ -14,6 +14,7 @@ import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { QuickAddSection } from '@/components/QuickAddSection'
+import { LowStockSection } from '@/components/LowStockSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
@@ -139,7 +140,7 @@ export function ListPage() {
     setPriceSheetItem(null)
   }
   function handleAddToPantry(item: ShoppingItem) {
-    addPantryItem(item.name, item.category)
+    addPantryItem(item.name, item.category, item.amount)
     showToast(`${item.name} zum Vorrat hinzugefügt`)
   }
 
@@ -239,6 +240,7 @@ export function ListPage() {
           </div>
         )}
 
+        <LowStockSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
         <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
 
         {!activeItems.length && !doneItems.length ? (
