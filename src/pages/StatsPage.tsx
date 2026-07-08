@@ -1,5 +1,6 @@
 import { useStore } from '@/store/useStore'
 import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek, totalSpent, avgSpendPerTrip, maxTripSpend, pricedPurchaseCount } from '@/utils/stats'
+import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
 import { formatChf } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -29,6 +30,9 @@ export function StatsPage() {
   const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
   const completionRate = stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
   const hasPriceData = pricedPurchaseCount(purchaseLog) > 0
+  const priceHistory = productPriceHistory(purchaseLog)
+  const spendWeeks = spendPerWeek(purchaseLog, 8)
+  const maxSpendWeek = Math.max(0.01, ...spendWeeks.map((w) => w.amount))
 
   return (
     <>
@@ -81,6 +85,48 @@ export function StatsPage() {
                 </div>
               ))}
             </div>
+
+            {hasPriceData && (
+              <>
+                <div
+                  className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+                  style={{ color: 'var(--category-fg)' }}
+                >
+                  Ausgaben pro Woche
+                </div>
+                <div className="card-surface mb-4.5 flex items-end gap-1.5 px-4 py-4" style={{ height: 100 }}>
+                  {spendWeeks.map((w) => (
+                    <div key={w.weekStart} className="flex flex-1 flex-col items-center justify-end gap-1">
+                      <div
+                        className="w-full rounded-t-md"
+                        style={{
+                          height: `${Math.max(4, (w.amount / maxSpendWeek) * 64)}px`,
+                          background: 'var(--accent)',
+                          opacity: w.amount ? 1 : 0.25,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+                  style={{ color: 'var(--category-fg)' }}
+                >
+                  Preisverlauf
+                </div>
+                <div className="card-surface mb-4.5 px-4 py-3.5">
+                  {priceHistory.slice(0, 8).map((entry) => (
+                    <div key={entry.name} className="mb-3 border-b pb-3 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
+                      <div className="mb-0.5 text-[14px] font-bold">{entry.name}</div>
+                      <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        Zuletzt {formatChf(entry.lastPrice)} · Ø {formatChf(entry.avgPrice)} · {entry.count}× erfasst
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             <div
               className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -7,11 +8,20 @@ import { useTheme } from './hooks/useTheme'
 import { OnboardingSheet } from './components/OnboardingSheet'
 import { useEnsureStoreHydration } from './hooks/useStoreHydration'
 import { ListPage } from './pages/ListPage'
-import { PantryPage } from './pages/PantryPage'
-import { CalculatorPage } from './pages/CalculatorPage'
-import { StatsPage } from './pages/StatsPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { ShoppingModePage } from './pages/ShoppingModePage'
+
+const PantryPage = lazy(() => import('./pages/PantryPage').then((m) => ({ default: m.PantryPage })))
+const CalculatorPage = lazy(() => import('./pages/CalculatorPage').then((m) => ({ default: m.CalculatorPage })))
+const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const ShoppingModePage = lazy(() => import('./pages/ShoppingModePage').then((m) => ({ default: m.ShoppingModePage })))
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+      Laden…
+    </div>
+  )
+}
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -25,14 +35,16 @@ function AnimatedRoutes() {
         transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
         className="relative flex min-h-0 flex-1 flex-col"
       >
-        <Routes location={location}>
-          <Route path="/" element={<ListPage />} />
-          <Route path="/shop" element={<ShoppingModePage />} />
-          <Route path="/pantry" element={<PantryPage />} />
-          <Route path="/calculator" element={<CalculatorPage />} />
-          <Route path="/stats" element={<StatsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes location={location}>
+            <Route path="/" element={<ListPage />} />
+            <Route path="/shop" element={<ShoppingModePage />} />
+            <Route path="/pantry" element={<PantryPage />} />
+            <Route path="/calculator" element={<CalculatorPage />} />
+            <Route path="/stats" element={<StatsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   )

@@ -3,17 +3,22 @@ import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { useStore } from '@/store/useStore'
+import { exportListJson, listExportFilename } from '@/utils/exportList'
+import { shareOrDownloadBackup } from '@/utils/backup'
 
 interface ListSwitcherSheetProps {
   onClose: () => void
   onRepeated?: (count: number) => void
+  onDuplicated?: (name: string) => void
+  onExported?: () => void
 }
 
-export function ListSwitcherSheet({ onClose, onRepeated }: ListSwitcherSheetProps) {
+export function ListSwitcherSheet({ onClose, onRepeated, onDuplicated, onExported }: ListSwitcherSheetProps) {
   const lists = useStore((s) => s.lists)
   const activeListId = useStore((s) => s.activeListId)
   const switchList = useStore((s) => s.switchList)
   const createList = useStore((s) => s.createList)
+  const duplicateList = useStore((s) => s.duplicateList)
   const deleteList = useStore((s) => s.deleteList)
   const renameList = useStore((s) => s.renameList)
   const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
@@ -31,6 +36,13 @@ export function ListSwitcherSheet({ onClose, onRepeated }: ListSwitcherSheetProp
     if (editName.trim()) renameList(listId, editName)
     setEditingId(null)
     setEditName('')
+  }
+
+  async function handleExport(listId: string) {
+    const list = lists.find((l) => l.id === listId)
+    if (!list) return
+    await shareOrDownloadBackup(exportListJson(list), listExportFilename(list))
+    onExported?.()
   }
 
   return (
@@ -79,6 +91,26 @@ export function ListSwitcherSheet({ onClose, onRepeated }: ListSwitcherSheetProp
                   <span className="ml-2 text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>
                     {list.items.filter((i) => !i.done).length} offen
                   </span>
+                </button>
+                <button
+                  className="tap-scale p-1"
+                  style={{ color: 'var(--text-muted)' }}
+                  onClick={() => {
+                    duplicateList(list.id)
+                    onDuplicated?.(`${list.name} (Kopie)`)
+                    onClose()
+                  }}
+                  aria-label={`${list.name} duplizieren`}
+                >
+                  <Icon path={ICON_PATHS.copy} size={17} />
+                </button>
+                <button
+                  className="tap-scale p-1"
+                  style={{ color: 'var(--text-muted)' }}
+                  onClick={() => void handleExport(list.id)}
+                  aria-label={`${list.name} exportieren`}
+                >
+                  <Icon path={ICON_PATHS.share} size={17} />
                 </button>
                 <button
                   className="tap-scale p-1"

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
@@ -11,6 +11,7 @@ import { searchProducts } from '@/utils/search'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
+import { parseRecipeText } from '@/utils/recipe'
 import type { ImportMode } from '@/types'
 
 interface AddItemSheetProps {
@@ -47,6 +48,10 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const [recipeText, setRecipeText] = useState('')
   const [recipeError, setRecipeError] = useState('')
   const [recipeMode, setRecipeMode] = useState<ImportMode>('append')
+  const recipePreview = useMemo(
+    () => (recipeText.trim() ? parseRecipeText(recipeText, customProducts) : []),
+    [recipeText, customProducts]
+  )
 
   const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
@@ -324,6 +329,27 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
               setRecipeError('')
             }}
           />
+          {recipePreview.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-[13px] font-bold">
+                Vorschau ({recipePreview.length} Zutaten)
+              </div>
+              <div className="card-surface max-h-40 overflow-y-auto">
+                {recipePreview.map((item) => (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5 text-[13px] last:border-b-0"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <span className="min-w-0 truncate font-semibold">{item.name}</span>
+                    <span className="flex-none text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                      {item.amount || '–'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {openCount > 0 && (
             <div className="mt-3">
               <div className="mb-2 text-[13px] font-bold">Mit bestehender Liste</div>
@@ -353,8 +379,14 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
           <div className="mt-2 min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
             {recipeError}
           </div>
-          <button className="btn-primary mt-3 w-full py-3.5 text-[15px]" onClick={handleRecipeImport}>
-            Zutaten zur Liste hinzufügen
+          <button
+            className="btn-primary mt-3 w-full py-3.5 text-[15px]"
+            onClick={handleRecipeImport}
+            disabled={!recipePreview.length}
+          >
+            {recipePreview.length
+              ? `${recipePreview.length} Zutaten zur Liste hinzufügen`
+              : 'Zutaten zur Liste hinzufügen'}
           </button>
         </div>
       )}
