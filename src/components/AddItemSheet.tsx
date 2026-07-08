@@ -126,17 +126,19 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       </div>
 
       {mode === 'search' && (
-        <>
-          <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
-          <input
-            autoFocus
-            type="text"
-            className="input"
-            placeholder="z.B. Tomaten"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div className="mt-2 max-h-[300px] overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0">
+            <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
+            <input
+              autoFocus
+              type="text"
+              className="input"
+              placeholder="z.B. Tomaten"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {results.map((r) => {
               const iconKey = getIconKey(r.name, r.category)
               const color = getCategoryColor(r.category)
@@ -181,15 +183,15 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             )}
           </div>
           {addedCount > 0 && (
-            <button className="btn-primary mt-4 w-full py-3.5 text-[15px]" onClick={onClose}>
+            <button className="btn-primary mt-4 w-full shrink-0 py-3.5 text-[15px]" onClick={onClose}>
               Fertig ({addedCount} hinzugefügt)
             </button>
           )}
-        </>
+        </div>
       )}
 
       {mode === 'form' && (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <h2 className="mb-3 text-lg font-bold">{formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}</h2>
           <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
           <div className="mt-4 flex gap-2.5">
@@ -200,11 +202,11 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
               {formMode === 'new' ? 'Anlegen & hinzufügen' : 'Hinzufügen'}
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {mode === 'import' && (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <h2 className="mb-1 text-lg font-bold">Wochenplan importieren</h2>
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             JSON aus deinem Essensplan-Chat hier einfügen.
@@ -254,7 +256,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
           <button className="btn-primary mt-3 w-full py-3.5 text-[15px]" onClick={handleImport}>
             Importieren
           </button>
-        </>
+        </div>
       )}
     </Sheet>
   )

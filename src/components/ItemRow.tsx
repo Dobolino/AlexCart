@@ -8,6 +8,7 @@ import { getIconKey } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { hapticSuccess } from '@/utils/haptics'
+import type { DragFixedPosition } from '@/hooks/useDragReorder'
 import type { ShoppingItem } from '@/types'
 
 interface ItemRowProps {
@@ -24,7 +25,8 @@ interface ItemRowProps {
     onPointerUp: (e: React.PointerEvent) => void
   }
   isDragging?: boolean
-  dragDeltaY?: number
+  dragFixedPos?: DragFixedPosition | null
+  anyDragging?: boolean
   isDragOver?: boolean
 }
 
@@ -43,7 +45,8 @@ export function ItemRow({
   onAdjustAmount,
   dragHandleProps,
   isDragging = false,
-  dragDeltaY = 0,
+  dragFixedPos = null,
+  anyDragging = false,
   isDragOver,
 }: ItemRowProps) {
   const [dragX, setDragX] = useState(0)
@@ -73,7 +76,7 @@ export function ItemRow({
   // horizontal ist, reagieren wir überhaupt - sonst würde ein Tap oder vertikales
   // Scrollen (leichtes Zittern reicht) kurz sichtbar die Zeile verschieben.
   function handlePointerDown(e: React.PointerEvent) {
-    if (dragHandleProps) return
+    if (dragHandleProps || anyDragging) return
     start.current = { x: e.clientX, y: e.clientY }
     horizontalConfirmed.current = false
     setDragging(true)
@@ -111,7 +114,7 @@ export function ItemRow({
 
   return (
     <motion.div
-      layout={!isDragging}
+      layout={!anyDragging}
       data-item-id={item.id}
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -120,14 +123,20 @@ export function ItemRow({
       className="relative overflow-hidden border-b"
       style={{
         borderColor: 'var(--border)',
-        outline: isDragOver ? '2px solid var(--accent)' : 'none',
-        zIndex: isDragging ? 40 : undefined,
+        zIndex: isDragging ? 50 : undefined,
       }}
     >
+      {isDragOver && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px]"
+          style={{ background: 'var(--accent)' }}
+          aria-hidden
+        />
+      )}
       {isDragging && (
         <div
-          className="absolute inset-0"
-          style={{ background: 'var(--surface)', opacity: 0.45 }}
+          className="absolute inset-0 rounded-sm border-2 border-dashed"
+          style={{ borderColor: 'var(--accent)', opacity: 0.35, background: 'var(--surface)' }}
           aria-hidden
         />
       )}
@@ -135,14 +144,26 @@ export function ItemRow({
         className="relative flex min-h-[60px] items-center gap-3 px-3.5 py-3.5"
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
-          transform: isDragging
-            ? `translateY(${dragDeltaY}px) scale(1.02)`
-            : `translateX(${dragX}px)`,
-          transition: dragging || isDragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
-          opacity: isDragging ? 0.98 : exiting ? 0 : 1,
-          touchAction: isDragging ? 'none' : 'pan-y',
-          boxShadow: isDragging ? '0 10px 28px rgba(0,0,0,0.16)' : undefined,
-          pointerEvents: isDragging ? 'none' : undefined,
+          ...(isDragging && dragFixedPos
+            ? {
+                position: 'fixed',
+                top: dragFixedPos.top,
+                left: dragFixedPos.left,
+                width: dragFixedPos.width,
+                zIndex: 1000,
+                transform: 'scale(1.04)',
+                boxShadow: '0 14px 32px rgba(0,0,0,0.22)',
+                borderRadius: '12px',
+                opacity: 0.98,
+                touchAction: 'none',
+                pointerEvents: 'none',
+              }
+            : {
+                transform: `translateX(${dragX}px)`,
+                transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
+                opacity: exiting ? 0 : isDragging ? 0 : 1,
+                touchAction: 'pan-y',
+              }),
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -152,11 +173,10 @@ export function ItemRow({
       >
         {dragHandleProps && (
           <button
-            className="tap-scale flex h-7 w-5 flex-none touch-none items-center justify-center opacity-40"
-            style={{ color: 'var(--text-muted)' }}
+            className="tap-scale flex h-7 w-5 flex-none touch-none select-none items-center justify-center opacity-40"
+            style={{ color: 'var(--text-muted)', WebkitUserSelect: 'none', userSelect: 'none' }}
             aria-label="Verschieben"
             onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
-            onPointerMove={dragHandleProps.onPointerMove}
             onPointerUp={dragHandleProps.onPointerUp}
             onPointerCancel={dragHandleProps.onPointerUp}
             onClick={(e) => e.stopPropagation()}

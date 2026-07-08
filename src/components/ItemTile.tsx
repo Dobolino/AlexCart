@@ -8,6 +8,7 @@ import { getIconKey } from '@/utils/icon'
 import { getCategoryTileColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { hapticSuccess } from '@/utils/haptics'
+import type { DragFixedPosition } from '@/hooks/useDragReorder'
 import type { ShoppingItem } from '@/types'
 
 interface ItemTileProps {
@@ -25,7 +26,8 @@ interface ItemTileProps {
     onPointerUp: (e: React.PointerEvent) => void
   }
   isDragging?: boolean
-  dragDeltaY?: number
+  dragFixedPos?: DragFixedPosition | null
+  anyDragging?: boolean
   isDragOver?: boolean
 }
 
@@ -45,7 +47,8 @@ export function ItemTile({
   onAdjustAmount,
   dragHandleProps,
   isDragging = false,
-  dragDeltaY = 0,
+  dragFixedPos = null,
+  anyDragging = false,
   isDragOver,
 }: ItemTileProps) {
   const [dragX, setDragX] = useState(0)
@@ -72,7 +75,7 @@ export function ItemTile({
   }
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (dragHandleProps) return
+    if (dragHandleProps || anyDragging) return
     start.current = { x: e.clientX, y: e.clientY }
     horizontalConfirmed.current = false
     setDragging(true)
@@ -108,21 +111,25 @@ export function ItemTile({
 
   return (
     <motion.div
-      layout={!isDragging}
+      layout={!anyDragging}
       data-item-id={item.id}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, x: -40, transition: { duration: 0.12 } }}
       className="item-tile relative overflow-hidden rounded-[10px]"
-      style={{
-        outline: isDragOver ? '2px solid var(--accent)' : 'none',
-        zIndex: isDragging ? 40 : undefined,
-      }}
+      style={{ zIndex: isDragging ? 50 : undefined }}
     >
+      {isDragOver && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px] rounded-full"
+          style={{ background: 'var(--accent)' }}
+          aria-hidden
+        />
+      )}
       {isDragging && (
         <div
-          className="absolute inset-0 rounded-[10px]"
-          style={{ background: colors.bg, opacity: 0.28 }}
+          className="absolute inset-0 rounded-[10px] border-2 border-dashed"
+          style={{ borderColor: colors.fg, opacity: 0.4, background: colors.bg }}
           aria-hidden
         />
       )}
@@ -130,15 +137,27 @@ export function ItemTile({
         className="relative flex min-h-[52px] items-center gap-2.5 px-3 py-3"
         style={{
           background: colors.bg,
-          transform: isDragging
-            ? `translateY(${dragDeltaY}px) scale(1.03)`
-            : `translateX(${dragX}px)`,
-          transition: dragging || isDragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
-          opacity: isDragging ? 0.98 : exiting ? 0 : 1,
-          touchAction: isDragging ? 'none' : 'pan-y',
-          boxShadow: isDragging ? '0 10px 28px rgba(0,0,0,0.22)' : undefined,
-          borderRadius: '10px',
-          pointerEvents: isDragging ? 'none' : undefined,
+          ...(isDragging && dragFixedPos
+            ? {
+                position: 'fixed',
+                top: dragFixedPos.top,
+                left: dragFixedPos.left,
+                width: dragFixedPos.width,
+                zIndex: 1000,
+                transform: 'scale(1.05)',
+                boxShadow: '0 14px 32px rgba(0,0,0,0.28)',
+                borderRadius: '10px',
+                opacity: 0.98,
+                touchAction: 'none',
+                pointerEvents: 'none',
+              }
+            : {
+                transform: `translateX(${dragX}px)`,
+                transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
+                opacity: exiting ? 0 : isDragging ? 0 : 1,
+                touchAction: 'pan-y',
+                borderRadius: '10px',
+              }),
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -148,11 +167,10 @@ export function ItemTile({
       >
         {dragHandleProps && (
           <button
-            className="tap-scale flex h-7 w-5 flex-none touch-none items-center justify-center opacity-60"
-            style={{ color: colors.fg }}
+            className="tap-scale flex h-7 w-5 flex-none touch-none select-none items-center justify-center opacity-60"
+            style={{ color: colors.fg, WebkitUserSelect: 'none', userSelect: 'none' }}
             aria-label="Verschieben"
             onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
-            onPointerMove={dragHandleProps.onPointerMove}
             onPointerUp={dragHandleProps.onPointerUp}
             onPointerCancel={dragHandleProps.onPointerUp}
             onClick={(e) => e.stopPropagation()}
