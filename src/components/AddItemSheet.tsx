@@ -5,12 +5,13 @@ import { ProductForm, type ProductFormValues } from './ProductForm'
 import { ICON_PATHS } from '@/constants/icons'
 import { DEFAULT_UNIT } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
-import { ProductIcon } from '@/components/product-icons/ProductIcon'
+import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
+import type { ImportMode } from '@/types'
 
 interface AddItemSheetProps {
   onClose: () => void
@@ -28,6 +29,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const addCustomProduct = useStore((s) => s.addCustomProduct)
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
+  const activeList = useStore((s) => s.activeList())
 
   const [mode, setMode] = useState<Mode>('search')
   const [query, setQuery] = useState('')
@@ -39,6 +41,9 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
 
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
+  const [importMode, setImportMode] = useState<ImportMode>('merge')
+
+  const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
   const results = searchProducts(query, customProducts)
 
@@ -90,14 +95,16 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       setImportError('Bitte JSON einfügen.')
       return
     }
-    const result = importIntoActiveList(importText.trim())
+    const result = importIntoActiveList(importText.trim(), importMode)
     if (!result.ok) {
       setImportError(result.error || 'Import fehlgeschlagen.')
       return
     }
     onClose()
     const suffix = result.filteredCount ? `, ${result.filteredCount} aus Vorrat gefiltert` : ''
-    onImported(`${result.keptCount} Artikel importiert${suffix}`)
+    const modeLabel =
+      importMode === 'replace' ? 'importiert' : importMode === 'append' ? 'angehängt' : 'zusammengeführt'
+    onImported(`${result.keptCount} Artikel ${modeLabel}${suffix}`)
   }
 
   return (
@@ -119,17 +126,19 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       </div>
 
       {mode === 'search' && (
-        <>
-          <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
-          <input
-            autoFocus
-            type="text"
-            className="input"
-            placeholder="z.B. Tomaten"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div className="mt-2 max-h-[300px] overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0">
+            <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
+            <input
+              autoFocus
+              type="text"
+              className="input"
+              placeholder="z.B. Tomaten"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {results.map((r) => {
               const iconKey = getIconKey(r.name, r.category)
               const color = getCategoryColor(r.category)
@@ -140,12 +149,12 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
                   style={{ borderColor: 'var(--border)' }}
                   onClick={() => openConfirmFor(r)}
                 >
-                  <span
-                    className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                    style={{ background: color.bg, color: color.fg }}
-                  >
-                    <ProductIcon iconKey={iconKey} size={20} />
-                  </span>
+                  <ProductIconSlot
+                    iconKey={iconKey}
+                    size={20}
+                    wrapClassName="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                    wrapStyle={{ background: color.bg, color: color.fg }}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{r.name}</span>
                     <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -174,15 +183,15 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             )}
           </div>
           {addedCount > 0 && (
-            <button className="btn-primary mt-4 w-full py-3.5 text-[15px]" onClick={onClose}>
+            <button className="btn-primary mt-4 w-full shrink-0 py-3.5 text-[15px]" onClick={onClose}>
               Fertig ({addedCount} hinzugefügt)
             </button>
           )}
-        </>
+        </div>
       )}
 
       {mode === 'form' && (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <h2 className="mb-3 text-lg font-bold">{formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}</h2>
           <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
           <div className="mt-4 flex gap-2.5">
@@ -193,11 +202,11 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
               {formMode === 'new' ? 'Anlegen & hinzufügen' : 'Hinzufügen'}
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {mode === 'import' && (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <h2 className="mb-1 text-lg font-bold">Wochenplan importieren</h2>
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             JSON aus deinem Essensplan-Chat hier einfügen.
@@ -206,15 +215,48 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             className="input min-h-[160px] font-mono text-[14px]"
             placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Obst & Gemüse"}]}'
             value={importText}
-            onChange={(e) => setImportText(e.target.value)}
+            onChange={(e) => {
+              setImportText(e.target.value)
+              setImportError('')
+            }}
           />
+          {openCount > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-[13px] font-bold">Mit bestehender Liste</div>
+              <div className="flex flex-col gap-1.5">
+                {(
+                  [
+                    ['merge', 'Zusammenführen', 'Gleiche Namen werden addiert, neue ergänzt'],
+                    ['append', 'Anhängen', 'Importierte Artikel hinten anfügen'],
+                    ['replace', 'Ersetzen', 'Offene Artikel ersetzen (Erledigte bleiben)'],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="tap-scale rounded-xl px-3.5 py-2.5 text-left"
+                    style={{
+                      background: importMode === value ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                      outline: importMode === value ? '2px solid var(--accent)' : 'none',
+                    }}
+                    onClick={() => setImportMode(value)}
+                  >
+                    <div className="text-[14px] font-bold">{label}</div>
+                    <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      {hint}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-2 min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
             {importError}
           </div>
           <button className="btn-primary mt-3 w-full py-3.5 text-[15px]" onClick={handleImport}>
             Importieren
           </button>
-        </>
+        </div>
       )}
     </Sheet>
   )

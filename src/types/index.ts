@@ -49,6 +49,8 @@ export interface ImportPayload {
   items: ImportItemPayload[]
 }
 
+export type ImportMode = 'replace' | 'append' | 'merge'
+
 export interface ImportResult {
   ok: boolean
   error?: string

@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
-import { ProductIcon } from './product-icons/ProductIcon'
+import { ProductIconSlot } from './ProductIconSlot'
+import { ItemAmountColumn } from './ItemAmountColumn'
 import { ItemActionSheet } from './ItemActionSheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { hapticSuccess } from '@/utils/haptics'
+import type { DragFixedPosition } from '@/hooks/useDragReorder'
 import type { ShoppingItem } from '@/types'
 
 interface ItemRowProps {
@@ -21,8 +23,11 @@ interface ItemRowProps {
   dragHandleProps?: {
     onPointerDown: (e: React.PointerEvent, id: string) => void
     onPointerMove: (e: React.PointerEvent) => void
-    onPointerUp: () => void
+    onPointerUp: (e: React.PointerEvent) => void
   }
+  isDragging?: boolean
+  dragFixedPos?: DragFixedPosition | null
+  anyDragging?: boolean
   isDragOver?: boolean
 }
 
@@ -40,6 +45,9 @@ export function ItemRow({
   onToggleFavorite,
   onAdjustAmount,
   dragHandleProps,
+  isDragging = false,
+  dragFixedPos = null,
+  anyDragging = false,
   isDragOver,
 }: ItemRowProps) {
   const [dragX, setDragX] = useState(0)
@@ -65,11 +73,8 @@ export function ItemRow({
     setTimeout(() => onToggle(item.id), EXIT_ANIMATION_MS)
   }
 
-  // Wisch nach rechts zum Abhaken, mit Deadzone: erst wenn die Bewegung eindeutig
-  // horizontal ist, reagieren wir überhaupt - sonst würde ein Tap oder vertikales
-  // Scrollen (leichtes Zittern reicht) kurz sichtbar die Zeile verschieben.
   function handlePointerDown(e: React.PointerEvent) {
-    if (dragHandleProps) return
+    if (dragHandleProps || anyDragging) return
     start.current = { x: e.clientX, y: e.clientY }
     horizontalConfirmed.current = false
     setDragging(true)
@@ -91,8 +96,6 @@ export function ItemRow({
     const wasHorizontal = horizontalConfirmed.current
     const shouldToggle = wasHorizontal && dragX > SWIPE_TRIGGER
     setDragX(0)
-    // Nach horizontalem Wisch feuert iOS/Safari oft noch ein click – das würde
-    // den Artikel direkt wieder als offen markieren (Doppel-Toggle).
     if (wasHorizontal) suppressClickRef.current = true
     if (shouldToggle) handleToggle()
   }
@@ -107,7 +110,7 @@ export function ItemRow({
 
   return (
     <motion.div
-      layout
+      layout={!anyDragging}
       data-item-id={item.id}
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -116,17 +119,47 @@ export function ItemRow({
       className="relative overflow-hidden border-b"
       style={{
         borderColor: 'var(--border)',
-        outline: isDragOver ? '2px solid var(--accent)' : 'none',
+        zIndex: isDragging ? 50 : undefined,
       }}
     >
+      {isDragOver && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px]"
+          style={{ background: 'var(--accent)' }}
+          aria-hidden
+        />
+      )}
+      {isDragging && (
+        <div
+          className="absolute inset-0 rounded-sm border-2 border-dashed"
+          style={{ borderColor: 'var(--accent)', opacity: 0.35, background: 'var(--surface)' }}
+          aria-hidden
+        />
+      )}
       <div
-        className="relative flex min-h-[60px] items-center gap-3 px-3.5 py-3.5"
+        className="relative flex min-h-[68px] items-center gap-3 px-4 py-4"
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
-          transform: `translateX(${dragX}px)`,
-          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
-          opacity: exiting ? 0 : 1,
-          touchAction: 'pan-y',
+          ...(isDragging && dragFixedPos
+            ? {
+                position: 'fixed',
+                top: dragFixedPos.top,
+                left: dragFixedPos.left,
+                width: dragFixedPos.width,
+                zIndex: 1000,
+                transform: 'scale(1.04)',
+                boxShadow: '0 14px 32px rgba(0,0,0,0.22)',
+                borderRadius: '12px',
+                opacity: 0.98,
+                touchAction: 'none',
+                pointerEvents: 'none',
+              }
+            : {
+                transform: `translateX(${dragX}px)`,
+                transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
+                opacity: exiting ? 0 : isDragging ? 0 : 1,
+                touchAction: 'pan-y',
+              }),
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -136,11 +169,10 @@ export function ItemRow({
       >
         {dragHandleProps && (
           <button
-            className="tap-scale flex h-7 w-5 flex-none touch-none items-center justify-center opacity-40"
-            style={{ color: 'var(--text-muted)' }}
+            className="tap-scale flex h-7 w-5 flex-none touch-none select-none items-center justify-center opacity-40"
+            style={{ color: 'var(--text-muted)', WebkitUserSelect: 'none', userSelect: 'none' }}
             aria-label="Verschieben"
             onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
-            onPointerMove={dragHandleProps.onPointerMove}
             onPointerUp={dragHandleProps.onPointerUp}
             onPointerCancel={dragHandleProps.onPointerUp}
             onClick={(e) => e.stopPropagation()}
@@ -148,12 +180,13 @@ export function ItemRow({
             <Icon path={ICON_PATHS.drag} size={16} />
           </button>
         )}
-        <div
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-          style={{ background: color.bg, color: color.fg }}
-        >
-          <ProductIcon iconKey={iconKey} size={20} />
-        </div>
+        {/* Reserviert für zukünftige Produkt-Icons (KI / Custom) */}
+        <ProductIconSlot
+          iconKey={iconKey}
+          size={20}
+          wrapClassName="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+          wrapStyle={{ background: color.bg, color: color.fg }}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {item.favorite && (
@@ -162,7 +195,7 @@ export function ItemRow({
               </span>
             )}
             <div
-              className="truncate text-[16px] font-semibold leading-tight"
+              className="truncate text-[17px] font-bold leading-snug"
               style={{
                 color: item.done ? 'var(--text-muted)' : 'var(--text)',
                 textDecoration: item.done ? 'line-through' : 'none',
@@ -172,37 +205,18 @@ export function ItemRow({
               {item.name}
             </div>
           </div>
-          {(item.amount || item.note) && (
-            <div className="mt-1 flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-              {showStepper ? (
-                <span className="flex flex-none items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className="tap-scale flex h-6 w-6 flex-none items-center justify-center rounded-full"
-                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
-                    onClick={() => onAdjustAmount(item, -1)}
-                    aria-label={`${item.name} Menge verringern`}
-                  >
-                    <Icon path={ICON_PATHS.minus} size={13} />
-                  </button>
-                  <span className="min-w-[3.2rem] truncate text-center font-semibold" style={{ color: 'var(--text)' }}>
-                    {item.amount}
-                  </span>
-                  <button
-                    className="tap-scale flex h-6 w-6 flex-none items-center justify-center rounded-full"
-                    style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
-                    onClick={() => onAdjustAmount(item, 1)}
-                    aria-label={`${item.name} Menge erhöhen`}
-                  >
-                    <Icon path={ICON_PATHS.plus} size={13} />
-                  </button>
-                </span>
-              ) : (
-                item.amount && <span className="truncate">{item.amount}</span>
-              )}
-              {item.note && <span className="truncate">{item.note}</span>}
+          {item.note && (
+            <div className="mt-0.5 truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              {item.note}
             </div>
           )}
         </div>
+        <ItemAmountColumn
+          item={item}
+          showStepper={!!showStepper}
+          onAdjustAmount={onAdjustAmount}
+          variant="row"
+        />
         <button
           className="tap-scale flex h-8 w-8 flex-none items-center justify-center rounded-full"
           style={{ color: 'var(--text-muted)' }}

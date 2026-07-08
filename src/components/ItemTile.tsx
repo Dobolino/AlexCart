@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
-import { ProductIcon } from './product-icons/ProductIcon'
+import { ProductIconSlot } from './ProductIconSlot'
+import { ItemAmountColumn } from './ItemAmountColumn'
 import { ItemActionSheet } from './ItemActionSheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
 import { getCategoryTileColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { hapticSuccess } from '@/utils/haptics'
+import type { DragFixedPosition } from '@/hooks/useDragReorder'
 import type { ShoppingItem } from '@/types'
 
 interface ItemTileProps {
@@ -22,8 +24,11 @@ interface ItemTileProps {
   dragHandleProps?: {
     onPointerDown: (e: React.PointerEvent, id: string) => void
     onPointerMove: (e: React.PointerEvent) => void
-    onPointerUp: () => void
+    onPointerUp: (e: React.PointerEvent) => void
   }
+  isDragging?: boolean
+  dragFixedPos?: DragFixedPosition | null
+  anyDragging?: boolean
   isDragOver?: boolean
 }
 
@@ -42,6 +47,9 @@ export function ItemTile({
   onToggleFavorite,
   onAdjustAmount,
   dragHandleProps,
+  isDragging = false,
+  dragFixedPos = null,
+  anyDragging = false,
   isDragOver,
 }: ItemTileProps) {
   const [dragX, setDragX] = useState(0)
@@ -68,7 +76,7 @@ export function ItemTile({
   }
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (dragHandleProps) return
+    if (dragHandleProps || anyDragging) return
     start.current = { x: e.clientX, y: e.clientY }
     horizontalConfirmed.current = false
     setDragging(true)
@@ -104,24 +112,53 @@ export function ItemTile({
 
   return (
     <motion.div
-      layout
+      layout={!anyDragging}
       data-item-id={item.id}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, x: -40, transition: { duration: 0.12 } }}
-      className="item-tile overflow-hidden rounded-[10px]"
-      style={{
-        background: colors.bg,
-        opacity: isDragOver ? 0.85 : exiting ? 0 : 1,
-        outline: isDragOver ? '2px solid var(--accent)' : 'none',
-      }}
+      className="item-tile relative overflow-hidden rounded-[12px]"
+      style={{ zIndex: isDragging ? 50 : undefined }}
     >
+      {isDragOver && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px] rounded-full"
+          style={{ background: 'var(--accent)' }}
+          aria-hidden
+        />
+      )}
+      {isDragging && (
+        <div
+          className="absolute inset-0 rounded-[12px] border-2 border-dashed"
+          style={{ borderColor: colors.fg, opacity: 0.4, background: colors.bg }}
+          aria-hidden
+        />
+      )}
       <div
-        className="relative flex min-h-[52px] items-center gap-2.5 px-3 py-3"
+        className="relative flex min-h-[64px] items-center gap-2.5 px-3.5 py-3.5"
         style={{
-          transform: `translateX(${dragX}px)`,
-          transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
-          touchAction: 'pan-y',
+          background: colors.bg,
+          ...(isDragging && dragFixedPos
+            ? {
+                position: 'fixed',
+                top: dragFixedPos.top,
+                left: dragFixedPos.left,
+                width: dragFixedPos.width,
+                zIndex: 1000,
+                transform: 'scale(1.05)',
+                boxShadow: '0 14px 32px rgba(0,0,0,0.28)',
+                borderRadius: '12px',
+                opacity: 0.98,
+                touchAction: 'none',
+                pointerEvents: 'none',
+              }
+            : {
+                transform: `translateX(${dragX}px)`,
+                transition: dragging ? 'none' : 'transform 0.18s var(--ease-spring), opacity 0.32s ease',
+                opacity: exiting ? 0 : isDragging ? 0 : 1,
+                touchAction: 'pan-y',
+                borderRadius: '12px',
+              }),
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -131,11 +168,10 @@ export function ItemTile({
       >
         {dragHandleProps && (
           <button
-            className="tap-scale flex h-7 w-5 flex-none touch-none items-center justify-center opacity-60"
-            style={{ color: colors.fg }}
+            className="tap-scale flex h-7 w-5 flex-none touch-none select-none items-center justify-center opacity-60"
+            style={{ color: colors.fg, WebkitUserSelect: 'none', userSelect: 'none' }}
             aria-label="Verschieben"
             onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
-            onPointerMove={dragHandleProps.onPointerMove}
             onPointerUp={dragHandleProps.onPointerUp}
             onPointerCancel={dragHandleProps.onPointerUp}
             onClick={(e) => e.stopPropagation()}
@@ -143,9 +179,13 @@ export function ItemTile({
             <Icon path={ICON_PATHS.drag} size={16} />
           </button>
         )}
-        <div className="flex h-8 w-8 flex-none items-center justify-center" style={{ color: colors.fg }}>
-          <ProductIcon iconKey={iconKey} size={22} />
-        </div>
+        {/* Reserviert für zukünftige Produkt-Icons (KI / Custom) */}
+        <ProductIconSlot
+          iconKey={iconKey}
+          size={22}
+          wrapClassName="flex h-8 w-8 flex-none items-center justify-center"
+          wrapStyle={{ color: colors.fg }}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
             {item.favorite && (
@@ -154,7 +194,7 @@ export function ItemTile({
               </span>
             )}
             <div
-              className="truncate text-[15px] font-semibold leading-tight"
+              className="truncate text-[16px] font-bold leading-snug"
               style={{
                 color: colors.fg,
                 textDecoration: item.done ? 'line-through' : 'none',
@@ -164,33 +204,19 @@ export function ItemTile({
               {item.name}
             </div>
           </div>
-          {(item.amount || item.note) && (
-            <div className="mt-0.5 flex items-center gap-2 text-[12px]" style={{ color: colors.fg, opacity: 0.8 }}>
-              {showStepper ? (
-                <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className="tap-scale flex h-5 w-5 items-center justify-center rounded-full"
-                    style={{ background: 'rgba(255,255,255,0.2)' }}
-                    onClick={() => onAdjustAmount(item, -1)}
-                  >
-                    <Icon path={ICON_PATHS.minus} size={11} />
-                  </button>
-                  <span className="min-w-[2.8rem] text-center font-semibold">{item.amount}</span>
-                  <button
-                    className="tap-scale flex h-5 w-5 items-center justify-center rounded-full"
-                    style={{ background: 'rgba(255,255,255,0.2)' }}
-                    onClick={() => onAdjustAmount(item, 1)}
-                  >
-                    <Icon path={ICON_PATHS.plus} size={11} />
-                  </button>
-                </span>
-              ) : (
-                item.amount && <span className="truncate">{item.amount}</span>
-              )}
-              {item.note && <span className="truncate opacity-80">{item.note}</span>}
+          {item.note && (
+            <div className="mt-0.5 truncate text-[12px]" style={{ color: colors.fg, opacity: 0.75 }}>
+              {item.note}
             </div>
           )}
         </div>
+        <ItemAmountColumn
+          item={item}
+          showStepper={!!showStepper}
+          onAdjustAmount={onAdjustAmount}
+          variant="tile"
+          accentColor={colors.fg}
+        />
         <button
           className="tap-scale flex h-7 w-7 flex-none items-center justify-center rounded-full"
           style={{ color: colors.fg, opacity: 0.75 }}

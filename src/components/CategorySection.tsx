@@ -34,6 +34,7 @@ export function CategorySection({
   const containerRef = useRef<HTMLDivElement>(null)
   const itemIds = items.map((i) => i.id)
   const drag = useDragReorder(itemIds, onReorder, containerRef)
+  const anyDragging = !!drag.dragId
 
   const dragProps = {
     onPointerDown: drag.onHandlePointerDown,
@@ -47,7 +48,11 @@ export function CategorySection({
         <div className="category-heading px-1.5 pb-2 text-[15px] font-bold" style={{ color: 'var(--text)' }}>
           {category}
         </div>
-        <div ref={containerRef} className="item-tiles flex flex-col gap-[3px]">
+        <div
+          ref={containerRef}
+          className={`item-tiles flex flex-col gap-1.5${anyDragging ? ' select-none' : ''}`}
+          style={anyDragging ? { WebkitUserSelect: 'none', userSelect: 'none' } : undefined}
+        >
           <AnimatePresence initial={false}>
             {items.map((item) => (
               <ItemTile
@@ -61,6 +66,9 @@ export function CategorySection({
                 onToggleFavorite={onToggleFavorite}
                 onAdjustAmount={onAdjustAmount}
                 dragHandleProps={dragProps}
+                isDragging={drag.dragId === item.id}
+                dragFixedPos={drag.dragId === item.id ? drag.dragFixedPos : null}
+                anyDragging={anyDragging}
                 isDragOver={drag.overId === item.id && drag.dragId !== item.id}
               />
             ))}
@@ -78,7 +86,9 @@ export function CategorySection({
       >
         {category}
       </div>
-      <div ref={containerRef} className="card-surface">
+      <div ref={containerRef} className={`card-surface${anyDragging ? ' select-none' : ''}`}
+        style={anyDragging ? { WebkitUserSelect: 'none', userSelect: 'none' } : undefined}
+      >
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <ItemRow
@@ -91,6 +101,9 @@ export function CategorySection({
               onToggleFavorite={onToggleFavorite}
               onAdjustAmount={onAdjustAmount}
               dragHandleProps={dragProps}
+              isDragging={drag.dragId === item.id}
+              dragFixedPos={drag.dragId === item.id ? drag.dragFixedPos : null}
+              anyDragging={anyDragging}
               isDragOver={drag.overId === item.id && drag.dragId !== item.id}
             />
           ))}

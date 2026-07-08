@@ -128,6 +128,17 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+body.is-dragging,
+body.is-dragging * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+.sheet-panel {
+  overscroll-behavior: contain;
+}
+
 /* html/body are hard-locked to the viewport (overflow: hidden) so the document
    itself can never scroll or rubber-band bounce - only elements that explicitly
    opt in (main[overflow-y:auto] inside .app-shell) scroll. Without this, iOS
