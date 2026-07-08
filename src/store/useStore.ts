@@ -22,7 +22,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 3
+const STORE_VERSION = 4
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -51,7 +51,13 @@ const safeStorage = {
 }
 
 function defaultSettings(): AppSettings {
-  return { theme: 'system', listViewMode: 'tiles', hasSeenOnboarding: false, askPriceOnCheckoff: false }
+  return {
+    theme: 'system',
+    listViewMode: 'tiles',
+    hasSeenOnboarding: false,
+    askPriceOnCheckoff: false,
+    weeklyBudget: 0,
+  }
 }
 
 function defaultPantry(): PantryItem[] {
@@ -148,6 +154,7 @@ interface AppState {
   setTheme: (theme: Theme) => void
   setListViewMode: (mode: ListViewMode) => void
   setAskPriceOnCheckoff: (ask: boolean) => void
+  setWeeklyBudget: (amount: number) => void
   setHasSeenOnboarding: () => void
   resetAll: () => void
 
@@ -491,6 +498,13 @@ export const useStore = create<AppState>()(
       setListViewMode: (listViewMode) => set((state) => ({ settings: { ...state.settings, listViewMode } })),
       setAskPriceOnCheckoff: (askPriceOnCheckoff) =>
         set((state) => ({ settings: { ...state.settings, askPriceOnCheckoff } })),
+      setWeeklyBudget: (weeklyBudget) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            weeklyBudget: Number.isFinite(weeklyBudget) && weeklyBudget > 0 ? Math.round(weeklyBudget * 100) / 100 : 0,
+          },
+        })),
       setHasSeenOnboarding: () =>
         set((state) => ({ settings: { ...state.settings, hasSeenOnboarding: true } })),
 
@@ -540,6 +554,13 @@ export const useStore = create<AppState>()(
               ...defaultSettings(),
               ...(state.settings as Partial<AppSettings>),
               askPriceOnCheckoff: false,
+            }
+          }
+          if (version < 4) {
+            state.settings = {
+              ...defaultSettings(),
+              ...(state.settings as Partial<AppSettings>),
+              weeklyBudget: 0,
             }
           }
           return state as AppState

@@ -7,6 +7,8 @@ export interface AppSettings {
   hasSeenOnboarding: boolean
   /** Preis-Eingabe direkt beim Abhaken anzeigen. */
   askPriceOnCheckoff: boolean
+  /** Wochenbudget in CHF – 0 = deaktiviert. */
+  weeklyBudget: number
 }
 
 export interface ShoppingItem {

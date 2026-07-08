@@ -8,6 +8,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
 import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { getCategoryColor } from '@/utils/categoryColor'
+import { parseChfInput } from '@/utils/currency'
 import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
 import type { CustomProduct, Theme } from '@/types'
 
@@ -20,13 +21,16 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 export function SettingsPage() {
   const theme = useStore((s) => s.settings.theme)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
+  const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const setTheme = useStore((s) => s.setTheme)
   const setAskPriceOnCheckoff = useStore((s) => s.setAskPriceOnCheckoff)
+  const setWeeklyBudget = useStore((s) => s.setWeeklyBudget)
   const resetAll = useStore((s) => s.resetAll)
   const customProducts = useStore((s) => s.customProducts)
   const removeCustomProduct = useStore((s) => s.removeCustomProduct)
   const [editing, setEditing] = useState<CustomProduct | null>(null)
   const [backupMessage, setBackupMessage] = useState('')
+  const [budgetInput, setBudgetInput] = useState(weeklyBudget > 0 ? String(weeklyBudget) : '')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleExportBackup() {
@@ -58,6 +62,14 @@ export function SettingsPage() {
     }
     reader.readAsText(file)
   }
+
+  function saveBudgetInput() {
+    const parsed = parseChfInput(budgetInput)
+    setWeeklyBudget(parsed ?? 0)
+    setBudgetInput(parsed ? String(parsed) : '')
+  }
+
+  const BUDGET_PRESETS = [100, 150, 200, 250]
 
   return (
     <>
@@ -113,6 +125,62 @@ export function SettingsPage() {
               />
             </button>
           </label>
+          <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
+            <span className="block text-[15px] font-semibold">Wochenbudget</span>
+            <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              Ausgaben der aktuellen Woche im Listen-Header verfolgen
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                CHF
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="input flex-1 py-2 text-[15px]"
+                placeholder="z. B. 150"
+                value={budgetInput}
+                onChange={(e) => setBudgetInput(e.target.value)}
+                onBlur={saveBudgetInput}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveBudgetInput()
+                }}
+              />
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {BUDGET_PRESETS.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                  style={{
+                    background: weeklyBudget === amount ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                    color: weeklyBudget === amount ? 'var(--accent)' : 'var(--text)',
+                    outline: weeklyBudget === amount ? '2px solid var(--accent)' : 'none',
+                  }}
+                  onClick={() => {
+                    setWeeklyBudget(amount)
+                    setBudgetInput(String(amount))
+                  }}
+                >
+                  {amount}
+                </button>
+              ))}
+              {weeklyBudget > 0 && (
+                <button
+                  type="button"
+                  className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                  style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
+                  onClick={() => {
+                    setWeeklyBudget(0)
+                    setBudgetInput('')
+                  }}
+                >
+                  Aus
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div

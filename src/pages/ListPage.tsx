@@ -17,7 +17,9 @@ import { QuickAddSection } from '@/components/QuickAddSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
+import { BudgetBar } from '@/components/BudgetBar'
 import { formatChf } from '@/utils/currency'
+import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import type { ShoppingItem } from '@/types'
 
 interface ToastState {
@@ -45,6 +47,8 @@ export function ListPage() {
   const listViewMode = useStore((s) => s.settings.listViewMode)
   const setListViewMode = useStore((s) => s.setListViewMode)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
+  const purchaseLog = useStore((s) => s.purchaseLog)
+  const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
 
   const [addOpen, setAddOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -64,11 +68,19 @@ export function ListPage() {
 
   const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
   const hasCalculatorTotal = calculatorEntries.length > 0
-  const summaryParts = [
-    ...(hasCalculatorTotal ? [formatChf(calculatorTotal)] : []),
-    `${activeItems.length} offen`,
-    ...(doneItems.length > 0 ? [`${doneItems.length} erledigt`] : []),
-  ]
+  const weekSpend = currentWeekSpend(purchaseLog)
+  const budgetSpend = totalBudgetSpend(weekSpend, calculatorTotal)
+  const hasWeeklyBudget = weeklyBudget > 0
+  const budget = hasWeeklyBudget ? budgetProgress(budgetSpend, weeklyBudget) : null
+
+  const summaryParts: string[] = []
+  if (hasWeeklyBudget) {
+    summaryParts.push(`${formatChf(budgetSpend)} / ${formatChf(weeklyBudget)}`)
+  } else if (hasCalculatorTotal) {
+    summaryParts.push(formatChf(calculatorTotal))
+  }
+  summaryParts.push(`${activeItems.length} offen`)
+  if (doneItems.length > 0) summaryParts.push(`${doneItems.length} erledigt`)
   const listSubtitle = summaryParts.join(' • ')
 
   function showToast(message: string, action?: ToastState['action'], secondaryAction?: ToastState['secondaryAction']) {
@@ -208,6 +220,7 @@ export function ListPage() {
           </div>
         }
       />
+      {budget && <BudgetBar progress={budget} />}
 
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
         {filteredItems.length > 0 && (
