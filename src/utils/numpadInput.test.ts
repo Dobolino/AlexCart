@@ -1,18 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { applyMoneyNumpadKey } from './numpadInput'
+import { applyFixedDecimalKey, centsToAmount } from './numpadInput'
 
-describe('applyMoneyNumpadKey', () => {
-  it('appends digits and comma', () => {
-    expect(applyMoneyNumpadKey('', '1')).toBe('1')
-    expect(applyMoneyNumpadKey('12', ',')).toBe('12,')
-    expect(applyMoneyNumpadKey('', ',')).toBe('0,')
+describe('applyFixedDecimalKey', () => {
+  it('builds amounts digit by digit like a cash register', () => {
+    let cents = 0
+    for (const key of ['1', '0', '2', '2', '5']) {
+      cents = applyFixedDecimalKey(cents, key)
+    }
+    expect(cents).toBe(10_225)
+    expect(centsToAmount(cents)).toBe(102.25)
   })
 
-  it('limits decimals to two places', () => {
-    expect(applyMoneyNumpadKey('1,23', '4')).toBe('1,23')
+  it('clears with C and deletes with backspace', () => {
+    expect(applyFixedDecimalKey(1025, '⌫')).toBe(102)
+    expect(applyFixedDecimalKey(1025, 'C')).toBe(0)
   })
+})
 
-  it('deletes the last character', () => {
-    expect(applyMoneyNumpadKey('12,5', '⌫')).toBe('12,')
+describe('centsToAmount', () => {
+  it('returns null for zero or negative cents', () => {
+    expect(centsToAmount(0)).toBeNull()
+    expect(centsToAmount(-1)).toBeNull()
   })
 })

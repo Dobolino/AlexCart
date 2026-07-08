@@ -8,6 +8,7 @@ import { parseRecipeText } from '@/utils/recipe'
 import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
+import { freshCalculatorEntries } from '@/utils/calculatorDay'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
 import type {
@@ -24,7 +25,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 6
+const STORE_VERSION = 7
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -120,6 +121,8 @@ interface AppState {
   filtered: FilteredEntry[]
   settings: AppSettings
   calculatorEntries: CalculatorEntry[]
+  /** Datum der manuellen Rechner-Einträge – bei neuem Tag werden sie geleert. */
+  calculatorDate: string
 
   activeList: () => ShoppingList | undefined
   filteredForActiveList: () => ShoppingItem[]
@@ -171,6 +174,7 @@ interface AppState {
   addCalculatorEntry: (amount: number) => void
   removeCalculatorEntry: (id: string) => void
   clearCalculator: () => void
+  ensureCalculatorDay: () => void
 
   resetStats: () => void
 }
@@ -187,6 +191,7 @@ export const useStore = create<AppState>()(
       filtered: [],
       settings: defaultSettings(),
       calculatorEntries: [],
+      calculatorDate: todayKey(),
 
       activeList: () => {
         const { lists, activeListId } = get()
@@ -580,16 +585,31 @@ export const useStore = create<AppState>()(
             filtered: [],
             settings: defaultSettings(),
             calculatorEntries: [],
+            calculatorDate: todayKey(),
           }
         }),
 
+      ensureCalculatorDay: () => {
+        const today = todayKey()
+        set((state) => {
+          if (state.calculatorDate === today) return state
+          return { calculatorEntries: [], calculatorDate: today }
+        })
+      },
+
       addCalculatorEntry: (amount) => {
         if (!Number.isFinite(amount) || amount <= 0) return
-        set((state) => ({ calculatorEntries: [...state.calculatorEntries, { id: uid(), amount }] }))
+        set((state) => {
+          const fresh = freshCalculatorEntries(state.calculatorEntries, state.calculatorDate)
+          return {
+            calculatorEntries: [...fresh.entries, { id: uid(), amount }],
+            calculatorDate: fresh.date,
+          }
+        })
       },
       removeCalculatorEntry: (id) =>
         set((state) => ({ calculatorEntries: state.calculatorEntries.filter((e) => e.id !== id) })),
-      clearCalculator: () => set({ calculatorEntries: [] }),
+      clearCalculator: () => set({ calculatorEntries: [], calculatorDate: todayKey() }),
 
       resetStats: () => set({ purchaseLog: [], stats: defaultStats() }),
     }),
@@ -636,6 +656,9 @@ export const useStore = create<AppState>()(
               currency: 'CHF',
             }
           }
+          if (version < 7) {
+            state.calculatorDate = todayKey()
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)
@@ -652,18 +675,25 @@ export const useStore = create<AppState>()(
         filtered: state.filtered,
         settings: state.settings,
         calculatorEntries: state.calculatorEntries,
+        calculatorDate: state.calculatorDate,
       }),
       merge: (persistedState, currentState) => {
         try {
           const persisted = (persistedState as Partial<AppState>) || {}
           const hasPersisted = persisted.lists && persisted.lists.length > 0
           if (hasPersisted) {
+            const calc = freshCalculatorEntries(
+              persisted.calculatorEntries ?? [],
+              persisted.calculatorDate
+            )
             return {
               ...currentState,
               ...persisted,
               stats: { ...defaultStats(), ...persisted.stats },
               settings: { ...defaultSettings(), ...persisted.settings },
               activeListId: persisted.activeListId || persisted.lists![0].id,
+              calculatorEntries: calc.entries,
+              calculatorDate: calc.date,
             }
           }
 

@@ -8,7 +8,10 @@ export function useEnsureStoreHydration(): void {
   useEffect(() => {
     if (useStore.persist.hasHydrated()) return
 
-    const unsub = useStore.persist.onFinishHydration(() => unsub())
+    const unsub = useStore.persist.onFinishHydration(() => {
+      useStore.getState().ensureCalculatorDay()
+      unsub()
+    })
 
     const timeout = window.setTimeout(() => {
       if (useStore.persist.hasHydrated()) return

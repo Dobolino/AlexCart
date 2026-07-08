@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { MoneyNumpad } from './MoneyNumpad'
-import { formatMoney, parseMoneyInput } from '@/utils/currency'
+import { centsToAmount } from '@/utils/numpadInput'
 import type { Currency, ShoppingItem } from '@/types'
 
 interface CheckoffPriceSheetProps {
@@ -13,11 +13,11 @@ interface CheckoffPriceSheetProps {
 }
 
 export function CheckoffPriceSheet({ item, currency, onClose, onSave, onSkip }: CheckoffPriceSheetProps) {
-  const [input, setInput] = useState('')
+  const [cents, setCents] = useState(0)
   const [error, setError] = useState('')
 
   function handleSave() {
-    const price = parseMoneyInput(input)
+    const price = centsToAmount(cents)
     if (price === null) {
       setError('Bitte einen gültigen Preis eingeben.')
       return
@@ -30,15 +30,11 @@ export function CheckoffPriceSheet({ item, currency, onClose, onSave, onSkip }: 
       <h2 className="mb-1 text-lg font-bold">Preis erfassen</h2>
       <p className="mb-3 text-[14px]" style={{ color: 'var(--text-muted)' }}>
         Was hat <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span> gekostet?
+        Ziffern nacheinander tippen – die Cent-Stellen füllen sich automatisch.
       </p>
 
-      <MoneyNumpad value={input} onChange={(value) => { setInput(value); setError('') }} currency={currency} compact />
+      <MoneyNumpad cents={cents} onChange={(value) => { setCents(value); setError('') }} currency={currency} compact />
 
-      {input && parseMoneyInput(input) !== null && (
-        <p className="mb-2 text-center text-[13px] font-semibold" style={{ color: 'var(--accent)' }}>
-          {formatMoney(parseMoneyInput(input)!, currency)}
-        </p>
-      )}
       {error && (
         <p className="mb-2 text-center text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
           {error}
