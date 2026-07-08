@@ -239,7 +239,7 @@ export function ListPage() {
       {budget && <BudgetBar progress={budget} currency={currency} />}
       <InstallPrompt />
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-24">
         {filteredItems.length > 0 && (
           <div
             className="glass-card mb-3.5 flex items-center justify-between gap-2.5 px-3.5 py-3 text-[13px]"
@@ -261,16 +261,18 @@ export function ListPage() {
         <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
 
         {!activeItems.length && !doneItems.length ? (
-          <EmptyState
-            icon={ICON_PATHS.cart}
-            title="Noch keine Einkaufsliste"
-            hint="Füge unten Artikel hinzu oder importiere deinen Wochenplan."
-            action={
-              <button className="btn-primary tap-scale mt-1 rounded-full px-6 py-3 text-[14px]" onClick={() => setAddOpen(true)}>
-                Artikel hinzufügen
-              </button>
-            }
-          />
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              icon={ICON_PATHS.cart}
+              title="Noch keine Einkaufsliste"
+              hint="Füge unten Artikel hinzu oder importiere deinen Wochenplan."
+              action={
+                <button className="btn-primary tap-scale mt-1 rounded-full px-6 py-3 text-[14px]" onClick={() => setAddOpen(true)}>
+                  Artikel hinzufügen
+                </button>
+              }
+            />
+          </div>
         ) : (
           <>
             {groups.map((g) => (
