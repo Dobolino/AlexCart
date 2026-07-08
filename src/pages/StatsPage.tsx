@@ -1,7 +1,7 @@
 import { useStore } from '@/store/useStore'
 import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek, totalSpent, avgSpendPerTrip, maxTripSpend, pricedPurchaseCount } from '@/utils/stats'
 import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
-import { formatChf } from '@/utils/currency'
+import { formatMoney } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { ICON_PATHS } from '@/constants/icons'
@@ -20,6 +20,7 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
 export function StatsPage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
   const stats = useStore((s) => s.stats)
+  const currency = useStore((s) => s.settings.currency)
   const resetStats = useStore((s) => s.resetStats)
 
   const top = topItems(purchaseLog)
@@ -51,9 +52,9 @@ export function StatsPage() {
 
         {hasPriceData && (
           <div className="mb-4.5 grid grid-cols-3 gap-2.5">
-            <StatTile value={formatChf(avgSpendPerTrip(purchaseLog))} label="Ø Ausgaben" />
-            <StatTile value={formatChf(maxTripSpend(purchaseLog))} label="Teuerster Tag" />
-            <StatTile value={formatChf(totalSpent(purchaseLog))} label="Gesamt erfasst" />
+            <StatTile value={formatMoney(avgSpendPerTrip(purchaseLog), currency)} label="Ø Ausgaben" />
+            <StatTile value={formatMoney(maxTripSpend(purchaseLog), currency)} label="Teuerster Tag" />
+            <StatTile value={formatMoney(totalSpent(purchaseLog), currency)} label="Gesamt erfasst" />
           </div>
         )}
 
@@ -120,7 +121,7 @@ export function StatsPage() {
                     <div key={entry.name} className="mb-3 border-b pb-3 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
                       <div className="mb-0.5 text-[14px] font-bold">{entry.name}</div>
                       <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        Zuletzt {formatChf(entry.lastPrice)} · Ø {formatChf(entry.avgPrice)} · {entry.count}× erfasst
+                        Zuletzt {formatMoney(entry.lastPrice, currency)} · Ø {formatMoney(entry.avgPrice, currency)} · {entry.count}× erfasst
                       </div>
                     </div>
                   ))}

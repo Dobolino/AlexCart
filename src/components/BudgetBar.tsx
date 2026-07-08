@@ -1,11 +1,13 @@
-import { formatChf } from '@/utils/currency'
+import { formatMoney } from '@/utils/currency'
+import type { Currency } from '@/types'
 import type { BudgetProgress } from '@/utils/budget'
 
 interface BudgetBarProps {
   progress: BudgetProgress
+  currency: Currency
 }
 
-export function BudgetBar({ progress }: BudgetBarProps) {
+export function BudgetBar({ progress, currency }: BudgetBarProps) {
   if (progress.budget <= 0) return null
 
   const fillColor =
@@ -17,8 +19,8 @@ export function BudgetBar({ progress }: BudgetBarProps) {
 
   const detail =
     progress.status === 'over'
-      ? `${formatChf(Math.abs(progress.remaining))} über Budget`
-      : `Noch ${formatChf(progress.remaining)} · ${progress.percent}%`
+      ? `${formatMoney(Math.abs(progress.remaining), currency)} über Budget`
+      : `Noch ${formatMoney(progress.remaining, currency)} · ${progress.percent}%`
 
   return (
     <div className="px-4 pb-2">

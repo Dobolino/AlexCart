@@ -3,7 +3,7 @@ import { useStore } from '@/store/useStore'
 import { PageHeader } from '@/components/PageHeader'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
-import { formatChf } from '@/utils/currency'
+import { formatMoney, currencySymbol } from '@/utils/currency'
 
 const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', ',', '0', '⌫']
 
@@ -12,6 +12,7 @@ export function CalculatorPage() {
   const addCalculatorEntry = useStore((s) => s.addCalculatorEntry)
   const removeCalculatorEntry = useStore((s) => s.removeCalculatorEntry)
   const clearCalculator = useStore((s) => s.clearCalculator)
+  const currency = useStore((s) => s.settings.currency)
   const [input, setInput] = useState('')
 
   const total = entries.reduce((sum, e) => sum + e.amount, 0)
@@ -50,7 +51,7 @@ export function CalculatorPage() {
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
           <span className="text-[14px] font-semibold opacity-80">Summe</span>
-          <span className="text-[28px] font-extrabold">{formatChf(total)}</span>
+          <span className="text-[28px] font-extrabold">{formatMoney(total, currency)}</span>
         </div>
 
         <div
@@ -60,10 +61,10 @@ export function CalculatorPage() {
           {input ? (
             <>
               <span>{input}</span>
-              <span className="text-[16px] font-semibold opacity-60">CHF</span>
+              <span className="text-[16px] font-semibold opacity-60">{currencySymbol(currency)}</span>
             </>
           ) : (
-            <span style={{ color: 'var(--text-muted)' }}>{formatChf(0)}</span>
+            <span style={{ color: 'var(--text-muted)' }}>{formatMoney(0, currency)}</span>
           )}
         </div>
 
@@ -96,7 +97,7 @@ export function CalculatorPage() {
                   className="flex items-center justify-between border-b px-4 py-3"
                   style={{ borderColor: 'var(--border)' }}
                 >
-                  <span className="text-[15px] font-semibold">{formatChf(entry.amount)}</span>
+                  <span className="text-[15px] font-semibold">{formatMoney(entry.amount, currency)}</span>
                   <button style={{ color: 'var(--danger)' }} onClick={() => removeCalculatorEntry(entry.id)}>
                     <Icon path={ICON_PATHS.close} size={16} />
                   </button>
