@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
@@ -15,6 +16,7 @@ import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { QuickAddSection } from '@/components/QuickAddSection'
 import { LowStockSection } from '@/components/LowStockSection'
+import { RecurringSection } from '@/components/RecurringSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
@@ -30,6 +32,7 @@ interface ToastState {
 }
 
 export function ListPage() {
+  const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
@@ -188,6 +191,16 @@ export function ListPage() {
         onTitleClick={() => setSwitcherOpen(true)}
         right={
           <div className="flex items-center gap-1">
+            {activeItems.length > 0 && (
+              <button
+                className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
+                onClick={() => navigate('/shop')}
+                aria-label="Einkaufsmodus starten"
+              >
+                <Icon path={ICON_PATHS.shopping} size={18} />
+              </button>
+            )}
             <button
               className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
               style={{
@@ -241,6 +254,7 @@ export function ListPage() {
         )}
 
         <LowStockSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
+        <RecurringSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
         <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
 
         {!activeItems.length && !doneItems.length ? (

@@ -4,6 +4,7 @@ import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
 import { applyImportMode } from '@/utils/mergeList'
 import { buildRepeatCandidates, candidatesToItems } from '@/utils/repeatWeek'
+import { parseRecipeText } from '@/utils/recipe'
 import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
@@ -127,6 +128,10 @@ interface AppState {
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
   repeatLastWeekToActiveList: () => { ok: boolean; error?: string; addedCount: number }
+  importRecipeToActiveList: (
+    text: string,
+    mode?: ImportMode
+  ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
   updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note'>>) => void
   toggleItemDone: (itemId: string, price?: number) => void
@@ -255,6 +260,12 @@ export const useStore = create<AppState>()(
         }))
 
         return { ok: true, addedCount }
+      },
+
+      importRecipeToActiveList: (text, mode = 'append') => {
+        const items = parseRecipeText(text, get().customProducts)
+        if (!items.length) return { ok: false, error: 'Keine Zutaten im Text erkannt.' }
+        return get().importIntoActiveList(JSON.stringify({ items }), mode)
       },
 
       addItemToActiveList: (item) => {
