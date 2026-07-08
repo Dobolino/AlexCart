@@ -12,7 +12,7 @@
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --blur-glass: blur(24px) saturate(180%);
   --nav-pill-height: 56px;
-  --nav-float-gap: 10px;
+  --nav-float-gap: 4px;
   --nav-side-inset: 16px;
   --nav-overlay-height: calc(var(--nav-pill-height) + var(--nav-float-gap) + var(--safe-bottom));
   --nav-scroll-padding: calc(var(--nav-overlay-height) + 20px);
@@ -169,6 +169,10 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+  /* iOS PWA: volle physische Fläche, nicht nur 100dvh (verhindert schwarzen Streifen unten) */
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 
 html {
@@ -176,7 +180,6 @@ html {
 }
 
 body {
-  height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -188,6 +191,11 @@ body {
   overscroll-behavior: none;
   position: fixed;
   inset: 0;
+  width: 100%;
+}
+
+#root {
+  position: relative;
   width: 100%;
 }
 
@@ -210,10 +218,15 @@ h3,
    beim allerersten Laden manchmal falsch positioniert, bis ein Scroll-Event
    ein Neu-Layout erzwingt. */
 .app-shell {
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--bg);
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 
 /* ---------- Glass-Materialien ---------- */
@@ -245,7 +258,7 @@ h3,
 .nav-liquid {
   position: fixed;
   z-index: 30;
-  bottom: calc(var(--nav-float-gap) + var(--safe-bottom));
+  bottom: max(var(--nav-float-gap), var(--safe-bottom));
   left: calc(var(--nav-side-inset) + var(--safe-left));
   right: calc(var(--nav-side-inset) + var(--safe-right));
   height: var(--nav-pill-height);
