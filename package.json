@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite dev.html",
     "build": "tsc && vite build",
+    "generate:icons": "node scripts/generate-icons.mjs",
     "publish:pages": "npm run build && node scripts/publish-legacy-pages.mjs",
     "preview": "vite preview",
     "test": "vitest run",
@@ -25,6 +26,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^16.5.0",
     "prettier": "^3.6.2",
+    "sharp": "^0.35.3",
     "tailwindcss": "^4.3.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.48.0",
