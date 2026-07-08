@@ -11,6 +11,7 @@ import { searchProducts } from '@/utils/search'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
+import type { ImportMode } from '@/types'
 
 interface AddItemSheetProps {
   onClose: () => void
@@ -28,6 +29,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const addCustomProduct = useStore((s) => s.addCustomProduct)
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
+  const activeList = useStore((s) => s.activeList())
 
   const [mode, setMode] = useState<Mode>('search')
   const [query, setQuery] = useState('')
@@ -39,6 +41,9 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
 
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
+  const [importMode, setImportMode] = useState<ImportMode>('merge')
+
+  const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
   const results = searchProducts(query, customProducts)
 
@@ -90,14 +95,16 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       setImportError('Bitte JSON einfügen.')
       return
     }
-    const result = importIntoActiveList(importText.trim())
+    const result = importIntoActiveList(importText.trim(), importMode)
     if (!result.ok) {
       setImportError(result.error || 'Import fehlgeschlagen.')
       return
     }
     onClose()
     const suffix = result.filteredCount ? `, ${result.filteredCount} aus Vorrat gefiltert` : ''
-    onImported(`${result.keptCount} Artikel importiert${suffix}`)
+    const modeLabel =
+      importMode === 'replace' ? 'importiert' : importMode === 'append' ? 'angehängt' : 'zusammengeführt'
+    onImported(`${result.keptCount} Artikel ${modeLabel}${suffix}`)
   }
 
   return (
@@ -206,8 +213,41 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             className="input min-h-[160px] font-mono text-[14px]"
             placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Obst & Gemüse"}]}'
             value={importText}
-            onChange={(e) => setImportText(e.target.value)}
+            onChange={(e) => {
+              setImportText(e.target.value)
+              setImportError('')
+            }}
           />
+          {openCount > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-[13px] font-bold">Mit bestehender Liste</div>
+              <div className="flex flex-col gap-1.5">
+                {(
+                  [
+                    ['merge', 'Zusammenführen', 'Gleiche Namen werden addiert, neue ergänzt'],
+                    ['append', 'Anhängen', 'Importierte Artikel hinten anfügen'],
+                    ['replace', 'Ersetzen', 'Offene Artikel ersetzen (Erledigte bleiben)'],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="tap-scale rounded-xl px-3.5 py-2.5 text-left"
+                    style={{
+                      background: importMode === value ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                      outline: importMode === value ? '2px solid var(--accent)' : 'none',
+                    }}
+                    onClick={() => setImportMode(value)}
+                  >
+                    <div className="text-[14px] font-bold">{label}</div>
+                    <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      {hint}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-2 min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
             {importError}
           </div>

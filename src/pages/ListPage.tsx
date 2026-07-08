@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
+import { QuickAddSection } from '@/components/QuickAddSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
 import type { ShoppingItem } from '@/types'
@@ -35,6 +36,7 @@ export function ListPage() {
   const clearFilteredNote = useStore((s) => s.clearFilteredNote)
   const reorderItemsInCategory = useStore((s) => s.reorderItemsInCategory)
   const reorderDoneItems = useStore((s) => s.reorderDoneItems)
+  const clearDoneItems = useStore((s) => s.clearDoneItems)
   const listViewMode = useStore((s) => s.settings.listViewMode)
   const setListViewMode = useStore((s) => s.setListViewMode)
 
@@ -68,6 +70,27 @@ export function ListPage() {
     if (!item) return
     deleteItem(itemId)
     showToast(`„${item.name}“ gelöscht`, { label: 'Rückgängig', onClick: () => restoreItem(item) })
+  }
+
+  function handleToggle(itemId: string) {
+    const item = list!.items.find((i) => i.id === itemId)
+    if (!item) return
+    const wasDone = item.done
+    toggleItemDone(itemId)
+    if (!wasDone) {
+      showToast(`„${item.name}“ erledigt`, {
+        label: 'Rückgängig',
+        onClick: () => toggleItemDone(itemId),
+      })
+    }
+  }
+
+  function handleClearDone() {
+    const count = doneItems.length
+    if (!count) return
+    clearDoneItems()
+    setDoneOpen(false)
+    showToast(`${count} erledigte Artikel entfernt`)
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
@@ -150,6 +173,8 @@ export function ListPage() {
           </div>
         )}
 
+        <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
+
         {!activeItems.length && !doneItems.length ? (
           <EmptyState
             icon={ICON_PATHS.cart}
@@ -170,7 +195,7 @@ export function ListPage() {
                 items={g.items}
                 viewMode={listViewMode}
                 onReorder={(ids) => reorderItemsInCategory(g.category, ids)}
-                onToggle={toggleItemDone}
+                onToggle={handleToggle}
                 onDelete={handleDelete}
                 onEdit={setEditingItem}
                 onAddToPantry={handleAddToPantry}
@@ -195,18 +220,29 @@ export function ListPage() {
                   </span>
                 </div>
                 {doneOpen && (
-                  <CategorySection
+                  <>
+                    <div className="mt-2 flex justify-end px-1">
+                      <button
+                        className="tap-scale text-[13px] font-bold"
+                        style={{ color: 'var(--danger)' }}
+                        onClick={handleClearDone}
+                      >
+                        Alle erledigten entfernen
+                      </button>
+                    </div>
+                    <CategorySection
                     category="Erledigt"
                     items={doneItems}
                     viewMode={listViewMode}
                     onReorder={reorderDoneItems}
-                    onToggle={toggleItemDone}
+                    onToggle={handleToggle}
                     onDelete={handleDelete}
                     onEdit={setEditingItem}
                     onAddToPantry={handleAddToPantry}
                     onToggleFavorite={toggleItemFavorite}
                     onAdjustAmount={handleAdjustAmount}
-                  />
+                    />
+                  </>
                 )}
               </>
             )}
