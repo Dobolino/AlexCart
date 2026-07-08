@@ -22,7 +22,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 2
+const STORE_VERSION = 3
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -51,7 +51,7 @@ const safeStorage = {
 }
 
 function defaultSettings(): AppSettings {
-  return { theme: 'system', listViewMode: 'tiles', hasSeenOnboarding: false }
+  return { theme: 'system', listViewMode: 'tiles', hasSeenOnboarding: false, askPriceOnCheckoff: false }
 }
 
 function defaultPantry(): PantryItem[] {
@@ -122,7 +122,8 @@ interface AppState {
   repeatLastWeekToActiveList: () => { ok: boolean; error?: string; addedCount: number }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
   updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note'>>) => void
-  toggleItemDone: (itemId: string) => void
+  toggleItemDone: (itemId: string, price?: number) => void
+  updatePurchaseLogPrice: (name: string, category: string, price: number) => void
   toggleItemFavorite: (itemId: string) => void
   deleteItem: (itemId: string) => void
   restoreItem: (item: ShoppingItem) => void
@@ -146,6 +147,7 @@ interface AppState {
 
   setTheme: (theme: Theme) => void
   setListViewMode: (mode: ListViewMode) => void
+  setAskPriceOnCheckoff: (ask: boolean) => void
   setHasSeenOnboarding: () => void
   resetAll: () => void
 
@@ -302,7 +304,7 @@ export const useStore = create<AppState>()(
         }))
       },
 
-      toggleItemDone: (itemId) => {
+      toggleItemDone: (itemId, price) => {
         const list = get().activeList()
         if (!list) return
         const item = list.items.find((i) => i.id === itemId)
@@ -312,7 +314,9 @@ export const useStore = create<AppState>()(
         set((state) => {
           let purchaseLog = state.purchaseLog
           if (nowDone) {
-            purchaseLog = [...purchaseLog, { name: item.name, category: item.category, date: todayKey() }]
+            const entry: PurchaseLogEntry = { name: item.name, category: item.category, date: todayKey() }
+            if (price !== undefined && price > 0) entry.price = price
+            purchaseLog = [...purchaseLog, entry]
           } else {
             let idx = -1
             for (let i = purchaseLog.length - 1; i >= 0; i--) {
@@ -333,6 +337,24 @@ export const useStore = create<AppState>()(
             ),
             purchaseLog,
           }
+        })
+      },
+
+      updatePurchaseLogPrice: (name, category, price) => {
+        const today = todayKey()
+        set((state) => {
+          let idx = -1
+          for (let i = state.purchaseLog.length - 1; i >= 0; i--) {
+            const e = state.purchaseLog[i]!
+            if (e.name === name && e.category === category && e.date === today) {
+              idx = i
+              break
+            }
+          }
+          if (idx < 0) return state
+          const purchaseLog = [...state.purchaseLog]
+          purchaseLog[idx] = { ...purchaseLog[idx]!, price: price > 0 ? price : undefined }
+          return { purchaseLog }
         })
       },
 
@@ -467,6 +489,8 @@ export const useStore = create<AppState>()(
 
       setTheme: (theme) => set((state) => ({ settings: { ...state.settings, theme } })),
       setListViewMode: (listViewMode) => set((state) => ({ settings: { ...state.settings, listViewMode } })),
+      setAskPriceOnCheckoff: (askPriceOnCheckoff) =>
+        set((state) => ({ settings: { ...state.settings, askPriceOnCheckoff } })),
       setHasSeenOnboarding: () =>
         set((state) => ({ settings: { ...state.settings, hasSeenOnboarding: true } })),
 
@@ -509,6 +533,13 @@ export const useStore = create<AppState>()(
               ...defaultSettings(),
               ...(state.settings as Partial<AppSettings>),
               hasSeenOnboarding: true,
+            }
+          }
+          if (version < 3) {
+            state.settings = {
+              ...defaultSettings(),
+              ...(state.settings as Partial<AppSettings>),
+              askPriceOnCheckoff: false,
             }
           }
           return state as AppState

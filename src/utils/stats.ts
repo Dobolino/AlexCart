@@ -71,3 +71,35 @@ export function avgItemsPerTrip(log: PurchaseLogEntry[]): number {
 export function distinctShoppingDays(log: PurchaseLogEntry[]): number {
   return new Set(log.map((e) => e.date)).size
 }
+
+function spendByDay(log: PurchaseLogEntry[]): Map<string, number> {
+  const byDay = new Map<string, number>()
+  for (const entry of log) {
+    if (!entry.price || entry.price <= 0) continue
+    byDay.set(entry.date, (byDay.get(entry.date) || 0) + entry.price)
+  }
+  return byDay
+}
+
+export function totalSpent(log: PurchaseLogEntry[]): number {
+  return log.reduce((sum, entry) => sum + (entry.price && entry.price > 0 ? entry.price : 0), 0)
+}
+
+export function pricedPurchaseCount(log: PurchaseLogEntry[]): number {
+  return log.filter((entry) => entry.price && entry.price > 0).length
+}
+
+/** Ø Ausgaben pro Einkaufstag (nur Tage mit erfassten Preisen). */
+export function avgSpendPerTrip(log: PurchaseLogEntry[]): number {
+  const byDay = spendByDay(log)
+  if (!byDay.size) return 0
+  let total = 0
+  for (const amount of byDay.values()) total += amount
+  return total / byDay.size
+}
+
+export function maxTripSpend(log: PurchaseLogEntry[]): number {
+  const byDay = spendByDay(log)
+  if (!byDay.size) return 0
+  return Math.max(...byDay.values())
+}
