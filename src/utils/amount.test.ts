@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, combineAmounts, mergeItems, adjustAmount, stepForUnit } from './amount'
+import { parseAmount, combineAmounts, mergeItems, adjustAmount, stepForUnit, joinAmount } from './amount'
 
 describe('parseAmount', () => {
   it('splits value and unit', () => {
@@ -10,6 +10,19 @@ describe('parseAmount', () => {
   it('returns null for empty/unparseable input', () => {
     expect(parseAmount('')).toBeNull()
     expect(parseAmount('etwas')).toBeNull()
+  })
+})
+
+describe('joinAmount', () => {
+  it('combines a value and unit', () => {
+    expect(joinAmount('500', 'g')).toBe('500 g')
+  })
+  it('returns nothing when no value is given, even with a unit selected', () => {
+    expect(joinAmount('', 'g')).toBe('')
+    expect(joinAmount('  ', 'Stück')).toBe('')
+  })
+  it('returns just the value when no unit is given', () => {
+    expect(joinAmount('3', '')).toBe('3')
   })
 })
 

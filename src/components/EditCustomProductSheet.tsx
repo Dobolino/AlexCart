@@ -3,7 +3,8 @@ import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
 import { ICON_PATHS } from '@/constants/icons'
-import { DEFAULT_UNIT } from '@/constants/units'
+import { getDefaultUnit } from '@/constants/units'
+import { getIconKey } from '@/utils/icon'
 import { useStore } from '@/store/useStore'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import type { CustomProduct } from '@/types'
@@ -22,7 +23,7 @@ export function EditCustomProductSheet({ product, onClose }: EditCustomProductSh
     name: product.name,
     category: product.category,
     amountValue: parsed ? String(parsed.value) : '',
-    unit: parsed?.unit || DEFAULT_UNIT,
+    unit: parsed?.unit || getDefaultUnit(getIconKey(product.name, product.category)),
     note: product.note || '',
   })
 

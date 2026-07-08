@@ -3,7 +3,8 @@ import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { CATEGORIES } from '@/data/products'
-import { UNITS, DEFAULT_UNIT } from '@/constants/units'
+import { UNITS, getDefaultUnit } from '@/constants/units'
+import { getIconKey } from '@/utils/icon'
 import { useStore } from '@/store/useStore'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import { isLowStock } from '@/utils/pantry'
@@ -20,13 +21,14 @@ export function EditPantrySheet({ item, onClose }: EditPantrySheetProps) {
 
   const currentParsed = parseAmount(item.amount)
   const minParsed = parseAmount(item.minAmount)
+  const fallbackUnit = getDefaultUnit(getIconKey(item.name, item.category))
 
   const [name, setName] = useState(item.name)
   const [category, setCategory] = useState(item.category)
   const [amountValue, setAmountValue] = useState(currentParsed ? String(currentParsed.value) : '')
-  const [amountUnit, setAmountUnit] = useState(currentParsed?.unit || DEFAULT_UNIT)
+  const [amountUnit, setAmountUnit] = useState(currentParsed?.unit || fallbackUnit)
   const [minValue, setMinValue] = useState(minParsed ? String(minParsed.value) : '')
-  const [minUnit, setMinUnit] = useState(minParsed?.unit || DEFAULT_UNIT)
+  const [minUnit, setMinUnit] = useState(minParsed?.unit || fallbackUnit)
 
   function handleSave() {
     if (!name.trim()) return

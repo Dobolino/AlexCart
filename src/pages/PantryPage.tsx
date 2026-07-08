@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { isLowStock } from '@/utils/pantry'
 import { joinAmount } from '@/utils/amount'
 import { CATEGORIES } from '@/data/products'
-import { UNITS, DEFAULT_UNIT } from '@/constants/units'
+import { UNITS, DEFAULT_UNIT, getDefaultUnit } from '@/constants/units'
+import { getIconKey } from '@/utils/icon'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { EditPantrySheet } from '@/components/EditPantrySheet'
@@ -23,8 +24,26 @@ export function PantryPage() {
   const [minValue, setMinValue] = useState('')
   const [minUnit, setMinUnit] = useState(DEFAULT_UNIT)
   const [editing, setEditing] = useState<PantryItem | null>(null)
+  const amountUnitTouched = useRef(false)
+  const minUnitTouched = useRef(false)
 
   const groups = groupByCategory(pantry)
+
+  function applyDefaultUnits(nextName: string, nextCategory: string) {
+    const unit = getDefaultUnit(getIconKey(nextName, nextCategory))
+    if (!amountUnitTouched.current) setAmountUnit(unit)
+    if (!minUnitTouched.current) setMinUnit(unit)
+  }
+
+  function handleNameChange(value: string) {
+    setName(value)
+    applyDefaultUnits(value, category)
+  }
+
+  function handleCategoryChange(value: string) {
+    setCategory(value)
+    applyDefaultUnits(name, value)
+  }
 
   function handleAdd() {
     if (!name.trim()) return
@@ -37,6 +56,10 @@ export function PantryPage() {
     setName('')
     setAmountValue('')
     setMinValue('')
+    setAmountUnit(DEFAULT_UNIT)
+    setMinUnit(DEFAULT_UNIT)
+    amountUnitTouched.current = false
+    minUnitTouched.current = false
   }
 
   return (
@@ -50,12 +73,12 @@ export function PantryPage() {
             className="input mb-2 w-full min-w-0"
             placeholder="z.B. Milch"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => handleNameChange(e.target.value)}
           />
           <select
             className="input mb-2 w-full min-w-0"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => handleCategoryChange(e.target.value)}
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -71,7 +94,14 @@ export function PantryPage() {
               value={amountValue}
               onChange={(e) => setAmountValue(e.target.value)}
             />
-            <select className="input w-full" value={amountUnit} onChange={(e) => setAmountUnit(e.target.value)}>
+            <select
+              className="input w-full"
+              value={amountUnit}
+              onChange={(e) => {
+                amountUnitTouched.current = true
+                setAmountUnit(e.target.value)
+              }}
+            >
               {UNITS.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
@@ -87,7 +117,14 @@ export function PantryPage() {
               value={minValue}
               onChange={(e) => setMinValue(e.target.value)}
             />
-            <select className="input w-full" value={minUnit} onChange={(e) => setMinUnit(e.target.value)}>
+            <select
+              className="input w-full"
+              value={minUnit}
+              onChange={(e) => {
+                minUnitTouched.current = true
+                setMinUnit(e.target.value)
+              }}
+            >
               {UNITS.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}

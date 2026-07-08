@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { ProductForm, type ProductFormValues } from './ProductForm'
-import { DEFAULT_UNIT } from '@/constants/units'
+import { getDefaultUnit } from '@/constants/units'
+import { getIconKey } from '@/utils/icon'
 import { useStore } from '@/store/useStore'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import type { ShoppingItem } from '@/types'
@@ -20,7 +21,7 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
     name: item.name,
     category: item.category,
     amountValue: parsed ? String(parsed.value) : '',
-    unit: parsed?.unit || DEFAULT_UNIT,
+    unit: parsed?.unit || getDefaultUnit(getIconKey(item.name, item.category)),
     note: item.note || '',
   })
 

@@ -3,7 +3,7 @@ import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
 import { ICON_PATHS } from '@/constants/icons'
-import { DEFAULT_UNIT } from '@/constants/units'
+import { DEFAULT_UNIT, getDefaultUnit } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
 import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { getCategoryColor } from '@/utils/categoryColor'
@@ -63,7 +63,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       name: result.name,
       category: result.category,
       amountValue: parsed ? String(parsed.value) : '',
-      unit: parsed?.unit || DEFAULT_UNIT,
+      unit: parsed?.unit || getDefaultUnit(getIconKey(result.name, result.category)),
       note: result.note || '',
     })
     setFormMode(result.isCustom ? 'confirm-custom' : 'confirm-builtin')
@@ -72,7 +72,8 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   }
 
   function openCreateForm() {
-    setForm({ ...EMPTY_FORM, name: query })
+    const category = EMPTY_FORM.category
+    setForm({ ...EMPTY_FORM, name: query, unit: getDefaultUnit(getIconKey(query, category)) })
     setFormMode('new')
     setEditingCustomId(null)
     setMode('form')
