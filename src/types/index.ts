@@ -34,6 +34,10 @@ export interface PantryItem {
   id: string
   name: string
   category: string
+  /** Aktueller Bestand, z. B. "0.5 l". */
+  amount?: string
+  /** Mindestbestand – darunter wird Nachkauf vorgeschlagen. */
+  minAmount?: string
 }
 
 export interface PurchaseLogEntry {
