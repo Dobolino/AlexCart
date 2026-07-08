@@ -25,6 +25,10 @@
         } catch (e) {
           document.documentElement.dataset.theme = 'light'
         }
+        /* iOS Standalone: 100dvh ist ~59px zu kurz → schwarzer Streifen unten. */
+        if (window.navigator.standalone) {
+          document.documentElement.style.setProperty('--app-height', '100vh')
+        }
       })()
     </script>
     <!-- PWA / iOS -->
