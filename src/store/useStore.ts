@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { importFromJSON } from '@/utils/import'
 import { applyImportMode } from '@/utils/mergeList'
+import { buildRepeatCandidates, candidatesToItems } from '@/utils/repeatWeek'
+import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
@@ -117,6 +119,7 @@ interface AppState {
     text: string,
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
+  repeatLastWeekToActiveList: () => { ok: boolean; error?: string; addedCount: number }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
   updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note'>>) => void
   toggleItemDone: (itemId: string) => void
@@ -208,6 +211,39 @@ export const useStore = create<AppState>()(
           filteredCount: result.filtered?.length ?? 0,
           addedCount: Math.max(0, openAfter - openBefore),
         }
+      },
+
+      repeatLastWeekToActiveList: () => {
+        const list = get().activeList()
+        if (!list) return { ok: false, error: 'Keine aktive Liste.', addedCount: 0 }
+
+        const candidates = buildRepeatCandidates(
+          get().purchaseLog,
+          get().lists,
+          get().customProducts,
+          get().pantry
+        )
+        if (!candidates.length) {
+          return { ok: false, error: 'Keine Einkäufe von letzter Woche gefunden.', addedCount: 0 }
+        }
+
+        const openNames = new Set(list.items.filter((i) => !i.done).map((i) => normalize(i.name)))
+        const toAdd = candidatesToItems(candidates.filter((c) => !openNames.has(normalize(c.name))))
+        if (!toAdd.length) {
+          return { ok: false, error: 'Alle Artikel von letzter Woche sind bereits auf der Liste.', addedCount: 0 }
+        }
+
+        const openBefore = list.items.filter((i) => !i.done).length
+        const mergedItems = applyImportMode(list.items, toAdd, 'append')
+        const openAfter = mergedItems.filter((i) => !i.done).length
+        const addedCount = openAfter - openBefore
+
+        set((state) => ({
+          lists: state.lists.map((l) => (l.id === list.id ? { ...l, items: mergedItems } : l)),
+          stats: { ...state.stats, itemsAddedTotal: state.stats.itemsAddedTotal + addedCount },
+        }))
+
+        return { ok: true, addedCount }
       },
 
       addItemToActiveList: (item) => {
