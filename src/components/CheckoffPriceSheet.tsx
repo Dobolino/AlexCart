@@ -1,21 +1,22 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
-import { formatChf, parseChfInput } from '@/utils/currency'
-import type { ShoppingItem } from '@/types'
+import { formatMoney, currencySymbol, parseMoneyInput } from '@/utils/currency'
+import type { Currency, ShoppingItem } from '@/types'
 
 interface CheckoffPriceSheetProps {
   item: ShoppingItem
+  currency: Currency
   onClose: () => void
   onSave: (price: number) => void
   onSkip: () => void
 }
 
-export function CheckoffPriceSheet({ item, onClose, onSave, onSkip }: CheckoffPriceSheetProps) {
+export function CheckoffPriceSheet({ item, currency, onClose, onSave, onSkip }: CheckoffPriceSheetProps) {
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
 
   function handleSave() {
-    const price = parseChfInput(input)
+    const price = parseMoneyInput(input)
     if (price === null) {
       setError('Bitte einen gültigen Preis eingeben.')
       return
@@ -31,7 +32,7 @@ export function CheckoffPriceSheet({ item, onClose, onSave, onSkip }: CheckoffPr
       </p>
       <div className="mb-2 flex items-center gap-2">
         <span className="text-[15px] font-bold" style={{ color: 'var(--text-muted)' }}>
-          CHF
+          {currencySymbol(currency)}
         </span>
         <input
           autoFocus
@@ -49,9 +50,9 @@ export function CheckoffPriceSheet({ item, onClose, onSave, onSkip }: CheckoffPr
           }}
         />
       </div>
-      {input && parseChfInput(input) !== null && (
+      {input && parseMoneyInput(input) !== null && (
         <p className="mb-2 text-[13px] font-semibold" style={{ color: 'var(--accent)' }}>
-          {formatChf(parseChfInput(input)!)}
+          {formatMoney(parseMoneyInput(input)!, currency)}
         </p>
       )}
       {error && (

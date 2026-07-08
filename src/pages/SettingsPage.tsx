@@ -8,9 +8,9 @@ import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
 import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { getCategoryColor } from '@/utils/categoryColor'
-import { parseChfInput } from '@/utils/currency'
+import { parseMoneyInput, currencySymbol } from '@/utils/currency'
 import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
-import type { CustomProduct, Theme } from '@/types'
+import type { Currency, CustomProduct, Theme } from '@/types'
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'light', label: 'Hell' },
@@ -18,13 +18,20 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'system', label: 'System' },
 ]
 
+const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
+  { value: 'CHF', label: 'CHF (Schweiz)' },
+  { value: 'EUR', label: 'EUR (Deutschland)' },
+]
+
 export function SettingsPage() {
   const theme = useStore((s) => s.settings.theme)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
+  const currency = useStore((s) => s.settings.currency)
   const setTheme = useStore((s) => s.setTheme)
   const setAskPriceOnCheckoff = useStore((s) => s.setAskPriceOnCheckoff)
   const setWeeklyBudget = useStore((s) => s.setWeeklyBudget)
+  const setCurrency = useStore((s) => s.setCurrency)
   const resetAll = useStore((s) => s.resetAll)
   const customProducts = useStore((s) => s.customProducts)
   const removeCustomProduct = useStore((s) => s.removeCustomProduct)
@@ -64,7 +71,7 @@ export function SettingsPage() {
   }
 
   function saveBudgetInput() {
-    const parsed = parseChfInput(budgetInput)
+    const parsed = parseMoneyInput(budgetInput)
     setWeeklyBudget(parsed ?? 0)
     setBudgetInput(parsed ? String(parsed) : '')
   }
@@ -104,7 +111,28 @@ export function SettingsPage() {
           Einkauf
         </div>
         <div className="card-surface mb-4.5 px-3.5 py-3.5">
-          <label className="flex items-center justify-between gap-3">
+          <span className="block text-[15px] font-semibold">Währung</span>
+          <span className="mb-3 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            Für Preise, Budget und Rechner – z. B. CHF in der Schweiz, EUR in Deutschland
+          </span>
+          <div className="flex gap-2">
+            {CURRENCY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className="tap-scale flex-1 rounded-xl py-2.5 text-[13px] font-bold"
+                style={{
+                  background: currency === opt.value ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                  color: currency === opt.value ? 'var(--accent)' : 'var(--text)',
+                  outline: currency === opt.value ? '2px solid var(--accent)' : 'none',
+                }}
+                onClick={() => setCurrency(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <label className="mt-4 flex items-center justify-between gap-3 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
             <span>
               <span className="block text-[15px] font-semibold">Preis beim Abhaken</span>
               <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -132,7 +160,7 @@ export function SettingsPage() {
             </span>
             <div className="flex items-center gap-2">
               <span className="text-[14px] font-bold" style={{ color: 'var(--text-muted)' }}>
-                CHF
+                {currencySymbol(currency)}
               </span>
               <input
                 type="text"

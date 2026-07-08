@@ -1,5 +1,6 @@
 export type Theme = 'light' | 'dark' | 'system'
 export type ListViewMode = 'list' | 'tiles'
+export type Currency = 'CHF' | 'EUR'
 
 export interface AppSettings {
   theme: Theme
@@ -7,8 +8,10 @@ export interface AppSettings {
   hasSeenOnboarding: boolean
   /** Preis-Eingabe direkt beim Abhaken anzeigen. */
   askPriceOnCheckoff: boolean
-  /** Wochenbudget in CHF – 0 = deaktiviert. */
+  /** Wochenbudget in der gewählten Währung – 0 = deaktiviert. */
   weeklyBudget: number
+  /** Anzeige- und Eingabewährung für Preise und Budget. */
+  currency: Currency
 }
 
 export interface ShoppingItem {
@@ -44,7 +47,7 @@ export interface PurchaseLogEntry {
   name: string
   category: string
   date: string
-  /** Optionaler Preis in CHF beim Abhaken. */
+  /** Optionaler Preis in der gewählten Währung beim Abhaken. */
   price?: number
 }
 

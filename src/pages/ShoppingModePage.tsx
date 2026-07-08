@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
-import { formatChf } from '@/utils/currency'
+import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import { hapticSuccess } from '@/utils/haptics'
 import { Icon } from '@/components/Icon'
@@ -16,6 +16,7 @@ export function ShoppingModePage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
+  const currency = useStore((s) => s.settings.currency)
   const [lastCheckedId, setLastCheckedId] = useState<string | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -68,7 +69,7 @@ export function ShoppingModePage() {
           <div className="truncate text-[17px] font-extrabold">{list.name}</div>
           <div className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {doneCount} von {totalCount || doneCount} erledigt
-            {budget ? ` · ${formatChf(budgetSpend)} / ${formatChf(budget.budget)}` : ''}
+            {budget ? ` · ${formatMoney(budgetSpend, currency)} / ${formatMoney(budget.budget, currency)}` : ''}
           </div>
         </div>
         {lastCheckedId ? (
@@ -105,7 +106,7 @@ export function ShoppingModePage() {
             <h2 className="mb-2 text-[22px] font-extrabold">Einkauf abgeschlossen!</h2>
             <p className="mb-6 text-[15px]" style={{ color: 'var(--text-muted)' }}>
               {doneCount > 0 ? `${doneCount} Artikel erledigt.` : 'Keine offenen Artikel mehr.'}
-              {budget ? ` Summe: ${formatChf(budgetSpend)}.` : ''}
+              {budget ? ` Summe: ${formatMoney(budgetSpend, currency)}.` : ''}
             </p>
             <button className="btn-primary tap-scale rounded-full px-8 py-3.5 text-[15px]" onClick={() => navigate('/')}>
               Zurück zur Liste

@@ -22,7 +22,7 @@ import { getIconKey } from '@/utils/icon'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { BudgetBar } from '@/components/BudgetBar'
 import { InstallPrompt } from '@/components/InstallPrompt'
-import { formatChf } from '@/utils/currency'
+import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import type { ShoppingItem } from '@/types'
 
@@ -54,6 +54,7 @@ export function ListPage() {
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
+  const currency = useStore((s) => s.settings.currency)
 
   const [addOpen, setAddOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -80,9 +81,9 @@ export function ListPage() {
 
   const summaryParts: string[] = []
   if (hasWeeklyBudget) {
-    summaryParts.push(`${formatChf(budgetSpend)} / ${formatChf(weeklyBudget)}`)
+    summaryParts.push(`${formatMoney(budgetSpend, currency)} / ${formatMoney(weeklyBudget, currency)}`)
   } else if (hasCalculatorTotal) {
-    summaryParts.push(formatChf(calculatorTotal))
+    summaryParts.push(formatMoney(calculatorTotal, currency))
   }
   summaryParts.push(`${activeItems.length} offen`)
   if (doneItems.length > 0) summaryParts.push(`${doneItems.length} erledigt`)
@@ -95,7 +96,7 @@ export function ListPage() {
   }
 
   function showDoneToast(item: ShoppingItem, withPrice?: number) {
-    const priceHint = withPrice ? ` · ${formatChf(withPrice)}` : ''
+    const priceHint = withPrice ? ` · ${formatMoney(withPrice, currency)}` : ''
     showToast(
       `„${item.name}" erledigt${priceHint}`,
       { label: 'Rückgängig', onClick: () => toggleItemDone(item.id) },
@@ -130,7 +131,7 @@ export function ListPage() {
       showDoneToast(priceSheetItem, price)
     } else {
       updatePurchaseLogPrice(priceSheetItem.name, priceSheetItem.category, price)
-      showToast(`Preis für „${priceSheetItem.name}" gespeichert · ${formatChf(price)}`)
+      showToast(`Preis für „${priceSheetItem.name}" gespeichert · ${formatMoney(price, currency)}`)
     }
     setPriceSheetItem(null)
   }
@@ -235,7 +236,7 @@ export function ListPage() {
           </div>
         }
       />
-      {budget && <BudgetBar progress={budget} />}
+      {budget && <BudgetBar progress={budget} currency={currency} />}
       <InstallPrompt />
 
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
@@ -411,6 +412,7 @@ export function ListPage() {
       {priceSheetItem && (
         <CheckoffPriceSheet
           item={priceSheetItem}
+          currency={currency}
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}
           onSkip={handlePriceSkip}
