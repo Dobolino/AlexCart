@@ -50,7 +50,7 @@ export function CalculatorPage() {
           <span className="text-[28px] font-extrabold">{formatMoney(total, currency)}</span>
         </div>
 
-        <MoneyNumpad cents={cents} onChange={setCents} currency={currency} label="Eingabe" />
+        <MoneyNumpad cents={cents} onChange={setCents} currency={currency} display="summary" />
 
         <button className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
           <span className="inline-flex items-center gap-2">
