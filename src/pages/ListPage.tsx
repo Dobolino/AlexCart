@@ -277,7 +277,12 @@ export function ListPage() {
 
       {addOpen && <AddItemSheet onClose={() => setAddOpen(false)} onImported={showToast} />}
       {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
-      {switcherOpen && <ListSwitcherSheet onClose={() => setSwitcherOpen(false)} />}
+      {switcherOpen && (
+        <ListSwitcherSheet
+          onClose={() => setSwitcherOpen(false)}
+          onRepeated={(count) => showToast(`${count} Artikel von letzter Woche hinzugefügt`)}
+        />
+      )}
       {filteredOpen && (
         <Sheet onClose={() => setFilteredOpen(false)}>
           <h2 className="mb-1 text-lg font-bold">Aus Vorrat gefiltert</h2>

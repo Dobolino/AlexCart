@@ -6,18 +6,21 @@ import { useStore } from '@/store/useStore'
 
 interface ListSwitcherSheetProps {
   onClose: () => void
+  onRepeated?: (count: number) => void
 }
 
-export function ListSwitcherSheet({ onClose }: ListSwitcherSheetProps) {
+export function ListSwitcherSheet({ onClose, onRepeated }: ListSwitcherSheetProps) {
   const lists = useStore((s) => s.lists)
   const activeListId = useStore((s) => s.activeListId)
   const switchList = useStore((s) => s.switchList)
   const createList = useStore((s) => s.createList)
   const deleteList = useStore((s) => s.deleteList)
   const renameList = useStore((s) => s.renameList)
+  const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [repeatError, setRepeatError] = useState('')
 
   function startRename(listId: string, currentName: string) {
     setEditingId(listId)
@@ -102,6 +105,27 @@ export function ListSwitcherSheet({ onClose }: ListSwitcherSheetProps) {
           </div>
         ))}
       </div>
+      <button
+        className="btn-soft tap-scale mb-4 flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-bold"
+        onClick={() => {
+          setRepeatError('')
+          const result = repeatLastWeekToActiveList()
+          if (!result.ok) {
+            setRepeatError(result.error || 'Konnte letzte Woche nicht übernehmen.')
+            return
+          }
+          onRepeated?.(result.addedCount)
+          onClose()
+        }}
+      >
+        <Icon path={ICON_PATHS.copy} size={16} />
+        Letzte Woche wiederholen
+      </button>
+      {repeatError && (
+        <p className="mb-3 text-[13px] font-semibold" style={{ color: 'var(--danger)' }}>
+          {repeatError}
+        </p>
+      )}
       <div className="flex gap-2">
         <input
           type="text"

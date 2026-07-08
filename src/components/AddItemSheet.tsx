@@ -29,6 +29,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const addCustomProduct = useStore((s) => s.addCustomProduct)
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
+  const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
   const activeList = useStore((s) => s.activeList())
 
   const [mode, setMode] = useState<Mode>('search')
@@ -105,6 +106,17 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
     const modeLabel =
       importMode === 'replace' ? 'importiert' : importMode === 'append' ? 'angehängt' : 'zusammengeführt'
     onImported(`${result.keptCount} Artikel ${modeLabel}${suffix}`)
+  }
+
+  function handleRepeatLastWeek() {
+    setImportError('')
+    const result = repeatLastWeekToActiveList()
+    if (!result.ok) {
+      setImportError(result.error || 'Konnte letzte Woche nicht übernehmen.')
+      return
+    }
+    onClose()
+    onImported(`${result.addedCount} Artikel von letzter Woche hinzugefügt`)
   }
 
   return (
@@ -209,8 +221,25 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <h2 className="mb-1 text-lg font-bold">Wochenplan importieren</h2>
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            JSON aus deinem Essensplan-Chat hier einfügen.
+            JSON aus Claude oder ChatGPT hier einfügen – oder Artikel der letzten Woche übernehmen.
           </p>
+          <button
+            className="btn-soft tap-scale mb-3 flex w-full items-center justify-center gap-2 py-3 text-[14px] font-bold"
+            onClick={handleRepeatLastWeek}
+          >
+            <Icon path={ICON_PATHS.copy} size={16} />
+            Letzte Woche wiederholen
+          </button>
+          <details className="mb-3 rounded-xl px-3.5 py-3 text-[12px]" style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}>
+            <summary className="cursor-pointer font-bold" style={{ color: 'var(--text)' }}>
+              Claude-Prompt für den Import
+            </summary>
+            <p className="mt-2 leading-relaxed">
+              Erstelle eine Einkaufsliste als JSON mit diesem Format: week (ISO-Datum), items mit name, amount und
+              category. Kategorien: Früchte & Gemüse, Milch & Käse, Fleisch & Fisch, Getreide & Beilagen, Brot &
+              Backwaren, Tiefkühl, Getränke, Sonstiges. Nur JSON ausgeben, ohne Erklärung.
+            </p>
+          </details>
           <textarea
             className="input min-h-[160px] font-mono text-[14px]"
             placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Obst & Gemüse"}]}'

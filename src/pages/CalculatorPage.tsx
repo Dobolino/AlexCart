@@ -3,12 +3,9 @@ import { useStore } from '@/store/useStore'
 import { PageHeader } from '@/components/PageHeader'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
+import { formatChf } from '@/utils/currency'
 
 const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', ',', '0', '⌫']
-
-function formatEuro(cents: number): string {
-  return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 export function CalculatorPage() {
   const entries = useStore((s) => s.calculatorEntries)
@@ -53,14 +50,21 @@ export function CalculatorPage() {
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
           <span className="text-[14px] font-semibold opacity-80">Summe</span>
-          <span className="text-[28px] font-extrabold">{formatEuro(total * 100)} €</span>
+          <span className="text-[28px] font-extrabold">{formatChf(total)}</span>
         </div>
 
         <div
-          className="card-surface mb-3 flex items-center justify-end px-5 py-4 text-[26px] font-bold"
+          className="card-surface mb-3 flex items-center justify-end gap-2 px-5 py-4 text-[26px] font-bold"
           style={{ color: 'var(--text)', minHeight: 64 }}
         >
-          {input ? `${input} €` : <span style={{ color: 'var(--text-muted)' }}>0,00 €</span>}
+          {input ? (
+            <>
+              <span>{input}</span>
+              <span className="text-[16px] font-semibold opacity-60">CHF</span>
+            </>
+          ) : (
+            <span style={{ color: 'var(--text-muted)' }}>{formatChf(0)}</span>
+          )}
         </div>
 
         <div className="mb-3 grid grid-cols-3 gap-2">
@@ -92,7 +96,7 @@ export function CalculatorPage() {
                   className="flex items-center justify-between border-b px-4 py-3"
                   style={{ borderColor: 'var(--border)' }}
                 >
-                  <span className="text-[15px] font-semibold">{formatEuro(entry.amount * 100)} €</span>
+                  <span className="text-[15px] font-semibold">{formatChf(entry.amount)}</span>
                   <button style={{ color: 'var(--danger)' }} onClick={() => removeCalculatorEntry(entry.id)}>
                     <Icon path={ICON_PATHS.close} size={16} />
                   </button>
