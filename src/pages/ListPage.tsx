@@ -4,7 +4,7 @@ import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
 import { buildShareText } from '@/utils/shareText'
 import { CategorySection } from '@/components/CategorySection'
-import { ProductIcon } from '@/components/product-icons/ProductIcon'
+import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { AddItemSheet } from '@/components/AddItemSheet'
 import { EditItemSheet } from '@/components/EditItemSheet'
 import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
@@ -16,6 +16,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { QuickAddSection } from '@/components/QuickAddSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
+import { formatChf } from '@/utils/currency'
 import type { ShoppingItem } from '@/types'
 
 interface ToastState {
@@ -39,6 +40,7 @@ export function ListPage() {
   const clearDoneItems = useStore((s) => s.clearDoneItems)
   const listViewMode = useStore((s) => s.settings.listViewMode)
   const setListViewMode = useStore((s) => s.setListViewMode)
+  const calculatorEntries = useStore((s) => s.calculatorEntries)
 
   const [addOpen, setAddOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -53,6 +55,15 @@ export function ListPage() {
   const activeItems = list.items.filter((i) => !i.done)
   const doneItems = list.items.filter((i) => i.done)
   const groups = groupByCategory(activeItems)
+
+  const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
+  const hasCalculatorTotal = calculatorEntries.length > 0
+  const summaryParts = [
+    ...(hasCalculatorTotal ? [formatChf(calculatorTotal)] : []),
+    `${activeItems.length} offen`,
+    ...(doneItems.length > 0 ? [`${doneItems.length} erledigt`] : []),
+  ]
+  const listSubtitle = summaryParts.join(' • ')
 
   function showToast(message: string, action?: ToastState['action']) {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -118,7 +129,7 @@ export function ListPage() {
     <>
       <PageHeader
         title={list.name}
-        subtitle={`${list.weekLabel ? `Woche ${list.weekLabel} · ` : ''}${activeItems.length} offen`}
+        subtitle={listSubtitle}
         onTitleClick={() => setSwitcherOpen(true)}
         right={
           <div className="flex items-center gap-1">
@@ -280,15 +291,20 @@ export function ListPage() {
               return (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between border-b px-3.5 py-3"
+                  className="flex items-center justify-between gap-3 border-b px-3.5 py-3.5"
                   style={{ borderColor: 'var(--border)' }}
                 >
-                  <span className="flex items-center gap-2.5 text-[15px] font-semibold">
-                    <ProductIcon iconKey={iconKey} size={20} />
-                    {item.name} {item.amount && `· ${item.amount}`}
+                  <span className="flex min-w-0 flex-1 items-center gap-2.5 text-[15px] font-semibold">
+                    <ProductIconSlot iconKey={iconKey} size={20} />
+                    <span className="truncate">{item.name}</span>
                   </span>
+                  {item.amount && (
+                    <span className="flex-none text-[12px] font-medium tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                      {item.amount}
+                    </span>
+                  )}
                   <button
-                    className="tap-scale"
+                    className="tap-scale flex-none"
                     onClick={() => {
                       restoreFilteredItem(item.id)
                       if (filteredItems.length <= 1) setFilteredOpen(false)

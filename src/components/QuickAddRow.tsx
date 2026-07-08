@@ -1,4 +1,4 @@
-import { ProductIcon } from '@/components/product-icons/ProductIcon'
+import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
@@ -30,12 +30,12 @@ export function QuickAddRow({ picks, onAdd }: QuickAddRowProps) {
               onClick={() => onAdd(pick)}
               aria-label={`${pick.name} hinzufügen`}
             >
-              <span
-                className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
-                style={{ background: color.bg, color: color.fg }}
-              >
-                <ProductIcon iconKey={iconKey} size={18} />
-              </span>
+              <ProductIconSlot
+                iconKey={iconKey}
+                size={18}
+                wrapClassName="flex h-8 w-8 flex-none items-center justify-center rounded-full"
+                wrapStyle={{ background: color.bg, color: color.fg }}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold">{pick.name}</span>
                 {pick.amount && (

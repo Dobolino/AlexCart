@@ -50,7 +50,7 @@ export function CategorySection({
         </div>
         <div
           ref={containerRef}
-          className={`item-tiles flex flex-col gap-[3px]${anyDragging ? ' select-none' : ''}`}
+          className={`item-tiles flex flex-col gap-1.5${anyDragging ? ' select-none' : ''}`}
           style={anyDragging ? { WebkitUserSelect: 'none', userSelect: 'none' } : undefined}
         >
           <AnimatePresence initial={false}>

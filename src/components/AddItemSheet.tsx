@@ -5,7 +5,7 @@ import { ProductForm, type ProductFormValues } from './ProductForm'
 import { ICON_PATHS } from '@/constants/icons'
 import { DEFAULT_UNIT } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
-import { ProductIcon } from '@/components/product-icons/ProductIcon'
+import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
 import { parseAmount, joinAmount } from '@/utils/amount'
@@ -149,12 +149,12 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
                   style={{ borderColor: 'var(--border)' }}
                   onClick={() => openConfirmFor(r)}
                 >
-                  <span
-                    className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                    style={{ background: color.bg, color: color.fg }}
-                  >
-                    <ProductIcon iconKey={iconKey} size={20} />
-                  </span>
+                  <ProductIconSlot
+                    iconKey={iconKey}
+                    size={20}
+                    wrapClassName="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                    wrapStyle={{ background: color.bg, color: color.fg }}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{r.name}</span>
                     <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
