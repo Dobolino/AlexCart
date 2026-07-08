@@ -18,7 +18,7 @@ interface AddItemSheetProps {
   onImported: (message: string) => void
 }
 
-type Mode = 'search' | 'form' | 'import'
+type Mode = 'search' | 'form' | 'import' | 'recipe'
 type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom'
 
 const EMPTY_FORM: ProductFormValues = { name: '', category: CATEGORIES[0], amountValue: '', unit: DEFAULT_UNIT, note: '' }
@@ -30,6 +30,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
   const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
+  const importRecipeToActiveList = useStore((s) => s.importRecipeToActiveList)
   const activeList = useStore((s) => s.activeList())
 
   const [mode, setMode] = useState<Mode>('search')
@@ -43,6 +44,9 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
   const [importMode, setImportMode] = useState<ImportMode>('merge')
+  const [recipeText, setRecipeText] = useState('')
+  const [recipeError, setRecipeError] = useState('')
+  const [recipeMode, setRecipeMode] = useState<ImportMode>('append')
 
   const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
@@ -119,20 +123,37 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
     onImported(`${result.addedCount} Artikel von letzter Woche hinzugefügt`)
   }
 
+  function handleRecipeImport() {
+    setRecipeError('')
+    const result = importRecipeToActiveList(recipeText.trim(), recipeMode)
+    if (!result.ok) {
+      setRecipeError(result.error || 'Rezept konnte nicht importiert werden.')
+      return
+    }
+    onClose()
+    onImported(`${result.addedCount ?? result.keptCount ?? 0} Zutaten hinzugefügt`)
+  }
+
   return (
     <Sheet onClose={onClose}>
-      <div className="mb-4 flex gap-1.5 rounded-2xl p-1" style={{ background: 'var(--chip-bg)' }}>
-        {(['search', 'import'] as const).map((m) => (
+      <div className="mb-4 flex gap-1 rounded-2xl p-1" style={{ background: 'var(--chip-bg)' }}>
+        {(
+          [
+            ['search', 'Hinzufügen'],
+            ['import', 'Import'],
+            ['recipe', 'Rezept'],
+          ] as const
+        ).map(([m, label]) => (
           <button
             key={m}
-            className="flex-1 rounded-xl py-2 text-[13px] font-bold tap-scale"
+            className="flex-1 rounded-xl py-2 text-[12px] font-bold tap-scale"
             style={{
               background: mode === m || (m === 'search' && mode === 'form') ? 'var(--surface)' : 'transparent',
               color: 'var(--text)',
             }}
             onClick={() => setMode(m)}
           >
-            {m === 'search' ? 'Hinzufügen' : 'Wochenplan importieren'}
+            {label}
           </button>
         ))}
       </div>
@@ -284,6 +305,56 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
           </div>
           <button className="btn-primary mt-3 w-full py-3.5 text-[15px]" onClick={handleImport}>
             Importieren
+          </button>
+        </div>
+      )}
+
+      {mode === 'recipe' && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+          <h2 className="mb-1 text-lg font-bold">Rezept importieren</h2>
+          <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            Zutatenliste aus Rezept, Screenshot-Text oder Chat hier einfügen.
+          </p>
+          <textarea
+            className="input min-h-[180px] text-[14px]"
+            placeholder={`Zutaten\n- 500 g Mehl\n- 2 Stück Eier\n- 1 l Milch\n- Salz`}
+            value={recipeText}
+            onChange={(e) => {
+              setRecipeText(e.target.value)
+              setRecipeError('')
+            }}
+          />
+          {openCount > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-[13px] font-bold">Mit bestehender Liste</div>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ['append', 'Anhängen'],
+                    ['merge', 'Zusammenführen'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="tap-scale flex-1 rounded-xl px-3 py-2.5 text-[13px] font-bold"
+                    style={{
+                      background: recipeMode === value ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                      outline: recipeMode === value ? '2px solid var(--accent)' : 'none',
+                    }}
+                    onClick={() => setRecipeMode(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mt-2 min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
+            {recipeError}
+          </div>
+          <button className="btn-primary mt-3 w-full py-3.5 text-[15px]" onClick={handleRecipeImport}>
+            Zutaten zur Liste hinzufügen
           </button>
         </div>
       )}

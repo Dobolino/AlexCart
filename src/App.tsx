@@ -11,6 +11,7 @@ import { PantryPage } from './pages/PantryPage'
 import { CalculatorPage } from './pages/CalculatorPage'
 import { StatsPage } from './pages/StatsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ShoppingModePage } from './pages/ShoppingModePage'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -26,6 +27,7 @@ function AnimatedRoutes() {
       >
         <Routes location={location}>
           <Route path="/" element={<ListPage />} />
+          <Route path="/shop" element={<ShoppingModePage />} />
           <Route path="/pantry" element={<PantryPage />} />
           <Route path="/calculator" element={<CalculatorPage />} />
           <Route path="/stats" element={<StatsPage />} />
@@ -39,13 +41,15 @@ function AnimatedRoutes() {
 function AppShell() {
   useTheme()
   useEnsureStoreHydration()
+  const location = useLocation()
   const hasSeenOnboarding = useStore((s) => s.settings.hasSeenOnboarding)
   const setHasSeenOnboarding = useStore((s) => s.setHasSeenOnboarding)
+  const hideNav = location.pathname === '/shop'
 
   return (
     <div className="app-shell">
       <AnimatedRoutes />
-      <BottomNav />
+      {!hideNav && <BottomNav />}
       {!hasSeenOnboarding && <OnboardingSheet onDone={setHasSeenOnboarding} />}
     </div>
   )
