@@ -41,7 +41,7 @@ export function CalculatorPage() {
   return (
     <>
       <PageHeader title="Rechner" subtitle="Summe aus Liste und manuellen Einträgen" />
-      <main className="pb-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+      <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div
           className="mb-3 flex items-center justify-between rounded-3xl px-5 py-5"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
@@ -50,7 +50,7 @@ export function CalculatorPage() {
           <span className="text-[28px] font-extrabold">{formatMoney(total, currency)}</span>
         </div>
 
-        <MoneyNumpad cents={cents} onChange={setCents} currency={currency} />
+        <MoneyNumpad cents={cents} onChange={setCents} currency={currency} label="Eingabe" />
 
         <button className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
           <span className="inline-flex items-center gap-2">

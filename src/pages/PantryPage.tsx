@@ -4,7 +4,7 @@ import { groupByCategory } from '@/utils/group'
 import { isLowStock } from '@/utils/pantry'
 import { joinAmount } from '@/utils/amount'
 import { CATEGORIES } from '@/data/products'
-import { UNITS, DEFAULT_UNIT, getDefaultUnit } from '@/constants/units'
+import { UNITS, getDefaultUnit, getDefaultUnitForCategory } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -20,9 +20,9 @@ export function PantryPage() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState(CATEGORIES[0])
   const [amountValue, setAmountValue] = useState('')
-  const [amountUnit, setAmountUnit] = useState(DEFAULT_UNIT)
+  const [amountUnit, setAmountUnit] = useState(() => getDefaultUnitForCategory(CATEGORIES[0]))
   const [minValue, setMinValue] = useState('')
-  const [minUnit, setMinUnit] = useState(DEFAULT_UNIT)
+  const [minUnit, setMinUnit] = useState(() => getDefaultUnitForCategory(CATEGORIES[0]))
   const [editing, setEditing] = useState<PantryItem | null>(null)
   const amountUnitTouched = useRef(false)
   const minUnitTouched = useRef(false)
@@ -30,7 +30,9 @@ export function PantryPage() {
   const groups = groupByCategory(pantry)
 
   function applyDefaultUnits(nextName: string, nextCategory: string) {
-    const unit = getDefaultUnit(getIconKey(nextName, nextCategory))
+    const unit = nextName.trim()
+      ? getDefaultUnit(getIconKey(nextName, nextCategory), nextCategory)
+      : getDefaultUnitForCategory(nextCategory)
     if (!amountUnitTouched.current) setAmountUnit(unit)
     if (!minUnitTouched.current) setMinUnit(unit)
   }
@@ -56,8 +58,8 @@ export function PantryPage() {
     setName('')
     setAmountValue('')
     setMinValue('')
-    setAmountUnit(DEFAULT_UNIT)
-    setMinUnit(DEFAULT_UNIT)
+    setAmountUnit(getDefaultUnitForCategory(category))
+    setMinUnit(getDefaultUnitForCategory(category))
     amountUnitTouched.current = false
     minUnitTouched.current = false
   }
@@ -65,7 +67,7 @@ export function PantryPage() {
   return (
     <>
       <PageHeader title="Vorrat" subtitle="Bestand & Mindestmengen" />
-      <main className="pb-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+      <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div className="card-surface mb-4 px-3.5 py-3.5">
           <div className="mb-2 text-[13px] font-bold">Neuer Vorrat-Artikel</div>
           <input
@@ -179,6 +181,14 @@ export function PantryPage() {
                           Nachkauf
                         </span>
                       )}
+                      <button
+                        className="tap-scale flex-none p-1"
+                        style={{ color: 'var(--text-muted)' }}
+                        onClick={() => setEditing(item)}
+                        aria-label={`${item.name} bearbeiten`}
+                      >
+                        <Icon path={ICON_PATHS.edit} size={18} />
+                      </button>
                       <button
                         className="tap-scale flex-none p-1"
                         style={{ color: 'var(--danger)' }}
