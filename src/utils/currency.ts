@@ -4,7 +4,13 @@ export function formatMoney(amount: number, currency: Currency): string {
   if (currency === 'EUR') {
     return `${amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
   }
-  return `CHF ${amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // Swiss grouping separator: normalize to a plain apostrophe - which exact
+  // apostrophe-like character ICU picks for 'de-CH' varies by platform/version
+  // (typographic ' vs straight '), so we pin it instead of leaving it to chance.
+  const formatted = amount
+    .toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .replace(/[’ʼ]/g, "'")
+  return `CHF ${formatted}`
 }
 
 export function currencySymbol(currency: Currency): string {

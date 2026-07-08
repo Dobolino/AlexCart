@@ -5,7 +5,7 @@ describe('formatMoney', () => {
   it('formats CHF in Swiss style', () => {
     expect(formatMoney(48.7, 'CHF')).toBe('CHF 48.70')
     expect(formatMoney(0, 'CHF')).toBe('CHF 0.00')
-    expect(formatMoney(1234.5, 'CHF')).toBe('CHF 1’234.50')
+    expect(formatMoney(1234.5, 'CHF')).toBe("CHF 1'234.50")
   })
 
   it('formats EUR in German style', () => {
