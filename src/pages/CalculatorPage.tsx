@@ -41,7 +41,7 @@ export function CalculatorPage() {
   return (
     <>
       <PageHeader title="Rechner" subtitle="Summe aus Liste und manuellen Einträgen" />
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-6">
+      <main className="pb-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div
           className="mb-3 flex items-center justify-between rounded-3xl px-5 py-5"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}

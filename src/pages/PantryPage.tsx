@@ -65,7 +65,7 @@ export function PantryPage() {
   return (
     <>
       <PageHeader title="Vorrat" subtitle="Bestand & Mindestmengen" />
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-6">
+      <main className="pb-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div className="card-surface mb-4 px-3.5 py-3.5">
           <div className="mb-2 text-[13px] font-bold">Neuer Vorrat-Artikel</div>
           <input

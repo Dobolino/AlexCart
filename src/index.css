@@ -11,6 +11,10 @@
   --radius-pill: 999px;
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --blur-glass: blur(24px) saturate(180%);
+  --nav-float-height: 58px;
+  --nav-float-margin: 10px;
+  --nav-float-inset: calc(var(--nav-float-height) + var(--nav-float-margin) + var(--safe-bottom));
+  --blur-nav: blur(40px) saturate(200%);
 }
 
 [data-theme='light'] {
@@ -33,7 +37,11 @@
   --chip-bg: rgba(0, 0, 0, 0.05);
   --chip-fg: #1b1f27;
   --done-bg: #f4f4f7;
-  --nav-glass: rgba(255, 255, 255, 0.78);
+  --nav-glass: rgba(255, 255, 255, 0.55);
+  --nav-liquid-bg: rgba(255, 255, 255, 0.62);
+  --nav-liquid-border: rgba(0, 0, 0, 0.08);
+  --nav-liquid-highlight: rgba(255, 255, 255, 0.85);
+  --nav-liquid-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
   --progress-track: rgba(0, 0, 0, 0.08);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.04);
 
@@ -88,7 +96,11 @@
   --chip-bg: rgba(255, 255, 255, 0.08);
   --chip-fg: rgba(255, 255, 255, 0.9);
   --done-bg: #232326;
-  --nav-glass: rgba(20, 20, 22, 0.72);
+  --nav-glass: rgba(28, 28, 30, 0.45);
+  --nav-liquid-bg: rgba(36, 36, 40, 0.52);
+  --nav-liquid-border: rgba(255, 255, 255, 0.14);
+  --nav-liquid-highlight: rgba(255, 255, 255, 0.1);
+  --nav-liquid-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   --progress-track: rgba(255, 255, 255, 0.12);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
 
@@ -221,6 +233,83 @@ h3,
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-card);
+}
+
+/* Schwebende Liquid-Glass-Navigation (Inhalt scrollt dahinter) */
+.nav-liquid {
+  position: fixed;
+  z-index: 30;
+  left: calc(14px + var(--safe-left));
+  right: calc(14px + var(--safe-right));
+  bottom: calc(var(--nav-float-margin) + var(--safe-bottom));
+  height: var(--nav-float-height);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  padding: 6px 8px;
+  border-radius: 22px;
+  background: var(--nav-liquid-bg);
+  border: 1px solid var(--nav-liquid-border);
+  box-shadow: var(--nav-liquid-shadow);
+  -webkit-backdrop-filter: var(--blur-nav);
+  backdrop-filter: var(--blur-nav);
+}
+
+.nav-liquid-tab {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px 4px;
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.nav-liquid-icon {
+  display: flex;
+  height: 30px;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--text-muted);
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.nav-liquid-icon-active {
+  background: var(--accent-soft);
+  box-shadow:
+    0 0 0 1px rgba(255, 159, 10, 0.2),
+    0 4px 14px rgba(255, 159, 10, 0.22);
+  color: var(--accent);
+}
+
+.nav-liquid-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.nav-liquid-label-active {
+  color: var(--accent);
+}
+
+.pb-nav {
+  padding-bottom: calc(var(--nav-float-inset) + 8px) !important;
+}
+
+.pb-nav-fab {
+  padding-bottom: calc(var(--nav-float-inset) + 80px) !important;
 }
 
 /* ---------- Buttons ---------- */

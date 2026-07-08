@@ -12,27 +12,24 @@ const TABS = [
 
 export function BottomNav() {
   return (
-    <nav
-      className="glass relative z-20 flex flex-none justify-around border-t"
-      style={{
-        background: 'var(--nav-glass)',
-        borderColor: 'var(--glass-border)',
-        paddingBottom: 'calc(6px + var(--safe-bottom))',
-        paddingTop: '8px',
-        paddingLeft: 'var(--safe-left)',
-        paddingRight: 'var(--safe-right)',
-      }}
-    >
+    <nav className="nav-liquid" aria-label="Hauptnavigation">
       {TABS.map((tab) => (
         <NavLink
           key={tab.to}
           to={tab.to}
           end={tab.to === '/'}
-          className="tap-scale flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[10.5px] font-bold"
-          style={({ isActive }) => ({ color: isActive ? 'var(--accent)' : 'var(--text-muted)' })}
+          className="nav-liquid-tab tap-scale"
         >
-          <Icon path={ICON_PATHS[tab.icon]} size={22} />
-          <span className="truncate">{tab.label}</span>
+          {({ isActive }) => (
+            <>
+              <span className={`nav-liquid-icon ${isActive ? 'nav-liquid-icon-active' : ''}`}>
+                <Icon path={ICON_PATHS[tab.icon]} size={22} />
+              </span>
+              <span className={`nav-liquid-label ${isActive ? 'nav-liquid-label-active' : ''}`}>
+                {tab.label}
+              </span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
