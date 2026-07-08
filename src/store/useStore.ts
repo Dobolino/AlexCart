@@ -146,6 +146,7 @@ interface AppState {
   clearDoneItems: () => void
 
   createList: (name: string) => void
+  duplicateList: (listId: string) => void
   switchList: (listId: string) => void
   renameList: (listId: string, name: string) => void
   deleteList: (listId: string) => void
@@ -463,6 +464,22 @@ export const useStore = create<AppState>()(
         set((state) => ({
           lists: [...state.lists, list],
           activeListId: list.id,
+          stats: { ...state.stats, listsCreated: state.stats.listsCreated + 1 },
+        }))
+      },
+      duplicateList: (listId) => {
+        const source = get().lists.find((l) => l.id === listId)
+        if (!source) return
+        const copy = newList(`${source.name} (Kopie)`)
+        copy.weekLabel = source.weekLabel
+        copy.items = source.items.map((item) => ({
+          ...item,
+          id: uid(),
+          addedAt: Date.now(),
+        }))
+        set((state) => ({
+          lists: [...state.lists, copy],
+          activeListId: copy.id,
           stats: { ...state.stats, listsCreated: state.stats.listsCreated + 1 },
         }))
       },

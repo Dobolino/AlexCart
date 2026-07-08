@@ -21,6 +21,7 @@ import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { BudgetBar } from '@/components/BudgetBar'
+import { InstallPrompt } from '@/components/InstallPrompt'
 import { formatChf } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import type { ShoppingItem } from '@/types'
@@ -235,6 +236,7 @@ export function ListPage() {
         }
       />
       {budget && <BudgetBar progress={budget} />}
+      <InstallPrompt />
 
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-24">
         {filteredItems.length > 0 && (
@@ -352,6 +354,8 @@ export function ListPage() {
         <ListSwitcherSheet
           onClose={() => setSwitcherOpen(false)}
           onRepeated={(count) => showToast(`${count} Artikel von letzter Woche hinzugefügt`)}
+          onDuplicated={(name) => showToast(`„${name}“ erstellt`)}
+          onExported={() => showToast('Liste exportiert')}
         />
       )}
       {filteredOpen && (
