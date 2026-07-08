@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { PageHeader } from '@/components/PageHeader'
 import { Icon } from '@/components/Icon'
@@ -6,6 +6,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { MoneyNumpad } from '@/components/MoneyNumpad'
 import { formatMoney } from '@/utils/currency'
 import { todayKey } from '@/utils/date'
+import { centsToAmount } from '@/utils/numpadInput'
 
 export function CalculatorPage() {
   const entries = useStore((s) => s.calculatorEntries)
@@ -13,8 +14,13 @@ export function CalculatorPage() {
   const addCalculatorEntry = useStore((s) => s.addCalculatorEntry)
   const removeCalculatorEntry = useStore((s) => s.removeCalculatorEntry)
   const clearCalculator = useStore((s) => s.clearCalculator)
+  const ensureCalculatorDay = useStore((s) => s.ensureCalculatorDay)
   const currency = useStore((s) => s.settings.currency)
-  const [input, setInput] = useState('')
+  const [cents, setCents] = useState(0)
+
+  useEffect(() => {
+    ensureCalculatorDay()
+  }, [ensureCalculatorDay])
 
   const checkoffEntries = useMemo(() => {
     const today = todayKey()
@@ -26,10 +32,10 @@ export function CalculatorPage() {
   const total = Math.round((manualTotal + checkoffTotal) * 100) / 100
 
   function handleAdd() {
-    const value = parseFloat(input.replace(',', '.'))
-    if (!Number.isFinite(value) || value <= 0) return
+    const value = centsToAmount(cents)
+    if (value === null) return
     addCalculatorEntry(value)
-    setInput('')
+    setCents(0)
   }
 
   return (
@@ -44,13 +50,16 @@ export function CalculatorPage() {
           <span className="text-[28px] font-extrabold">{formatMoney(total, currency)}</span>
         </div>
 
-        <MoneyNumpad value={input} onChange={setInput} currency={currency} />
+        <MoneyNumpad cents={cents} onChange={setCents} currency={currency} />
 
-        <button className="btn-primary tap-scale mb-4 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
+        <button className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
           <span className="inline-flex items-center gap-2">
             <Icon path={ICON_PATHS.plus} size={20} /> Manuell hinzufügen
           </span>
         </button>
+        <p className="mb-4 px-1.5 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          Ziffern nacheinander tippen (z. B. 1-0-2-2-5 = 102,25). Manuelle Einträge werden täglich zurückgesetzt.
+        </p>
 
         {checkoffEntries.length > 0 && (
           <>
