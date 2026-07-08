@@ -16,18 +16,22 @@ import { ICON_PATHS } from '@/constants/icons'
 import { QuickAddSection } from '@/components/QuickAddSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
+import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { formatChf } from '@/utils/currency'
 import type { ShoppingItem } from '@/types'
 
 interface ToastState {
   message: string
   action?: { label: string; onClick: () => void }
+  secondaryAction?: { label: string; onClick: () => void }
 }
 
 export function ListPage() {
   const list = useStore((s) => s.activeList())
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
+  const updatePurchaseLogPrice = useStore((s) => s.updatePurchaseLogPrice)
+  const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const toggleItemFavorite = useStore((s) => s.toggleItemFavorite)
   const deleteItem = useStore((s) => s.deleteItem)
   const restoreItem = useStore((s) => s.restoreItem)
@@ -47,6 +51,8 @@ export function ListPage() {
   const [filteredOpen, setFilteredOpen] = useState(false)
   const [doneOpen, setDoneOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null)
+  const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
+  const [priceSheetMode, setPriceSheetMode] = useState<'on-checkoff' | 'add-later'>('on-checkoff')
   const [toast, setToast] = useState<ToastState | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -65,12 +71,61 @@ export function ListPage() {
   ]
   const listSubtitle = summaryParts.join(' • ')
 
-  function showToast(message: string, action?: ToastState['action']) {
+  function showToast(message: string, action?: ToastState['action'], secondaryAction?: ToastState['secondaryAction']) {
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast({ message, action })
-    toastTimer.current = setTimeout(() => setToast(null), action ? 4000 : 1800)
+    setToast({ message, action, secondaryAction })
+    toastTimer.current = setTimeout(() => setToast(null), action || secondaryAction ? 5000 : 1800)
   }
 
+  function showDoneToast(item: ShoppingItem, withPrice?: number) {
+    const priceHint = withPrice ? ` · ${formatChf(withPrice)}` : ''
+    showToast(
+      `„${item.name}" erledigt${priceHint}`,
+      { label: 'Rückgängig', onClick: () => toggleItemDone(item.id) },
+      withPrice === undefined
+        ? { label: 'Preis', onClick: () => openPriceSheetLater(item) }
+        : undefined
+    )
+  }
+
+  function openPriceSheetLater(item: ShoppingItem) {
+    setPriceSheetMode('add-later')
+    setPriceSheetItem(item)
+  }
+
+  function handleToggle(itemId: string) {
+    const item = list!.items.find((i) => i.id === itemId)
+    if (!item) return
+    const wasDone = item.done
+    if (!wasDone && askPriceOnCheckoff) {
+      setPriceSheetMode('on-checkoff')
+      setPriceSheetItem(item)
+      return
+    }
+    toggleItemDone(itemId)
+    if (!wasDone) showDoneToast(item)
+  }
+
+  function handlePriceSave(price: number) {
+    if (!priceSheetItem) return
+    if (priceSheetMode === 'on-checkoff') {
+      toggleItemDone(priceSheetItem.id, price)
+      showDoneToast(priceSheetItem, price)
+    } else {
+      updatePurchaseLogPrice(priceSheetItem.name, priceSheetItem.category, price)
+      showToast(`Preis für „${priceSheetItem.name}" gespeichert · ${formatChf(price)}`)
+    }
+    setPriceSheetItem(null)
+  }
+
+  function handlePriceSkip() {
+    if (!priceSheetItem) return
+    if (priceSheetMode === 'on-checkoff') {
+      toggleItemDone(priceSheetItem.id)
+      showDoneToast(priceSheetItem)
+    }
+    setPriceSheetItem(null)
+  }
   function handleAddToPantry(item: ShoppingItem) {
     addPantryItem(item.name, item.category)
     showToast(`${item.name} zum Vorrat hinzugefügt`)
@@ -81,19 +136,6 @@ export function ListPage() {
     if (!item) return
     deleteItem(itemId)
     showToast(`„${item.name}“ gelöscht`, { label: 'Rückgängig', onClick: () => restoreItem(item) })
-  }
-
-  function handleToggle(itemId: string) {
-    const item = list!.items.find((i) => i.id === itemId)
-    if (!item) return
-    const wasDone = item.done
-    toggleItemDone(itemId)
-    if (!wasDone) {
-      showToast(`„${item.name}“ erledigt`, {
-        label: 'Rückgängig',
-        onClick: () => toggleItemDone(itemId),
-      })
-    }
   }
 
   function handleClearDone() {
@@ -333,19 +375,40 @@ export function ListPage() {
         </Sheet>
       )}
 
+      {priceSheetItem && (
+        <CheckoffPriceSheet
+          item={priceSheetItem}
+          onClose={() => setPriceSheetItem(null)}
+          onSave={handlePriceSave}
+          onSkip={handlePriceSkip}
+        />
+      )}
+
       {toast && (
         <FloatingPortal>
           <div
-            className="glass fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full py-2.5 pl-4.5 pr-2 text-[13px] font-semibold"
+            className="glass fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-2.5 pl-4 pr-2 text-[13px] font-semibold"
             style={{
               color: 'var(--text)',
               bottom: 'calc(88px + var(--safe-bottom))',
             }}
           >
-            <span>{toast.message}</span>
+            <span className="min-w-0 truncate">{toast.message}</span>
+            {toast.secondaryAction && (
+              <button
+                className="tap-scale flex-none rounded-full px-3 py-1.5 text-[13px] font-bold"
+                style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                onClick={() => {
+                  toast.secondaryAction!.onClick()
+                  setToast(null)
+                }}
+              >
+                {toast.secondaryAction.label}
+              </button>
+            )}
             {toast.action && (
               <button
-                className="tap-scale rounded-full px-3 py-1.5 text-[13px] font-bold"
+                className="tap-scale flex-none rounded-full px-3 py-1.5 text-[13px] font-bold"
                 style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
                 onClick={() => {
                   toast.action!.onClick()

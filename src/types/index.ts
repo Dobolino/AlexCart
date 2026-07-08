@@ -5,6 +5,8 @@ export interface AppSettings {
   theme: Theme
   listViewMode: ListViewMode
   hasSeenOnboarding: boolean
+  /** Preis-Eingabe direkt beim Abhaken anzeigen. */
+  askPriceOnCheckoff: boolean
 }
 
 export interface ShoppingItem {
@@ -36,6 +38,8 @@ export interface PurchaseLogEntry {
   name: string
   category: string
   date: string
+  /** Optionaler Preis in CHF beim Abhaken. */
+  price?: number
 }
 
 export interface ImportItemPayload {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek } from './stats'
+import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek, totalSpent, avgSpendPerTrip, maxTripSpend, pricedPurchaseCount } from './stats'
 
 const log = [
   { name: 'Tomaten', category: 'Früchte & Gemüse', date: '2026-07-01' },
@@ -54,5 +54,20 @@ describe('productsPerWeek', () => {
     ]
     const result = productsPerWeek(sameWeekLog, 1)
     expect(result[0].count).toBe(2)
+  })
+})
+
+describe('spend stats', () => {
+  const pricedLog = [
+    { name: 'Milch', category: 'Milch & Käse', date: '2026-07-01', price: 2.5 },
+    { name: 'Brot', category: 'Brot & Backwaren', date: '2026-07-01', price: 4.2 },
+    { name: 'Käse', category: 'Milch & Käse', date: '2026-07-02', price: 6.8 },
+  ]
+
+  it('sums priced purchases and aggregates per trip', () => {
+    expect(totalSpent(pricedLog)).toBeCloseTo(13.5)
+    expect(avgSpendPerTrip(pricedLog)).toBeCloseTo(6.75)
+    expect(maxTripSpend(pricedLog)).toBeCloseTo(6.8)
+    expect(pricedPurchaseCount(pricedLog)).toBe(3)
   })
 })

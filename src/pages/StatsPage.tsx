@@ -1,5 +1,6 @@
 import { useStore } from '@/store/useStore'
-import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek } from '@/utils/stats'
+import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek, totalSpent, avgSpendPerTrip, maxTripSpend, pricedPurchaseCount } from '@/utils/stats'
+import { formatChf } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { ICON_PATHS } from '@/constants/icons'
@@ -27,6 +28,7 @@ export function StatsPage() {
   const maxTopCount = top[0]?.count ?? 1
   const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
   const completionRate = stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
+  const hasPriceData = pricedPurchaseCount(purchaseLog) > 0
 
   return (
     <>
@@ -42,6 +44,14 @@ export function StatsPage() {
           <StatTile value={stats.importsCount} label="Importierte Listen" />
           <StatTile value={stats.manualProductsCreated} label="Eigene Produkte" />
         </div>
+
+        {hasPriceData && (
+          <div className="mb-4.5 grid grid-cols-3 gap-2.5">
+            <StatTile value={formatChf(avgSpendPerTrip(purchaseLog))} label="Ø Ausgaben" />
+            <StatTile value={formatChf(maxTripSpend(purchaseLog))} label="Teuerster Tag" />
+            <StatTile value={formatChf(totalSpent(purchaseLog))} label="Gesamt erfasst" />
+          </div>
+        )}
 
         {!purchaseLog.length ? (
           <EmptyState
@@ -116,7 +126,8 @@ export function StatsPage() {
             </div>
 
             <p className="mb-4 px-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              An {distinctShoppingDays(purchaseLog)} Tagen eingekauft.
+              An {distinctShoppingDays(purchaseLog)} Tagen eingekauft
+              {hasPriceData ? ` · ${pricedPurchaseCount(purchaseLog)} Preise erfasst` : ''}.
             </p>
 
             <button

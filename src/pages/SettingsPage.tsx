@@ -19,7 +19,9 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 
 export function SettingsPage() {
   const theme = useStore((s) => s.settings.theme)
+  const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const setTheme = useStore((s) => s.setTheme)
+  const setAskPriceOnCheckoff = useStore((s) => s.setAskPriceOnCheckoff)
   const resetAll = useStore((s) => s.resetAll)
   const customProducts = useStore((s) => s.customProducts)
   const removeCustomProduct = useStore((s) => s.removeCustomProduct)
@@ -81,6 +83,36 @@ export function SettingsPage() {
               {opt.label}
             </button>
           ))}
+        </div>
+
+        <div
+          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+          style={{ color: 'var(--category-fg)' }}
+        >
+          Einkauf
+        </div>
+        <div className="card-surface mb-4.5 px-3.5 py-3.5">
+          <label className="flex items-center justify-between gap-3">
+            <span>
+              <span className="block text-[15px] font-semibold">Preis beim Abhaken</span>
+              <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                Preis direkt erfassen – sonst über den Toast nachträglich
+              </span>
+            </span>
+            <button
+              type="button"
+              className="tap-scale relative h-7 w-12 flex-none rounded-full transition-colors"
+              style={{ background: askPriceOnCheckoff ? 'var(--accent)' : 'var(--chip-bg)' }}
+              onClick={() => setAskPriceOnCheckoff(!askPriceOnCheckoff)}
+              aria-label="Preis beim Abhaken umschalten"
+              aria-pressed={askPriceOnCheckoff}
+            >
+              <span
+                className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform"
+                style={{ left: askPriceOnCheckoff ? '22px' : '2px' }}
+              />
+            </button>
+          </label>
         </div>
 
         <div
