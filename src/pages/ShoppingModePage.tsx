@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import { hapticSuccess } from '@/utils/haptics'
+import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
@@ -17,13 +18,19 @@ export function ShoppingModePage() {
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
+  const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
+  const resetCalculatorSession = useStore((s) => s.resetCalculatorSession)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const currency = useStore((s) => s.settings.currency)
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
-  const [sessionTotal, setSessionTotal] = useState(0)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const tripTotal = useMemo(
+    () => (list ? todayPricedTotalForList(purchaseLog, list.items) : 0),
+    [purchaseLog, list]
+  )
 
   if (!list) return null
 
@@ -35,6 +42,7 @@ export function ShoppingModePage() {
   const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
   const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog), calculatorTotal)
   const budget = weeklyBudget > 0 ? budgetProgress(budgetSpend, weeklyBudget) : null
+  const showTripTotal = tripTotal > 0
 
   function armUndo(next: { id: string; price?: number }) {
     setLastChecked(next)
@@ -56,7 +64,6 @@ export function ShoppingModePage() {
     if (!priceSheetItem) return
     hapticSuccess()
     toggleItemDone(priceSheetItem.id, price)
-    setSessionTotal((t) => t + price)
     armUndo({ id: priceSheetItem.id, price })
     setPriceSheetItem(null)
   }
@@ -72,9 +79,19 @@ export function ShoppingModePage() {
   function handleUndo() {
     if (!lastChecked) return
     toggleItemDone(lastChecked.id)
-    if (lastChecked.price) setSessionTotal((t) => Math.max(0, t - lastChecked.price!))
     setLastChecked(null)
     if (undoTimer.current) clearTimeout(undoTimer.current)
+  }
+
+  function handleResetTrip() {
+    clearTodayCheckoffsForActiveList()
+  }
+
+  function handleFinishShopping() {
+    if (tripTotal > 0 || calculatorEntries.length > 0) {
+      resetCalculatorSession()
+    }
+    navigate('/')
   }
 
   return (
@@ -100,11 +117,8 @@ export function ShoppingModePage() {
           <div className="truncate text-[17px] font-extrabold">{list.name}</div>
           <div className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {doneCount} von {totalCount || doneCount} erledigt
-            {budget
-              ? ` · ${formatMoney(budgetSpend, currency)} / ${formatMoney(budget.budget, currency)}`
-              : sessionTotal > 0
-                ? ` · ${formatMoney(sessionTotal, currency)}`
-                : ''}
+            {showTripTotal ? ` · ${formatMoney(tripTotal, currency)}` : ''}
+            {budget ? ` · Budget ${formatMoney(budgetSpend, currency)}` : ''}
           </div>
         </div>
         {lastChecked ? (
@@ -115,10 +129,29 @@ export function ShoppingModePage() {
           >
             <Icon path={ICON_PATHS.undo} size={14} />
           </button>
+        ) : showTripTotal ? (
+          <button
+            className="tap-scale flex h-10 items-center justify-center rounded-full px-2.5 text-[11px] font-bold"
+            style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+            onClick={handleResetTrip}
+            aria-label="Einkaufssumme zurücksetzen"
+          >
+            Leeren
+          </button>
         ) : (
           <div className="w-10" />
         )}
       </header>
+
+      {showTripTotal && (
+        <div
+          className="mx-4 mb-2 flex items-center justify-between rounded-2xl px-4 py-3"
+          style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+        >
+          <span className="text-[13px] font-semibold opacity-90">Aktueller Einkauf</span>
+          <span className="text-[22px] font-extrabold tabular-nums">{formatMoney(tripTotal, currency)}</span>
+        </div>
+      )}
 
       {budget && (
         <div className="px-4 py-2">
@@ -141,15 +174,25 @@ export function ShoppingModePage() {
             <h2 className="mb-2 text-[22px] font-extrabold">Einkauf abgeschlossen!</h2>
             <p className="mb-6 text-[15px]" style={{ color: 'var(--text-muted)' }}>
               {doneCount > 0 ? `${doneCount} Artikel erledigt.` : 'Keine offenen Artikel mehr.'}
-              {budget
-                ? ` Summe: ${formatMoney(budgetSpend, currency)}.`
-                : sessionTotal > 0
-                  ? ` Summe: ${formatMoney(sessionTotal, currency)}.`
-                  : ''}
+              {showTripTotal ? ` Summe: ${formatMoney(tripTotal, currency)}.` : ''}
             </p>
-            <button className="btn-primary tap-scale rounded-full px-8 py-3.5 text-[15px]" onClick={() => navigate('/')}>
-              Zurück zur Liste
-            </button>
+            <div className="flex w-full max-w-xs flex-col gap-2.5">
+              {showTripTotal && (
+                <button
+                  className="w-full rounded-2xl py-3.5 text-[15px] font-bold"
+                  style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                  onClick={handleResetTrip}
+                >
+                  Rechner zurücksetzen
+                </button>
+              )}
+              <button
+                className="btn-primary tap-scale rounded-full px-8 py-3.5 text-[15px]"
+                onClick={handleFinishShopping}
+              >
+                {showTripTotal ? 'Fertig & Rechner leeren' : 'Zurück zur Liste'}
+              </button>
+            </div>
           </div>
         ) : (
           groups.map((group) => (

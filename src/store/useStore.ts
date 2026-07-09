@@ -9,7 +9,7 @@ import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
-import { removeTodayPurchaseLogEntriesForItems, removeTodayPurchaseLogEntry } from '@/utils/purchaseLog'
+import { removeTodayPurchaseLogEntriesForItems, removeTodayPurchaseLogEntry, removeAllTodayPricedCheckoffs, removeTodayPricedCheckoffsForList } from '@/utils/purchaseLog'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
 import type {
@@ -175,6 +175,9 @@ interface AppState {
   addCalculatorEntry: (amount: number) => void
   removeCalculatorEntry: (id: string) => void
   clearCalculator: () => void
+  clearTodayCheckoffs: () => void
+  clearTodayCheckoffsForActiveList: () => void
+  resetCalculatorSession: () => void
   ensureCalculatorDay: () => void
 
   resetStats: () => void
@@ -626,6 +629,23 @@ export const useStore = create<AppState>()(
       removeCalculatorEntry: (id) =>
         set((state) => ({ calculatorEntries: state.calculatorEntries.filter((e) => e.id !== id) })),
       clearCalculator: () => set({ calculatorEntries: [], calculatorDate: todayKey() }),
+      clearTodayCheckoffs: () =>
+        set((state) => ({
+          purchaseLog: removeAllTodayPricedCheckoffs(state.purchaseLog),
+        })),
+      clearTodayCheckoffsForActiveList: () => {
+        const list = get().activeList()
+        if (!list) return
+        set((state) => ({
+          purchaseLog: removeTodayPricedCheckoffsForList(state.purchaseLog, list.items),
+        }))
+      },
+      resetCalculatorSession: () =>
+        set((state) => ({
+          calculatorEntries: [],
+          calculatorDate: todayKey(),
+          purchaseLog: removeAllTodayPricedCheckoffs(state.purchaseLog),
+        })),
 
       resetStats: () => set({ purchaseLog: [], stats: defaultStats() }),
     }),
