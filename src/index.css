@@ -43,7 +43,7 @@
   --chip-fg: #1b1f27;
   --done-bg: #f4f4f7;
   --nav-glass: rgba(255, 255, 255, 0.55);
-  --nav-liquid-bg: rgba(255, 255, 255, 0.58);
+  --nav-liquid-bg: rgba(255, 255, 255, 0.45);
   --nav-liquid-border: rgba(255, 255, 255, 0.45);
   --nav-liquid-shadow:
     0 4px 24px rgba(0, 0, 0, 0.12),
@@ -108,7 +108,7 @@
   --chip-fg: rgba(255, 255, 255, 0.9);
   --done-bg: #232326;
   --nav-glass: rgba(28, 28, 30, 0.45);
-  --nav-liquid-bg: rgba(22, 22, 24, 0.52);
+  --nav-liquid-bg: rgba(22, 22, 24, 0.42);
   --nav-liquid-border: rgba(255, 255, 255, 0.12);
   --nav-liquid-shadow:
     0 8px 32px rgba(0, 0, 0, 0.45),
@@ -245,15 +245,16 @@ h3,
   box-shadow: var(--shadow-card);
 }
 
-/* Schwebende Liquid-Glass-Pille als Flex-Kind – bleibt im paintbaren Bereich. */
+/* Schwebende Liquid-Glass-Pille als fixed Overlay – Inhalt scrollt dahinter. */
 .nav-liquid {
-  flex: none;
-  z-index: 20;
+  position: fixed;
+  z-index: 30;
+  bottom: var(--nav-bottom-pad);
+  left: calc(var(--nav-side-inset) + var(--safe-left));
+  right: calc(var(--nav-side-inset) + var(--safe-right));
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  margin: 0 calc(var(--nav-side-inset) + var(--safe-right)) var(--nav-bottom-pad)
-    calc(var(--nav-side-inset) + var(--safe-left));
   padding: 4px 8px;
   min-height: var(--nav-pill-height);
   border-radius: 28px;
@@ -263,6 +264,9 @@ h3,
   -webkit-backdrop-filter: var(--blur-nav);
   backdrop-filter: var(--blur-nav);
   pointer-events: auto;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  isolation: isolate;
 }
 
 .nav-liquid-tab {
@@ -315,18 +319,17 @@ h3,
   color: var(--accent);
 }
 
-/* Die Tab-Bar ist jetzt normaler Layout-Flow (kein Overlay mehr), main muss ihr also
-   nicht mehr per Padding ausweichen - nur noch etwas Luft am Ende der Liste. */
+/* Inhalt scrollt unter der schwebenden Pille; padding-bottom erweitert die Scrollweite */
 .scroll-behind-nav {
-  padding-bottom: 16px !important;
+  padding-bottom: var(--nav-scroll-padding) !important;
+  scroll-padding-bottom: var(--nav-scroll-padding);
   -webkit-overflow-scrolling: touch;
 }
 
-/* Nur hier gebraucht: der FAB auf der Listenseite ist weiterhin position:fixed
-   und muss über der (jetzt normal fließenden) Tab-Bar schweben. */
+/* ListPage: zusätzlicher Platz für den fixed FAB über der Pille */
 .scroll-behind-nav-fab {
-  padding-bottom: calc(var(--nav-overlay-height) + 64px) !important;
-  scroll-padding-bottom: calc(var(--nav-overlay-height) + 64px);
+  padding-bottom: calc(var(--nav-scroll-padding) + 64px) !important;
+  scroll-padding-bottom: calc(var(--nav-scroll-padding) + 64px);
   -webkit-overflow-scrolling: touch;
 }
 
