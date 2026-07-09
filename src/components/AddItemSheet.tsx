@@ -264,7 +264,9 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             <p className="mt-2 leading-relaxed">
               Erstelle eine Einkaufsliste als JSON mit diesem Format: week (ISO-Datum), items mit name, amount und
               category. Kategorien: Früchte & Gemüse, Milch & Käse, Fleisch & Fisch, Getreide & Beilagen, Brot &
-              Backwaren, Tiefkühl, Getränke, Sonstiges. Nur JSON ausgeben, ohne Erklärung.
+              Backwaren, Tiefkühl, Getränke, Konserven & Saucen, Gewürze, Öl & Backen, Sonstiges, Asiatisch &
+              Indisch, Protein & Health, Süßes & Snacks, Haushalt & Reinigung, Drogerie & Kosmetik, Tierbedarf. Nur
+              JSON ausgeben, ohne Erklärung.
             </p>
           </details>
           <textarea
