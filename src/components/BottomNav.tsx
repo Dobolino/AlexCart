@@ -10,7 +10,7 @@ const TABS = [
   { to: '/settings', label: 'Optionen', icon: 'settings' },
 ]
 
-/** Freischwebende iOS-Style Tab-Pill als fixed Overlay – kein Layout-Block. */
+/** Tab-Leiste als Flex-Kind am Ende von .app-shell (nicht position:fixed). */
 export function BottomNav() {
   return (
     <nav className="nav-liquid" aria-label="Hauptnavigation">
