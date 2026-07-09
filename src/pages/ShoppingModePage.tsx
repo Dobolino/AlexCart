@@ -219,13 +219,13 @@ export function ShoppingModePage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[18px] font-bold leading-tight">{item.name}</span>
-                      {item.amount && <AmountBadge amount={item.amount} prominent />}
                       {item.note && (
-                        <span className="mt-1 block truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                        <span className="mt-0.5 block truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
                           {item.note}
                         </span>
                       )}
                     </span>
+                    {item.amount && <AmountBadge amount={item.amount} prominent />}
                   </button>
                 ))}
               </div>
