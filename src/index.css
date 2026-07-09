@@ -82,6 +82,10 @@
   --cat-drugstore-fg: #a3315c;
   --cat-pets-bg: rgba(160, 110, 60, 0.16);
   --cat-pets-fg: #7a4f1e;
+  --cat-canned-bg: rgba(200, 90, 40, 0.15);
+  --cat-canned-fg: #a3421e;
+  --cat-spices-bg: rgba(200, 170, 50, 0.16);
+  --cat-spices-fg: #8a6d1e;
 }
 
 [data-theme='dark'] {
@@ -143,6 +147,10 @@
   --cat-drugstore-fg: #f9a8d4;
   --cat-pets-bg: rgba(210, 160, 106, 0.2);
   --cat-pets-fg: #e0b888;
+  --cat-canned-bg: rgba(230, 120, 70, 0.2);
+  --cat-canned-fg: #f0a578;
+  --cat-spices-bg: rgba(220, 190, 70, 0.2);
+  --cat-spices-fg: #e8d183;
 }
 
 * {

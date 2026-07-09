@@ -20,6 +20,8 @@ const CATEGORY_COLORS: Record<string, CategoryColor> = {
   'Haushalt & Reinigung': { bg: 'var(--cat-household-bg)', fg: 'var(--cat-household-fg)' },
   'Drogerie & Kosmetik': { bg: 'var(--cat-drugstore-bg)', fg: 'var(--cat-drugstore-fg)' },
   Tierbedarf: { bg: 'var(--cat-pets-bg)', fg: 'var(--cat-pets-fg)' },
+  'Konserven & Saucen': { bg: 'var(--cat-canned-bg)', fg: 'var(--cat-canned-fg)' },
+  'Gewürze, Öl & Backen': { bg: 'var(--cat-spices-bg)', fg: 'var(--cat-spices-fg)' },
 }
 
 const CATEGORY_TILE_COLORS: Record<string, CategoryColor> = {
@@ -37,6 +39,8 @@ const CATEGORY_TILE_COLORS: Record<string, CategoryColor> = {
   'Haushalt & Reinigung': { bg: '#5a7896', fg: '#ffffff' },
   'Drogerie & Kosmetik': { bg: '#b8618a', fg: '#ffffff' },
   Tierbedarf: { bg: '#8a6a3f', fg: '#ffffff' },
+  'Konserven & Saucen': { bg: '#b8552e', fg: '#ffffff' },
+  'Gewürze, Öl & Backen': { bg: '#a8901e', fg: '#ffffff' },
 }
 
 /** Dezente Akzentfarbe pro Kategorie – erledigte Artikel bleiben bewusst grau. */

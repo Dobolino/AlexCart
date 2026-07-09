@@ -12,6 +12,8 @@ export const CATEGORIES: string[] = [
   "Brot & Backwaren",
   "Tiefkühl",
   "Getränke",
+  "Konserven & Saucen",
+  "Gewürze, Öl & Backen",
   "Sonstiges",
   "Asiatisch & Indisch",
   "Protein & Health",
@@ -679,37 +681,37 @@ export const PRODUCTS: Product[] = [
   },
   {
     "name": "Olivenöl",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "ol"
   },
   {
     "name": "Sonnenblumenöl",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "ol"
   },
   {
     "name": "Essig",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "essig"
   },
   {
     "name": "Salz",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "gewuerz"
   },
   {
     "name": "Pfeffer",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "gewuerz"
   },
   {
     "name": "Zucker",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "zucker"
   },
   {
     "name": "Honig",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "honig"
   },
   {
@@ -724,52 +726,52 @@ export const PRODUCTS: Product[] = [
   },
   {
     "name": "Tomatenmark",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Passierte Tomaten",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Kokosöl",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "ol"
   },
   {
     "name": "Senf",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "gewuerz"
   },
   {
     "name": "Ketchup",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Mayonnaise",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Brühe",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Sojasauce",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Backpulver",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "mehl"
   },
   {
     "name": "Vanillezucker",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "zucker"
   },
   {
@@ -1334,67 +1336,67 @@ export const PRODUCTS: Product[] = [
   },
   {
     "name": "Currypaste",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "wuerzpaste"
   },
   {
     "name": "Balsamico",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "essig"
   },
   {
     "name": "Chilisauce",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "sauce"
   },
   {
     "name": "Barbecue-Sauce",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "sauce"
   },
   {
     "name": "Pesto",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "sauce"
   },
   {
     "name": "Hummus",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "aufstrich"
   },
   {
     "name": "Erdnussbutter",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "aufstrich"
   },
   {
     "name": "Nutella",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "aufstrich"
   },
   {
     "name": "Marmelade",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "aufstrich"
   },
   {
     "name": "Ahornsirup",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "sirup"
   },
   {
     "name": "Hefe",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "backzutat"
   },
   {
     "name": "Gelatine",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "backzutat"
   },
   {
     "name": "Kokosraspeln",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "backzutat"
   },
   {
@@ -1409,27 +1411,27 @@ export const PRODUCTS: Product[] = [
   },
   {
     "name": "Oliven",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Kapern",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Essiggurken",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Sauerkraut",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
     "name": "Kimchi",
-    "category": "Sonstiges",
+    "category": "Konserven & Saucen",
     "icon": "dose"
   },
   {
@@ -2024,17 +2026,17 @@ export const PRODUCTS: Product[] = [
   },
   {
     "name": "Senfkörner",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "gewuerz"
   },
   {
     "name": "Vanilleschote",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "backzutat"
   },
   {
     "name": "Speisestärke",
-    "category": "Sonstiges",
+    "category": "Gewürze, Öl & Backen",
     "icon": "mehl"
   },
   {
