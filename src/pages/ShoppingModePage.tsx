@@ -6,6 +6,7 @@ import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import { hapticSuccess } from '@/utils/haptics'
 import { todayPricedTotalForList } from '@/utils/purchaseLog'
+import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
@@ -17,6 +18,7 @@ export function ShoppingModePage() {
   const list = useStore((s) => s.activeList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
   const resetCalculatorSession = useStore((s) => s.resetCalculatorSession)
@@ -27,10 +29,10 @@ export function ShoppingModePage() {
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const tripTotal = useMemo(
-    () => (list ? todayPricedTotalForList(purchaseLog, list.items) : 0),
-    [purchaseLog, list]
-  )
+  const tripTotal = useMemo(() => {
+    if (!list) return 0
+    return todayPricedTotalForList(purchaseLog, list.items, todayKey(), new Set(excludedIds))
+  }, [purchaseLog, list, excludedIds])
 
   if (!list) return null
 

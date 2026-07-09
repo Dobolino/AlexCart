@@ -9,7 +9,7 @@ import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
-import { removeTodayPurchaseLogEntriesForItems, removeTodayPurchaseLogEntry, removeAllTodayPricedCheckoffs, removeTodayPricedCheckoffsForList } from '@/utils/purchaseLog'
+import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList } from '@/utils/purchaseLog'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
 import type {
@@ -26,7 +26,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 7
+const STORE_VERSION = 8
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -84,6 +84,17 @@ function defaultStats(): AppStats {
   return { listsCreated: 1, importsCount: 0, manualProductsCreated: 0, itemsAddedTotal: 0 }
 }
 
+function mergeCalculatorExclusions(existing: string[], add: string[]): string[] {
+  if (!add.length) return existing
+  const set = new Set(existing)
+  for (const id of add) set.add(id)
+  return [...set]
+}
+
+function ensurePurchaseLogIds(log: PurchaseLogEntry[]): PurchaseLogEntry[] {
+  return log.map((entry) => (entry.id ? entry : { ...entry, id: uid() }))
+}
+
 /** Stabile Referenz für den "keine gefilterten Items" Fall – ein neues [] bei jedem Aufruf
  *  würde useSyncExternalStore glauben lassen, der Store ändere sich ständig (Endlosschleife). */
 const EMPTY_ITEMS: ShoppingItem[] = []
@@ -124,6 +135,8 @@ interface AppState {
   calculatorEntries: CalculatorEntry[]
   /** Datum der manuellen Rechner-Einträge – bei neuem Tag werden sie geleert. */
   calculatorDate: string
+  /** Ausgeblendete Kauf-Einträge im Rechner – Statistik bleibt unverändert. */
+  calculatorExcludedPurchaseIds: string[]
 
   activeList: () => ShoppingList | undefined
   filteredForActiveList: () => ShoppingItem[]
@@ -196,6 +209,7 @@ export const useStore = create<AppState>()(
       settings: defaultSettings(),
       calculatorEntries: [],
       calculatorDate: todayKey(),
+      calculatorExcludedPurchaseIds: [],
 
       activeList: () => {
         const { lists, activeListId } = get()
@@ -346,7 +360,12 @@ export const useStore = create<AppState>()(
         set((state) => {
           let purchaseLog = state.purchaseLog
           if (nowDone) {
-            const entry: PurchaseLogEntry = { name: item.name, category: item.category, date: todayKey() }
+            const entry: PurchaseLogEntry = {
+              id: uid(),
+              name: item.name,
+              category: item.category,
+              date: todayKey(),
+            }
             if (price !== undefined && price > 0) entry.price = price
             purchaseLog = [...purchaseLog, entry]
           } else {
@@ -394,15 +413,10 @@ export const useStore = create<AppState>()(
       deleteItem: (itemId) => {
         const list = get().activeList()
         if (!list) return
-        const item = list.items.find((i) => i.id === itemId)
-        if (!item) return
         set((state) => ({
           lists: state.lists.map((l) =>
             l.id !== list.id ? l : { ...l, items: l.items.filter((i) => i.id !== itemId) }
           ),
-          purchaseLog: item.done
-            ? removeTodayPurchaseLogEntry(state.purchaseLog, item.name, item.category)
-            : state.purchaseLog,
         }))
       },
 
@@ -454,12 +468,10 @@ export const useStore = create<AppState>()(
       clearDoneItems: () => {
         const list = get().activeList()
         if (!list) return
-        const doneItems = list.items.filter((i) => i.done)
         set((state) => ({
           lists: state.lists.map((l) =>
             l.id !== list.id ? l : { ...l, items: l.items.filter((i) => !i.done) }
           ),
-          purchaseLog: removeTodayPurchaseLogEntriesForItems(state.purchaseLog, doneItems),
         }))
       },
       reorderItemsInCategory: (category, orderedIds) => {
@@ -508,7 +520,6 @@ export const useStore = create<AppState>()(
         })),
       deleteList: (listId) =>
         set((state) => {
-          const deleted = state.lists.find((l) => l.id === listId)
           const remaining = state.lists.filter((l) => l.id !== listId)
           const lists = remaining.length ? remaining : [newList('Wocheneinkauf')]
           const activeListId = state.activeListId === listId ? lists[0]!.id : state.activeListId
@@ -516,9 +527,6 @@ export const useStore = create<AppState>()(
             lists,
             activeListId,
             filtered: state.filtered.filter((f) => f.listId !== listId),
-            purchaseLog: deleted
-              ? removeTodayPurchaseLogEntriesForItems(state.purchaseLog, deleted.items)
-              : state.purchaseLog,
           }
         }),
 
@@ -605,6 +613,7 @@ export const useStore = create<AppState>()(
             settings: defaultSettings(),
             calculatorEntries: [],
             calculatorDate: todayKey(),
+            calculatorExcludedPurchaseIds: [],
           }
         }),
 
@@ -631,23 +640,33 @@ export const useStore = create<AppState>()(
       clearCalculator: () => set({ calculatorEntries: [], calculatorDate: todayKey() }),
       clearTodayCheckoffs: () =>
         set((state) => ({
-          purchaseLog: removeAllTodayPricedCheckoffs(state.purchaseLog),
+          calculatorExcludedPurchaseIds: mergeCalculatorExclusions(
+            state.calculatorExcludedPurchaseIds,
+            idsToExcludeTodayPricedCheckoffs(state.purchaseLog)
+          ),
         })),
       clearTodayCheckoffsForActiveList: () => {
         const list = get().activeList()
         if (!list) return
         set((state) => ({
-          purchaseLog: removeTodayPricedCheckoffsForList(state.purchaseLog, list.items),
+          calculatorExcludedPurchaseIds: mergeCalculatorExclusions(
+            state.calculatorExcludedPurchaseIds,
+            idsToExcludeTodayPricedCheckoffsForList(state.purchaseLog, list.items)
+          ),
         }))
       },
       resetCalculatorSession: () =>
         set((state) => ({
           calculatorEntries: [],
           calculatorDate: todayKey(),
-          purchaseLog: removeAllTodayPricedCheckoffs(state.purchaseLog),
+          calculatorExcludedPurchaseIds: mergeCalculatorExclusions(
+            state.calculatorExcludedPurchaseIds,
+            idsToExcludeTodayPricedCheckoffs(state.purchaseLog)
+          ),
         })),
 
-      resetStats: () => set({ purchaseLog: [], stats: defaultStats() }),
+      resetStats: () =>
+        set({ purchaseLog: [], stats: defaultStats(), calculatorExcludedPurchaseIds: [] }),
     }),
     {
       name: STORE_NAME,
@@ -695,6 +714,12 @@ export const useStore = create<AppState>()(
           if (version < 7) {
             state.calculatorDate = todayKey()
           }
+          if (version < 8) {
+            if (Array.isArray(state.purchaseLog)) {
+              state.purchaseLog = ensurePurchaseLogIds(state.purchaseLog)
+            }
+            state.calculatorExcludedPurchaseIds = state.calculatorExcludedPurchaseIds ?? []
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)
@@ -712,6 +737,7 @@ export const useStore = create<AppState>()(
         settings: state.settings,
         calculatorEntries: state.calculatorEntries,
         calculatorDate: state.calculatorDate,
+        calculatorExcludedPurchaseIds: state.calculatorExcludedPurchaseIds,
       }),
       merge: (persistedState, currentState) => {
         try {
@@ -730,6 +756,8 @@ export const useStore = create<AppState>()(
               activeListId: persisted.activeListId || persisted.lists![0].id,
               calculatorEntries: calc.entries,
               calculatorDate: calc.date,
+              purchaseLog: ensurePurchaseLogIds(persisted.purchaseLog ?? []),
+              calculatorExcludedPurchaseIds: persisted.calculatorExcludedPurchaseIds ?? [],
             }
           }
 

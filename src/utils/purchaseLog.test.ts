@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  removeAllTodayPricedCheckoffs,
+  idsToExcludeTodayPricedCheckoffs,
   removeTodayPurchaseLogEntriesForItems,
   removeTodayPurchaseLogEntry,
+  todayPricedEntries,
   todayPricedTotal,
   todayPricedTotalForList,
 } from './purchaseLog'
 
 const log = [
-  { name: 'Milch', category: 'Milch & Käse', date: '2026-07-09', price: 2.5 },
-  { name: 'Brot', category: 'Brot & Backwaren', date: '2026-07-09', price: 3.2 },
-  { name: 'Äpfel', category: 'Obst & Gemüse', date: '2026-07-08', price: 4.0 },
+  { id: 'a', name: 'Milch', category: 'Milch & Käse', date: '2026-07-09', price: 2.5 },
+  { id: 'b', name: 'Brot', category: 'Brot & Backwaren', date: '2026-07-09', price: 3.2 },
+  { id: 'c', name: 'Äpfel', category: 'Obst & Gemüse', date: '2026-07-08', price: 4.0 },
 ]
 
 describe('purchaseLog', () => {
@@ -45,9 +46,16 @@ describe('purchaseLog', () => {
     expect(total).toBe(2.5)
   })
 
-  it('removeAllTodayPricedCheckoffs entfernt nur heutige Preise', () => {
-    const next = removeAllTodayPricedCheckoffs(log, '2026-07-09')
-    expect(next).toHaveLength(1)
-    expect(next[0]?.name).toBe('Äpfel')
+  it('todayPricedEntries ignoriert ausgeblendete Rechner-Einträge', () => {
+    const hidden = new Set(['a'])
+    const visible = todayPricedEntries(log, '2026-07-09', hidden)
+    expect(visible).toHaveLength(1)
+    expect(visible[0]?.name).toBe('Brot')
+    expect(todayPricedTotal(log, '2026-07-09', hidden)).toBe(3.2)
+  })
+
+  it('idsToExcludeTodayPricedCheckoffs liefert nur heutige Preis-IDs', () => {
+    const ids = idsToExcludeTodayPricedCheckoffs(log, '2026-07-09')
+    expect(ids).toEqual(['a', 'b'])
   })
 })

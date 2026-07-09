@@ -1,61 +1,84 @@
 import type { PurchaseLogEntry, ShoppingItem } from '@/types'
 import { todayKey } from '@/utils/date'
 
-/** Heutige Einträge mit erfasstem Preis. */
+/** Stabile ID – Legacy-Einträge ohne id bekommen einen Index-basierten Schlüssel. */
+export function purchaseLogEntryId(entry: PurchaseLogEntry, index = 0): string {
+  return entry.id || `legacy:${entry.date}|${entry.name}|${entry.category}|${index}`
+}
+
+/** Heutige Einträge mit erfasstem Preis (optional ohne Rechner-ausgeblendete). */
 export function todayPricedEntries(
   purchaseLog: PurchaseLogEntry[],
-  today: string = todayKey()
+  today: string = todayKey(),
+  excludedIds: ReadonlySet<string> = new Set()
 ): PurchaseLogEntry[] {
-  return purchaseLog.filter((e) => e.date === today && (e.price ?? 0) > 0)
+  return purchaseLog.filter(
+    (e, i) =>
+      e.date === today &&
+      (e.price ?? 0) > 0 &&
+      !excludedIds.has(purchaseLogEntryId(e, i))
+  )
 }
 
 export function todayPricedTotal(
   purchaseLog: PurchaseLogEntry[],
-  today: string = todayKey()
+  today: string = todayKey(),
+  excludedIds: ReadonlySet<string> = new Set()
 ): number {
-  return Math.round(todayPricedEntries(purchaseLog, today).reduce((sum, e) => sum + (e.price ?? 0), 0) * 100) / 100
+  return Math.round(
+    todayPricedEntries(purchaseLog, today, excludedIds).reduce((sum, e) => sum + (e.price ?? 0), 0) * 100
+  ) / 100
 }
 
 /** Summe der heute abgehakten Artikel auf einer bestimmten Liste. */
 export function todayPricedTotalForList(
   purchaseLog: PurchaseLogEntry[],
   listItems: ShoppingItem[],
-  today: string = todayKey()
+  today: string = todayKey(),
+  excludedIds: ReadonlySet<string> = new Set()
 ): number {
   const done = listItems.filter((i) => i.done)
   const total = purchaseLog
     .filter(
-      (e) =>
+      (e, i) =>
         e.date === today &&
         (e.price ?? 0) > 0 &&
-        done.some((i) => i.name === e.name && i.category === e.category)
+        !excludedIds.has(purchaseLogEntryId(e, i)) &&
+        done.some((item) => item.name === e.name && item.category === e.category)
     )
     .reduce((sum, e) => sum + (e.price ?? 0), 0)
   return Math.round(total * 100) / 100
 }
 
-/** Entfernt alle heutigen Preis-Einträge (Rechner „Aus Liste abgehakt“). */
-export function removeAllTodayPricedCheckoffs(
+/** IDs heutiger Preis-Einträge für den Rechner ausblenden (Statistik bleibt erhalten). */
+export function idsToExcludeTodayPricedCheckoffs(
   purchaseLog: PurchaseLogEntry[],
   today: string = todayKey()
-): PurchaseLogEntry[] {
-  return purchaseLog.filter((e) => !(e.date === today && (e.price ?? 0) > 0))
+): string[] {
+  return purchaseLog
+    .filter((e) => e.date === today && (e.price ?? 0) > 0)
+    .map((e, i) => purchaseLogEntryId(e, i))
 }
 
-/** Entfernt heutige Preis-Einträge nur für erledigte Artikel einer Liste. */
-export function removeTodayPricedCheckoffsForList(
+/** IDs heutiger Preis-Einträge einer Liste für den Rechner ausblenden. */
+export function idsToExcludeTodayPricedCheckoffsForList(
   purchaseLog: PurchaseLogEntry[],
   listItems: ShoppingItem[],
   today: string = todayKey()
-): PurchaseLogEntry[] {
+): string[] {
   const done = listItems.filter((i) => i.done)
-  return purchaseLog.filter((e) => {
-    if (e.date !== today || !(e.price && e.price > 0)) return true
-    return !done.some((i) => i.name === e.name && i.category === e.category)
-  })
+  return purchaseLog
+    .map((e, i) => ({ e, i }))
+    .filter(
+      ({ e }) =>
+        e.date === today &&
+        (e.price ?? 0) > 0 &&
+        done.some((item) => item.name === e.name && item.category === e.category)
+    )
+    .map(({ e, i }) => purchaseLogEntryId(e, i))
 }
 
-/** Entfernt den heutigen Kauf-Eintrag für name/category (z. B. beim Löschen abgehakter Artikel). */
+/** Entfernt den heutigen Kauf-Eintrag für name/category (z. B. beim Abhaken rückgängig). */
 export function removeTodayPurchaseLogEntry(
   purchaseLog: PurchaseLogEntry[],
   name: string,

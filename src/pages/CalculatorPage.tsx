@@ -12,6 +12,7 @@ import { todayPricedEntries } from '@/utils/purchaseLog'
 export function CalculatorPage() {
   const entries = useStore((s) => s.calculatorEntries)
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const addCalculatorEntry = useStore((s) => s.addCalculatorEntry)
   const removeCalculatorEntry = useStore((s) => s.removeCalculatorEntry)
   const clearCalculator = useStore((s) => s.clearCalculator)
@@ -25,10 +26,10 @@ export function CalculatorPage() {
     ensureCalculatorDay()
   }, [ensureCalculatorDay])
 
-  const checkoffEntries = useMemo(
-    () => todayPricedEntries(purchaseLog, todayKey()),
-    [purchaseLog]
-  )
+  const checkoffEntries = useMemo(() => {
+    const hidden = new Set(excludedIds)
+    return todayPricedEntries(purchaseLog, todayKey(), hidden)
+  }, [purchaseLog, excludedIds])
 
   const manualTotal = entries.reduce((sum, e) => sum + e.amount, 0)
   const checkoffTotal = checkoffEntries.reduce((sum, e) => sum + (e.price ?? 0), 0)
@@ -43,7 +44,7 @@ export function CalculatorPage() {
   }
 
   function handleResetAll() {
-    if (!window.confirm('Heutige Einkaufssumme zurücksetzen? Abgehakte Preise und manuelle Einträge werden gelöscht.')) return
+    if (!window.confirm('Heutige Einkaufssumme zurücksetzen? Der Rechner wird geleert – die Statistik bleibt erhalten.')) return
     resetCalculatorSession()
     setCents(0)
   }
@@ -95,7 +96,7 @@ export function CalculatorPage() {
                 className="tap-scale text-[12px] font-bold"
                 style={{ color: 'var(--danger)' }}
                 onClick={() => {
-                  if (window.confirm('Alle heutigen Abhak-Preise löschen?')) clearTodayCheckoffs()
+                  if (window.confirm('Abhak-Preise im Rechner ausblenden? Die Statistik bleibt erhalten.')) clearTodayCheckoffs()
                 }}
               >
                 Leeren

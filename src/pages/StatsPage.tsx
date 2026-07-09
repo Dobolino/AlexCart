@@ -20,6 +20,7 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
 export function StatsPage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
   const stats = useStore((s) => s.stats)
+  const lists = useStore((s) => s.lists)
   const currency = useStore((s) => s.settings.currency)
   const resetStats = useStore((s) => s.resetStats)
 
@@ -40,10 +41,13 @@ export function StatsPage() {
       <PageHeader title="Statistik" subtitle="Deine Einkaufsgewohnheiten" />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div className="mb-2.5 grid grid-cols-3 gap-2.5">
-          <StatTile value={stats.listsCreated} label="Listen erstellt" />
+          <StatTile value={lists.length} label="Einkaufslisten" />
           <StatTile value={purchaseLog.length} label="Produkte gekauft" />
           <StatTile value={`${completionRate}%`} label="Erledigungsquote" />
         </div>
+        <p className="mb-2.5 px-1.5 text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+          Statistik entsteht beim Abhaken von Artikeln. Weitere Listen: auf der Liste den Titel oben antippen.
+        </p>
         <div className="mb-4.5 grid grid-cols-3 gap-2.5">
           <StatTile value={avgItemsPerTrip(purchaseLog).toFixed(1)} label="Ø pro Einkauf" />
           <StatTile value={stats.importsCount} label="Importierte Listen" />

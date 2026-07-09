@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Icon } from './Icon'
+import { ICON_PATHS } from '@/constants/icons'
 
 interface PageHeaderProps {
   title: string
@@ -20,8 +22,13 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
       }}
     >
       <Title className="tap-scale text-left" onClick={onTitleClick}>
-        <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-tight" style={{ color: 'var(--text)' }}>
-          {title}
+        <h1 className="font-display flex items-center gap-1.5 text-[28px] font-extrabold leading-tight tracking-tight" style={{ color: 'var(--text)' }}>
+          <span>{title}</span>
+          {onTitleClick && (
+            <span className="mt-1 inline-flex rotate-90" style={{ color: 'var(--text-muted)' }}>
+              <Icon path={ICON_PATHS.chevron} size={18} />
+            </span>
+          )}
         </h1>
         {subtitle && (
           <div className="mt-0.5 text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>

@@ -44,6 +44,8 @@ export interface PantryItem {
 }
 
 export interface PurchaseLogEntry {
+  /** Wird beim Abhaken gesetzt; ältere Einträge erhalten eine ID bei der Migration. */
+  id?: string
   name: string
   category: string
   date: string
