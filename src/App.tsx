@@ -6,6 +6,7 @@ import { BottomNav } from './components/BottomNav'
 import { useStore } from './store/useStore'
 import { useTheme } from './hooks/useTheme'
 import { OnboardingSheet } from './components/OnboardingSheet'
+import { DebugSafeArea } from './components/DebugSafeArea'
 import { useEnsureStoreHydration } from './hooks/useStoreHydration'
 import { ListPage } from './pages/ListPage'
 
@@ -60,6 +61,7 @@ function AppShell() {
 
   return (
     <div className="app-shell">
+      <DebugSafeArea />
       <AnimatedRoutes />
       {!hideNav && <BottomNav />}
       {!hasSeenOnboarding && <OnboardingSheet onDone={setHasSeenOnboarding} />}
