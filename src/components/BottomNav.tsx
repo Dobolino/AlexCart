@@ -10,7 +10,7 @@ const TABS = [
   { to: '/settings', label: 'Optionen', icon: 'settings' },
 ]
 
-/** Tab-Leiste als Flex-Kind am Ende von .app-shell (nicht position:fixed). */
+/** Schwebende Tab-Pille als Flex-Kind am Ende von .app-shell. */
 export function BottomNav() {
   return (
     <nav className="nav-liquid" aria-label="Hauptnavigation">

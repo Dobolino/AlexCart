@@ -25,11 +25,9 @@
         } catch (e) {
           document.documentElement.dataset.theme = 'light'
         }
-        /* Standalone: sofort physische Höhe setzen, bevor CSS/JS mounten
-           (100dvh/innerHeight sind dort oft ~62pt zu kurz). */
+        /* Standalone: innerHeight = paintbare Höhe; screen.height wäre zu groß → Nav-Clip */
         if (window.navigator.standalone) {
-          var sh = Math.max(window.screen.width, window.screen.height)
-          document.documentElement.style.setProperty('--app-h', sh + 'px')
+          document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px')
         }
       })()
     </script>
