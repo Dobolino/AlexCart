@@ -14,11 +14,18 @@ function copyDistFile(name, destName = name) {
   cpSync(path.join(dist, name), path.join(root, destName))
 }
 
+// Also rename in-place inside dist/ itself: the GitHub Actions Pages deploy
+// (actions/upload-pages-artifact) uploads dist/ as-is, and GitHub Pages needs
+// an index.html at the root to serve "/" - without this, a Pages source set to
+// "GitHub Actions" (rather than "Deploy from a branch") 404s on every visit
+// even though the workflow itself reports success.
+cpSync(path.join(dist, 'dev.html'), path.join(dist, 'index.html'))
+
 rmSync(path.join(root, 'assets'), { recursive: true, force: true })
 mkdirSync(path.join(root, 'assets'), { recursive: true })
 cpSync(path.join(dist, 'assets'), path.join(root, 'assets'), { recursive: true })
 
-copyDistFile('dev.html', 'index.html')
+copyDistFile('index.html')
 copyDistFile('sw.js')
 copyDistFile('manifest.webmanifest')
 
