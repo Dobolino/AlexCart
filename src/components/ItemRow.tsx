@@ -73,6 +73,8 @@ export function ItemRow({
     blocked: !!dragHandleProps || anyDragging || isDragging,
   })
 
+  const showDeleteAction = swipe.deleteOpen || swipe.dragX < -4
+
   return (
     <motion.div
       layout={!anyDragging}
@@ -102,7 +104,7 @@ export function ItemRow({
         />
       )}
 
-      {!isDragging && <SwipeDeleteAction onDelete={swipe.confirmDelete} />}
+      {!isDragging && showDeleteAction && <SwipeDeleteAction onDelete={swipe.confirmDelete} />}
 
       <div
         className="relative flex min-h-[68px] items-center gap-3 px-4 py-4"
@@ -123,11 +125,13 @@ export function ItemRow({
                 pointerEvents: 'none',
               }
             : {
-                transform: `translateX(${swipe.dragX}px)`,
-                transition: swipe.dragging || swipe.deleteExiting
-                  ? 'none'
+                transform: exiting ? 'translateX(96px)' : `translateX(${swipe.dragX}px)`,
+                transition: swipe.dragging || swipe.deleteExiting || exiting
+                  ? exiting
+                    ? 'transform 0.28s var(--ease-spring), opacity 0.28s ease'
+                    : 'none'
                   : 'transform 0.22s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
-                opacity: exiting ? 0 : 1,
+                opacity: exiting || swipe.deleteExiting ? 0 : 1,
                 touchAction: 'pan-y',
               }),
         }}

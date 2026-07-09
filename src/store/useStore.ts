@@ -9,6 +9,7 @@ import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
+import { removeTodayPurchaseLogEntriesForItems, removeTodayPurchaseLogEntry } from '@/utils/purchaseLog'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
 import type {
@@ -390,10 +391,15 @@ export const useStore = create<AppState>()(
       deleteItem: (itemId) => {
         const list = get().activeList()
         if (!list) return
+        const item = list.items.find((i) => i.id === itemId)
+        if (!item) return
         set((state) => ({
           lists: state.lists.map((l) =>
             l.id !== list.id ? l : { ...l, items: l.items.filter((i) => i.id !== itemId) }
           ),
+          purchaseLog: item.done
+            ? removeTodayPurchaseLogEntry(state.purchaseLog, item.name, item.category)
+            : state.purchaseLog,
         }))
       },
 
@@ -445,10 +451,12 @@ export const useStore = create<AppState>()(
       clearDoneItems: () => {
         const list = get().activeList()
         if (!list) return
+        const doneItems = list.items.filter((i) => i.done)
         set((state) => ({
           lists: state.lists.map((l) =>
             l.id !== list.id ? l : { ...l, items: l.items.filter((i) => !i.done) }
           ),
+          purchaseLog: removeTodayPurchaseLogEntriesForItems(state.purchaseLog, doneItems),
         }))
       },
       reorderItemsInCategory: (category, orderedIds) => {
@@ -497,10 +505,18 @@ export const useStore = create<AppState>()(
         })),
       deleteList: (listId) =>
         set((state) => {
+          const deleted = state.lists.find((l) => l.id === listId)
           const remaining = state.lists.filter((l) => l.id !== listId)
           const lists = remaining.length ? remaining : [newList('Wocheneinkauf')]
-          const activeListId = state.activeListId === listId ? lists[0].id : state.activeListId
-          return { lists, activeListId, filtered: state.filtered.filter((f) => f.listId !== listId) }
+          const activeListId = state.activeListId === listId ? lists[0]!.id : state.activeListId
+          return {
+            lists,
+            activeListId,
+            filtered: state.filtered.filter((f) => f.listId !== listId),
+            purchaseLog: deleted
+              ? removeTodayPurchaseLogEntriesForItems(state.purchaseLog, deleted.items)
+              : state.purchaseLog,
+          }
         }),
 
       addPantryItem: (name, category, amount, minAmount) => {
