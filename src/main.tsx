@@ -3,12 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import './index.css'
-import { nudgeViewport } from './utils/nudgeViewport'
-
-nudgeViewport()
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') nudgeViewport()
-})
 
 if (import.meta.env.PROD) {
   registerSW({

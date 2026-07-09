@@ -33,6 +33,50 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" sizes="180x180" href="/AlexCart/icons/icon-180.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/AlexCart/icons/icon-192.png" />
+    <!-- iOS bestimmt die initiale Render-Fläche einer als Standalone-App gestarteten
+         Seite anhand dieser Startbilder, nicht anhand des Web-Manifests - ohne ein
+         exakt zur Gerätegröße passendes Bild kann iOS beim Start eine falsche Fläche
+         annehmen (Ursache des "schwarzer Streifen unten"-Bugs in Hochformat). -->
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-16-pro-max.png"
+      media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-16-pro.png"
+      media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-16-plus.png"
+      media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-16.png"
+      media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-14-13-12.png"
+      media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-11-pro-max-xs-max.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-11-xr.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+    />
+    <link
+      rel="apple-touch-startup-image"
+      href="/AlexCart/splash/iphone-se.png"
+      media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+    />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"

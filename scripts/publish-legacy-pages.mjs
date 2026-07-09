@@ -38,6 +38,9 @@ for (const file of readdirSync(dist)) {
 rmSync(path.join(root, 'icons'), { recursive: true, force: true })
 cpSync(path.join(dist, 'icons'), path.join(root, 'icons'), { recursive: true })
 
+rmSync(path.join(root, 'splash'), { recursive: true, force: true })
+cpSync(path.join(dist, 'splash'), path.join(root, 'splash'), { recursive: true })
+
 cpSync(path.join(root, 'public', '.nojekyll'), path.join(root, '.nojekyll'))
 
 console.log('Published dist/ to repo root for legacy GitHub Pages.')
