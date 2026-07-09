@@ -12,13 +12,12 @@
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --blur-glass: blur(24px) saturate(180%);
   --nav-pill-height: 56px;
-  --nav-float-gap: 2px;
-  --nav-side-inset: 16px;
-  --nav-bottom-gap: max(var(--nav-float-gap), var(--safe-bottom));
-  /* Gesamthöhe, die die Pill (inkl. Rand oben/unten) am Bildschirmrand einnimmt -
-     nur noch für Elemente gebraucht, die selbst position:fixed sind (z.B. der FAB
+  --nav-top-pad: 6px;
+  --nav-bottom-pad: max(var(--safe-bottom), 10px);
+  /* Gesamthöhe, die die Nav-Leiste (inkl. Innenabstand) am Bildschirmrand einnimmt -
+     u.a. für Elemente gebraucht, die selbst position:fixed sind (z.B. der FAB
      auf der Listenseite) und darüber schweben müssen. */
-  --nav-overlay-height: calc(var(--nav-pill-height) + var(--nav-float-gap) + var(--nav-bottom-gap));
+  --nav-overlay-height: calc(var(--nav-pill-height) + var(--nav-top-pad) + var(--nav-bottom-pad));
   --nav-scroll-padding: calc(var(--nav-overlay-height) + 20px);
   --blur-nav: blur(64px) saturate(220%);
 }
@@ -221,11 +220,6 @@ h3,
 .app-shell {
   position: fixed;
   inset: 0;
-  /* On some iOS standalone launches the reported viewport is shorter than the
-     true screen (see viewportGapFix.ts) - stretch past the reported bottom
-     edge by that measured amount so nothing is left unpainted. 0px when the
-     browser reports the full height correctly, i.e. everywhere else. */
-  bottom: calc(-1 * var(--bottom-viewport-gap, 0px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -261,22 +255,27 @@ h3,
    (nicht position:fixed): iOS Safari kann fixed-positionierte Balken/Leisten beim
    Rubber-Band-Scrollen/nach Tab-Wechsel falsch platzieren, selbst wenn html/body
    per position:fixed gesperrt sind (siehe .app-shell-Kommentar oben) - das war
-   genau der "schwarzer Streifen unten"-Bug. Der Pill-Look kommt hier stattdessen
-   nur noch von margin/border-radius auf einem Element, das ganz normal am Ende
-   des flex-column-Layouts sitzt und daher nie "falsch" positioniert werden kann. */
+   genau der "schwarzer Streifen unten"-Bug.
+
+   Randlos statt schwebende Pille: Auf manchen iOS-Standalone-Launches malt WebKit
+   nachweislich nur bis zu einer intern gemeldeten (zu kurzen) Viewport-Grenze,
+   unabhängig davon, wo die Nav layoutmäßig positioniert ist - jeder Abstand
+   zwischen Pille und Bildschirmrand kann dort als unbemalter schwarzer Rand
+   sichtbar werden, und das lässt sich per CSS nicht zuverlässig umgehen. Die
+   Leiste füllt den unteren Rand daher selbst komplett aus (eigene Hintergrundfarbe
+   bis ganz nach unten) statt eine Lücke freizulassen, in der das passieren könnte. */
 .nav-liquid {
   flex: none;
   z-index: 20;
-  margin: var(--nav-float-gap) calc(var(--nav-side-inset) + var(--safe-right)) var(--nav-bottom-gap)
-    calc(var(--nav-side-inset) + var(--safe-left));
-  height: var(--nav-pill-height);
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  padding: 4px 8px;
-  border-radius: 28px;
+  padding: var(--nav-top-pad) calc(8px + var(--safe-right)) var(--nav-bottom-pad) calc(8px + var(--safe-left));
+  min-height: var(--nav-pill-height);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
   background: var(--nav-liquid-bg);
-  border: 1px solid var(--nav-liquid-border);
+  border-top: 1px solid var(--nav-liquid-border);
   box-shadow: var(--nav-liquid-shadow);
   -webkit-backdrop-filter: var(--blur-nav);
   backdrop-filter: var(--blur-nav);
