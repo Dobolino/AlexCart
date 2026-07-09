@@ -25,12 +25,23 @@
         } catch (e) {
           document.documentElement.dataset.theme = 'light'
         }
+        /* Standalone: sofort physische Höhe setzen, bevor CSS/JS mounten
+           (100dvh/innerHeight sind dort oft ~62pt zu kurz). */
+        if (window.navigator.standalone) {
+          var sh = Math.max(window.screen.width, window.screen.height)
+          document.documentElement.style.setProperty('--app-h', sh + 'px')
+        }
       })()
     </script>
     <!-- PWA / iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="AlexShop" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- `default` statt `black-translucent`: Letzteres erzeugt in iOS-Standalone
+         einen Layout-Viewport ~safe-area-inset-top zu kurz; der Streifen unten
+         liegt außerhalb des paintbaren Bereichs (WebKit-Bug, bestätigt am Gerät).
+         Wird nur bei Neu-Installation gelesen – nach Änderung App vom Home-
+         Bildschirm entfernen und neu hinzufügen. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" sizes="180x180" href="/AlexCart/icons/icon-180.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/AlexCart/icons/icon-192.png" />
     <!-- iOS bestimmt die initiale Render-Fläche einer als Standalone-App gestarteten
@@ -169,9 +180,9 @@
         fb.style.display = 'flex'
       }, 8000)
     </script>
-    <script type="module" crossorigin src="/AlexCart/assets/dev-D-jybQMc.js"></script>
+    <script type="module" crossorigin src="/AlexCart/assets/dev-DdQUzPGO.js"></script>
     <link rel="modulepreload" crossorigin href="/AlexCart/assets/useStore-ColS6-9R.js">
-    <link rel="stylesheet" crossorigin href="/AlexCart/assets/dev-CQ1lIwbe.css">
+    <link rel="stylesheet" crossorigin href="/AlexCart/assets/dev-DWJ2dW_x.css">
   <link rel="manifest" href="/AlexCart/manifest.webmanifest"></head>
   <body>
     <div id="root">
