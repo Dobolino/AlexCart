@@ -30,11 +30,13 @@ export function useItemSwipe({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteExiting, setDeleteExiting] = useState(false)
   const start = useRef({ x: 0, y: 0 })
+  const dragXRef = useRef(0)
   const direction = useRef<'none' | 'left' | 'right'>('none')
   const suppressClickRef = useRef(false)
 
   const closeDelete = useCallback(() => {
     setDeleteOpen(false)
+    dragXRef.current = 0
     setDragX(0)
   }, [])
 
@@ -43,6 +45,7 @@ export function useItemSwipe({
     hapticLight()
     setDeleteExiting(true)
     setDeleteOpen(false)
+    dragXRef.current = -420
     setDragX(-420)
     window.setTimeout(() => onDelete(), DELETE_EXIT_MS)
   }, [deleteExiting, onDelete])
@@ -69,33 +72,41 @@ export function useItemSwipe({
 
     if (direction.current === 'right') {
       if (!canCheckOnSwipe) return
-      setDragX(Math.max(0, Math.min(SWIPE_CHECK_MAX, dx)))
+      const nextX = Math.max(0, Math.min(SWIPE_CHECK_MAX, dx))
+      dragXRef.current = nextX
+      setDragX(nextX)
       return
     }
 
-    setDragX(Math.min(0, Math.max(-DELETE_FULL_THRESHOLD - 24, dx)))
+    const nextX = Math.min(0, Math.max(-DELETE_FULL_THRESHOLD - 24, dx))
+    dragXRef.current = nextX
+    setDragX(nextX)
   }
 
   function handlePointerUp() {
     if (!dragging || blocked) return
     setDragging(false)
     const wasHorizontal = direction.current !== 'none'
+    const offsetX = dragXRef.current
     if (wasHorizontal) suppressClickRef.current = true
 
     if (direction.current === 'right' && canCheckOnSwipe) {
-      const shouldCheck = dragX > SWIPE_CHECK_TRIGGER
+      const shouldCheck = offsetX > SWIPE_CHECK_TRIGGER
+      dragXRef.current = 0
       setDragX(0)
       if (shouldCheck) onCheck()
     } else if (direction.current === 'left') {
-      if (dragX <= -DELETE_FULL_THRESHOLD) {
+      if (offsetX <= -DELETE_FULL_THRESHOLD) {
         confirmDelete()
-      } else if (dragX <= -DELETE_SNAP_THRESHOLD) {
+      } else if (offsetX <= -DELETE_SNAP_THRESHOLD) {
         setDeleteOpen(true)
+        dragXRef.current = -DELETE_ACTION_WIDTH
         setDragX(-DELETE_ACTION_WIDTH)
       } else {
         closeDelete()
       }
     } else if (!deleteOpen) {
+      dragXRef.current = 0
       setDragX(0)
     }
 

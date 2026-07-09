@@ -72,7 +72,7 @@ export function ItemTile({
   const swipe = useItemSwipe({
     onCheck: handleToggle,
     onDelete: () => onDelete(item.id),
-    blocked: !!dragHandleProps || anyDragging || isDragging,
+    blocked: anyDragging || isDragging,
   })
 
   const showDeleteAction = swipe.deleteOpen || swipe.dragX < -4
