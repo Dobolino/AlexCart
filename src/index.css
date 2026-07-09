@@ -221,6 +221,11 @@ h3,
 .app-shell {
   position: fixed;
   inset: 0;
+  /* On some iOS standalone launches the reported viewport is shorter than the
+     true screen (see viewportGapFix.ts) - stretch past the reported bottom
+     edge by that measured amount so nothing is left unpainted. 0px when the
+     browser reports the full height correctly, i.e. everywhere else. */
+  bottom: calc(-1 * var(--bottom-viewport-gap, 0px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
