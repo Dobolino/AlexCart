@@ -9,7 +9,7 @@ export function AmountBadge({ amount, prominent = false }: AmountBadgeProps) {
     <span
       className={
         prominent
-          ? 'mt-1.5 inline-flex max-w-full items-center rounded-xl px-2.5 py-1 text-[15px] font-extrabold leading-tight tabular-nums'
+          ? 'flex-none shrink-0 inline-flex max-w-[42%] items-center justify-center rounded-xl px-2.5 py-1 text-right text-[15px] font-extrabold leading-tight tabular-nums'
           : 'inline-flex max-w-full items-center rounded-lg px-2 py-0.5 text-[13px] font-bold leading-tight tabular-nums'
       }
       style={{
