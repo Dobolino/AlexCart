@@ -23,6 +23,8 @@ export interface ShoppingItem {
   addedAt: number
   note?: string
   favorite?: boolean
+  /** Bevorzugte Variante für Kostenschätzung. */
+  variantId?: string
 }
 
 export interface ShoppingList {
@@ -51,6 +53,49 @@ export interface PurchaseLogEntry {
   date: string
   /** Optionaler Preis in der gewählten Währung beim Abhaken. */
   price?: number
+  variantId?: string
+  variantName?: string
+  /** Aktionspreis – verfälscht nicht den Normal-Durchschnitt. */
+  wasSale?: boolean
+}
+
+/** Einzelne Produktvariante (Marke, Bio, Grösse …). */
+export interface ProductVariant {
+  id: string
+  name: string
+  /** Für spätere Barcode-Erkennung. */
+  barcode?: string
+  /** Für spätere Filial-Zuordnung (Coop, Migros, …). */
+  store?: string
+  lastPrice?: number
+  avgPrice?: number
+  purchaseCount: number
+  lastPurchaseDate?: string
+  lastSalePrice?: number
+  lastPurchaseWasSale: boolean
+  avgSalePrice?: number
+  salePurchaseCount: number
+}
+
+/** Preisprofil pro Listenartikel (z. B. „Milch“ mit mehreren Varianten). */
+export interface ProductPriceProfile {
+  id: string
+  itemName: string
+  category: string
+  baseKey: string
+  variants: ProductVariant[]
+  preferredVariantId?: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** Preisdaten beim Abhaken oder nachträglich. */
+export interface CheckoffPriceData {
+  price: number
+  variantId?: string
+  /** Pflicht bei neuer Variante. */
+  variantName?: string
+  wasSale?: boolean
 }
 
 export interface ImportItemPayload {

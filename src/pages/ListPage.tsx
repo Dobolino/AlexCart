@@ -24,7 +24,8 @@ import { BudgetBar } from '@/components/BudgetBar'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
-import type { ShoppingItem } from '@/types'
+import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
+import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
 interface ToastState {
   message: string
@@ -53,6 +54,7 @@ export function ListPage() {
   const setListViewMode = useStore((s) => s.setListViewMode)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const priceProfiles = useStore((s) => s.priceProfiles)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const currency = useStore((s) => s.settings.currency)
 
@@ -79,11 +81,16 @@ export function ListPage() {
   const hasWeeklyBudget = weeklyBudget > 0
   const budget = hasWeeklyBudget ? budgetProgress(budgetSpend, weeklyBudget) : null
 
+  const listEstimate = estimateOpenListCost(activeItems, priceProfiles)
+
   const summaryParts: string[] = []
   if (hasWeeklyBudget) {
     summaryParts.push(`${formatMoney(budgetSpend, currency)} / ${formatMoney(weeklyBudget, currency)}`)
   } else if (hasCalculatorTotal) {
     summaryParts.push(formatMoney(calculatorTotal, currency))
+  }
+  if (listEstimate.pricedItemCount > 0) {
+    summaryParts.push(`Geschätzt ${formatMoney(listEstimate.total, currency)}`)
   }
   summaryParts.push(`${activeItems.length} offen`)
   if (doneItems.length > 0) summaryParts.push(`${doneItems.length} erledigt`)
@@ -124,14 +131,14 @@ export function ListPage() {
     if (!wasDone) showDoneToast(item)
   }
 
-  function handlePriceSave(price: number) {
+  function handlePriceSave(data: CheckoffPriceData) {
     if (!priceSheetItem) return
     if (priceSheetMode === 'on-checkoff') {
-      toggleItemDone(priceSheetItem.id, price)
-      showDoneToast(priceSheetItem, price)
+      toggleItemDone(priceSheetItem.id, data)
+      showDoneToast(priceSheetItem, data.price)
     } else {
-      updatePurchaseLogPrice(priceSheetItem.name, priceSheetItem.category, price)
-      showToast(`Preis für „${priceSheetItem.name}" gespeichert · ${formatMoney(price, currency)}`)
+      updatePurchaseLogPrice(priceSheetItem, data)
+      showToast(`Preis für „${priceSheetItem.name}" gespeichert · ${formatMoney(data.price, currency)}`)
     }
     setPriceSheetItem(null)
   }
@@ -414,6 +421,7 @@ export function ListPage() {
       {priceSheetItem && (
         <CheckoffPriceSheet
           item={priceSheetItem}
+          profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
           currency={currency}
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}

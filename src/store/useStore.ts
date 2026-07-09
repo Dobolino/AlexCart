@@ -10,15 +10,19 @@ import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
 import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList } from '@/utils/purchaseLog'
+import { buildProfilesFromPurchaseLog } from '@/utils/priceProfiles'
+import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
 import type {
   AppSettings,
   AppStats,
   CalculatorEntry,
+  CheckoffPriceData,
   CustomProduct,
   ListViewMode,
   PantryItem,
+  ProductPriceProfile,
   PurchaseLogEntry,
   ShoppingItem,
   ShoppingList,
@@ -26,7 +30,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 8
+const STORE_VERSION = 9
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -129,6 +133,7 @@ interface AppState {
   pantry: PantryItem[]
   customProducts: CustomProduct[]
   purchaseLog: PurchaseLogEntry[]
+  priceProfiles: ProductPriceProfile[]
   stats: AppStats
   filtered: FilteredEntry[]
   settings: AppSettings
@@ -151,9 +156,9 @@ interface AppState {
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
-  updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note'>>) => void
-  toggleItemDone: (itemId: string, price?: number) => void
-  updatePurchaseLogPrice: (name: string, category: string, price: number) => void
+  updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note' | 'variantId'>>) => void
+  toggleItemDone: (itemId: string, priceOrData?: number | CheckoffPriceData) => void
+  updatePurchaseLogPrice: (item: ShoppingItem, priceOrData: number | CheckoffPriceData) => void
   toggleItemFavorite: (itemId: string) => void
   deleteItem: (itemId: string) => void
   restoreItem: (item: ShoppingItem) => void
@@ -204,6 +209,7 @@ export const useStore = create<AppState>()(
       pantry: defaultPantry(),
       customProducts: [],
       purchaseLog: [],
+      priceProfiles: [],
       stats: defaultStats(),
       filtered: [],
       settings: defaultSettings(),
@@ -331,6 +337,7 @@ export const useStore = create<AppState>()(
                           ...(patch.amount !== undefined ? { amount: patch.amount.trim() } : {}),
                           ...(patch.category !== undefined ? { category: normalizeCategory(patch.category) } : {}),
                           ...(patch.note !== undefined ? { note: patch.note.trim() || undefined } : {}),
+                          ...(patch.variantId !== undefined ? { variantId: patch.variantId || undefined } : {}),
                         }
                   ),
                 }
@@ -350,64 +357,55 @@ export const useStore = create<AppState>()(
         }))
       },
 
-      toggleItemDone: (itemId, price) => {
+      toggleItemDone: (itemId, priceOrData) => {
         const list = get().activeList()
         if (!list) return
         const item = list.items.find((i) => i.id === itemId)
         if (!item) return
         const nowDone = !item.done
+        const checkoff = parseCheckoffInput(priceOrData)
 
         set((state) => {
-          let purchaseLog = state.purchaseLog
           if (nowDone) {
-            const entry: PurchaseLogEntry = {
-              id: uid(),
-              name: item.name,
-              category: item.category,
-              date: todayKey(),
+            if (checkoff) {
+              return commitItemPurchase(state, item, checkoff, {
+                listId: list.id,
+                itemId,
+                markDone: true,
+                wasDone: item.done,
+              })
             }
-            if (price !== undefined && price > 0) entry.price = price
-            purchaseLog = [...purchaseLog, entry]
-          } else {
-            let idx = -1
-            for (let i = purchaseLog.length - 1; i >= 0; i--) {
-              const e = purchaseLog[i]!
-              if (e.name === item.name && e.category === item.category && e.date === todayKey()) {
-                idx = i
-                break
-              }
+            return {
+              lists: state.lists.map((l) =>
+                l.id !== list.id
+                  ? l
+                  : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: true } : i)) }
+              ),
+              purchaseLog: [
+                ...state.purchaseLog,
+                { id: uid(), name: item.name, category: item.category, date: todayKey() },
+              ],
+              pantry: replenishPantryItem(state.pantry, item),
             }
-            if (idx >= 0) purchaseLog = purchaseLog.filter((_, i) => i !== idx)
           }
 
-          return {
-            lists: state.lists.map((l) =>
-              l.id !== list.id
-                ? l
-                : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: nowDone } : i)) }
-            ),
-            purchaseLog,
-            pantry: nowDone ? replenishPantryItem(state.pantry, item) : state.pantry,
-          }
+          return undoTodayCheckoff(state, item, list.id, itemId)
         })
       },
 
-      updatePurchaseLogPrice: (name, category, price) => {
-        const today = todayKey()
-        set((state) => {
-          let idx = -1
-          for (let i = state.purchaseLog.length - 1; i >= 0; i--) {
-            const e = state.purchaseLog[i]!
-            if (e.name === name && e.category === category && e.date === today) {
-              idx = i
-              break
-            }
-          }
-          if (idx < 0) return state
-          const purchaseLog = [...state.purchaseLog]
-          purchaseLog[idx] = { ...purchaseLog[idx]!, price: price > 0 ? price : undefined }
-          return { purchaseLog }
-        })
+      updatePurchaseLogPrice: (item, priceOrData) => {
+        const checkoff = parseCheckoffInput(priceOrData)
+        if (!checkoff) return
+        const list = get().activeList()
+        if (!list) return
+        set((state) =>
+          commitItemPurchase(state, item, checkoff, {
+            listId: list.id,
+            itemId: item.id,
+            markDone: true,
+            wasDone: true,
+          })
+        )
       },
 
       deleteItem: (itemId) => {
@@ -608,6 +606,7 @@ export const useStore = create<AppState>()(
             pantry: defaultPantry(),
             customProducts: [],
             purchaseLog: [],
+            priceProfiles: [],
             stats: defaultStats(),
             filtered: [],
             settings: defaultSettings(),
@@ -720,6 +719,12 @@ export const useStore = create<AppState>()(
             }
             state.calculatorExcludedPurchaseIds = state.calculatorExcludedPurchaseIds ?? []
           }
+          if (version < 9) {
+            state.priceProfiles =
+              state.priceProfiles && state.priceProfiles.length > 0
+                ? state.priceProfiles
+                : buildProfilesFromPurchaseLog(state.purchaseLog ?? [], uid)
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)
@@ -732,6 +737,7 @@ export const useStore = create<AppState>()(
         pantry: state.pantry,
         customProducts: state.customProducts,
         purchaseLog: state.purchaseLog,
+        priceProfiles: state.priceProfiles,
         stats: state.stats,
         filtered: state.filtered,
         settings: state.settings,
@@ -757,6 +763,7 @@ export const useStore = create<AppState>()(
               calculatorEntries: calc.entries,
               calculatorDate: calc.date,
               purchaseLog: ensurePurchaseLogIds(persisted.purchaseLog ?? []),
+              priceProfiles: persisted.priceProfiles ?? [],
               calculatorExcludedPurchaseIds: persisted.calculatorExcludedPurchaseIds ?? [],
             }
           }

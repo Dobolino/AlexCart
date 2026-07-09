@@ -12,13 +12,15 @@ import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { AmountBadge } from '@/components/AmountBadge'
-import type { ShoppingItem } from '@/types'
+import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
+import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
 export function ShoppingModePage() {
   const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const priceProfiles = useStore((s) => s.priceProfiles)
   const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
@@ -35,9 +37,20 @@ export function ShoppingModePage() {
     return todayPricedTotalForList(purchaseLog, list.items, todayKey(), new Set(excludedIds))
   }, [purchaseLog, list, excludedIds])
 
+  const openItems = useMemo(() => list?.items.filter((i) => !i.done) ?? [], [list])
+
+  const openEstimate = useMemo(
+    () => estimateOpenListCost(openItems, priceProfiles),
+    [openItems, priceProfiles]
+  )
+
+  const projectedTotal = useMemo(
+    () => Math.round((tripTotal + openEstimate.total) * 100) / 100,
+    [tripTotal, openEstimate.total]
+  )
+
   if (!list) return null
 
-  const openItems = list.items.filter((i) => !i.done)
   const doneCount = list.items.filter((i) => i.done).length
   const totalCount = openItems.length + doneCount
   const groups = groupByCategory(openItems)
@@ -46,6 +59,7 @@ export function ShoppingModePage() {
   const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog), calculatorTotal)
   const budget = weeklyBudget > 0 ? budgetProgress(budgetSpend, weeklyBudget) : null
   const showTripTotal = tripTotal > 0
+  const showProjectedTotal = projectedTotal > 0 && (tripTotal > 0 || openEstimate.pricedItemCount > 0)
 
   function armUndo(next: { id: string; price?: number }) {
     setLastChecked(next)
@@ -63,11 +77,11 @@ export function ShoppingModePage() {
     armUndo({ id: item.id })
   }
 
-  function handlePriceSave(price: number) {
+  function handlePriceSave(data: CheckoffPriceData) {
     if (!priceSheetItem) return
     hapticSuccess()
-    toggleItemDone(priceSheetItem.id, price)
-    armUndo({ id: priceSheetItem.id, price })
+    toggleItemDone(priceSheetItem.id, data)
+    armUndo({ id: priceSheetItem.id, price: data.price })
     setPriceSheetItem(null)
   }
 
@@ -120,7 +134,9 @@ export function ShoppingModePage() {
           <div className="truncate text-[17px] font-extrabold">{list.name}</div>
           <div className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {doneCount} von {totalCount || doneCount} erledigt
-            {showTripTotal ? ` · ${formatMoney(tripTotal, currency)}` : ''}
+            {showProjectedTotal
+              ? ` · ${tripTotal > 0 ? formatMoney(tripTotal, currency) + ' / ' : ''}${formatMoney(projectedTotal, currency)} geschätzt`
+              : ''}
             {budget ? ` · Budget ${formatMoney(budgetSpend, currency)}` : ''}
           </div>
         </div>
@@ -146,13 +162,24 @@ export function ShoppingModePage() {
         )}
       </header>
 
-      {showTripTotal && (
+      {(showTripTotal || showProjectedTotal) && (
         <div
           className="mx-4 mb-2 flex items-center justify-between rounded-2xl px-4 py-3"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
-          <span className="text-[13px] font-semibold opacity-90">Aktueller Einkauf</span>
-          <span className="text-[22px] font-extrabold tabular-nums">{formatMoney(tripTotal, currency)}</span>
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold opacity-90">
+              {tripTotal > 0 ? 'Aktueller Einkauf' : 'Geschätzte Summe'}
+            </div>
+            {showProjectedTotal && tripTotal > 0 && openEstimate.pricedItemCount > 0 && (
+              <div className="text-[11px] opacity-80">
+                inkl. {openEstimate.pricedItemCount} offene Artikel geschätzt
+              </div>
+            )}
+          </div>
+          <span className="text-[22px] font-extrabold tabular-nums">
+            {formatMoney(showProjectedTotal ? projectedTotal : tripTotal, currency)}
+          </span>
         </div>
       )}
 
@@ -251,6 +278,7 @@ export function ShoppingModePage() {
       {priceSheetItem && (
         <CheckoffPriceSheet
           item={priceSheetItem}
+          profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
           currency={currency}
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}
