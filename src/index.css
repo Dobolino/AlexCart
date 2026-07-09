@@ -1,8 +1,6 @@
 @import 'tailwindcss';
 
 :root {
-  /* Safari: 100dvh. iOS Standalone: per JS auf 100vh überschrieben (siehe standaloneViewport.ts). */
-  --app-height: 100dvh;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -16,7 +14,11 @@
   --nav-pill-height: 56px;
   --nav-float-gap: 2px;
   --nav-side-inset: 16px;
-  --nav-overlay-height: calc(var(--nav-pill-height) + var(--nav-float-gap) + var(--safe-bottom));
+  --nav-bottom-gap: max(var(--nav-float-gap), var(--safe-bottom));
+  /* Gesamthöhe, die die Pill (inkl. Rand oben/unten) am Bildschirmrand einnimmt -
+     nur noch für Elemente gebraucht, die selbst position:fixed sind (z.B. der FAB
+     auf der Listenseite) und darüber schweben müssen. */
+  --nav-overlay-height: calc(var(--nav-pill-height) + var(--nav-float-gap) + var(--nav-bottom-gap));
   --nav-scroll-padding: calc(var(--nav-overlay-height) + 20px);
   --blur-nav: blur(64px) saturate(220%);
 }
@@ -159,16 +161,20 @@ body.is-dragging * {
   overscroll-behavior: contain;
 }
 
-/* html/body are hard-locked to the viewport (overflow: hidden) so the document
-   itself can never scroll or rubber-band bounce - only elements that explicitly
-   opt in (main[overflow-y:auto] inside .app-shell) scroll. Without this, iOS
-   Safari can still let the whole page drag/bounce even when every visible
-   element looks correctly contained, which drags the "fixed" header/nav and
-   any open Sheet along with it. */
+/* html/body are hard-locked to the exact visual viewport (position: fixed; inset: 0,
+   not just height: 100dvh) so the document itself can never scroll, rubber-band
+   bounce, or be miscalculated by an iOS dvh quirk on cold start - only elements
+   that explicitly opt in (main[overflow-y:auto] inside .app-shell) scroll. Without
+   this, iOS Safari can still let the whole page drag/bounce even when every visible
+   element looks correctly contained, which drags any position:fixed element (header,
+   nav, an open Sheet) along with it. This is also why BottomNav (.nav-liquid) is a
+   normal flex child instead of position: fixed - a fixed nav can still independently
+   misbehave even with this lock in place. */
 html,
 body,
 #root {
-  height: var(--app-height, 100dvh);
+  position: fixed;
+  inset: 0;
   margin: 0;
   overflow: hidden;
 }
@@ -177,19 +183,6 @@ html {
   background: var(--bg);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-}
-
-/* Füllt die Home-Indicator-Zone, falls WebKit die Höhe knapp unterschätzt. */
-html::after {
-  content: '';
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--safe-bottom);
-  background: var(--bg);
-  z-index: 1;
-  pointer-events: none;
 }
 
 body {
@@ -202,13 +195,6 @@ body {
     system-ui,
     sans-serif;
   overscroll-behavior: none;
-  width: 100%;
-}
-
-#root {
-  position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 h1,
@@ -224,15 +210,11 @@ h3,
     sans-serif;
 }
 
-/* Feste Höhe statt min-height + normale Flex-Reihenfolge (Header/Main/Nav) ohne
-   position: sticky/fixed – umgeht zwei iOS-Safari-Bugs: sticky bricht innerhalb
-   eines von framer-motion transformierten Vorfahren, und fixed-Elemente werden
-   beim allerersten Laden manchmal falsch positioniert, bis ein Scroll-Event
-   ein Neu-Layout erzwingt. */
 .app-shell {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
   overflow: hidden;
   background: var(--bg);
 }
@@ -262,14 +244,18 @@ h3,
   box-shadow: var(--shadow-card);
 }
 
-/* Floating Liquid-Glass Pill – Overlay, kein Layout-Block */
+/* Floating Liquid-Glass Pill, aber als normales Flex-Kind am Ende von .app-shell
+   (nicht position:fixed): iOS Safari kann fixed-positionierte Balken/Leisten beim
+   Rubber-Band-Scrollen/nach Tab-Wechsel falsch platzieren, selbst wenn html/body
+   per position:fixed gesperrt sind (siehe .app-shell-Kommentar oben) - das war
+   genau der "schwarzer Streifen unten"-Bug. Der Pill-Look kommt hier stattdessen
+   nur noch von margin/border-radius auf einem Element, das ganz normal am Ende
+   des flex-column-Layouts sitzt und daher nie "falsch" positioniert werden kann. */
 .nav-liquid {
-  position: fixed;
-  z-index: 30;
-  /* Etwas tiefer als reine Safe-Area, schwebt über dem Home-Indicator */
-  bottom: max(6px, calc(var(--safe-bottom) - 6px));
-  left: calc(var(--nav-side-inset) + var(--safe-left));
-  right: calc(var(--nav-side-inset) + var(--safe-right));
+  flex: none;
+  z-index: 20;
+  margin: var(--nav-float-gap) calc(var(--nav-side-inset) + var(--safe-right)) var(--nav-bottom-gap)
+    calc(var(--nav-side-inset) + var(--safe-left));
   height: var(--nav-pill-height);
   display: flex;
   align-items: stretch;
@@ -282,9 +268,6 @@ h3,
   -webkit-backdrop-filter: var(--blur-nav);
   backdrop-filter: var(--blur-nav);
   pointer-events: auto;
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  isolation: isolate;
 }
 
 .nav-liquid-tab {
@@ -337,16 +320,18 @@ h3,
   color: var(--accent);
 }
 
-/* Content scrollt unter der Tab-Bar; padding-bottom erweitert die Scrollweite */
+/* Die Tab-Bar ist jetzt normaler Layout-Flow (kein Overlay mehr), main muss ihr also
+   nicht mehr per Padding ausweichen - nur noch etwas Luft am Ende der Liste. */
 .scroll-behind-nav {
-  padding-bottom: var(--nav-scroll-padding) !important;
-  scroll-padding-bottom: var(--nav-scroll-padding);
+  padding-bottom: 16px !important;
   -webkit-overflow-scrolling: touch;
 }
 
+/* Nur hier gebraucht: der FAB auf der Listenseite ist weiterhin position:fixed
+   und muss über der (jetzt normal fließenden) Tab-Bar schweben. */
 .scroll-behind-nav-fab {
-  padding-bottom: calc(var(--nav-scroll-padding) + 64px) !important;
-  scroll-padding-bottom: calc(var(--nav-scroll-padding) + 64px);
+  padding-bottom: calc(var(--nav-overlay-height) + 64px) !important;
+  scroll-padding-bottom: calc(var(--nav-overlay-height) + 64px);
   -webkit-overflow-scrolling: touch;
 }
 
