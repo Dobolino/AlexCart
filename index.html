@@ -25,11 +25,9 @@
         } catch (e) {
           document.documentElement.dataset.theme = 'light'
         }
-        /* Standalone: sofort physische Höhe setzen, bevor CSS/JS mounten
-           (100dvh/innerHeight sind dort oft ~62pt zu kurz). */
+        /* Standalone: innerHeight = paintbare Höhe; screen.height wäre zu groß → Nav-Clip */
         if (window.navigator.standalone) {
-          var sh = Math.max(window.screen.width, window.screen.height)
-          document.documentElement.style.setProperty('--app-h', sh + 'px')
+          document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px')
         }
       })()
     </script>
@@ -180,9 +178,9 @@
         fb.style.display = 'flex'
       }, 8000)
     </script>
-    <script type="module" crossorigin src="/AlexCart/assets/dev-DdQUzPGO.js"></script>
+    <script type="module" crossorigin src="/AlexCart/assets/dev-DQbURLbp.js"></script>
     <link rel="modulepreload" crossorigin href="/AlexCart/assets/useStore-ColS6-9R.js">
-    <link rel="stylesheet" crossorigin href="/AlexCart/assets/dev-DWJ2dW_x.css">
+    <link rel="stylesheet" crossorigin href="/AlexCart/assets/dev-CSVD4LyD.css">
   <link rel="manifest" href="/AlexCart/manifest.webmanifest"></head>
   <body>
     <div id="root">
