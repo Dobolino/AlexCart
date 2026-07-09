@@ -75,6 +75,8 @@ export function ItemTile({
     blocked: !!dragHandleProps || anyDragging || isDragging,
   })
 
+  const showDeleteAction = swipe.deleteOpen || swipe.dragX < -4
+
   return (
     <motion.div
       layout={!anyDragging}
@@ -100,7 +102,7 @@ export function ItemTile({
         />
       )}
 
-      {!isDragging && <SwipeDeleteAction onDelete={swipe.confirmDelete} rounded />}
+      {!isDragging && showDeleteAction && <SwipeDeleteAction onDelete={swipe.confirmDelete} rounded />}
 
       <div
         className="relative flex min-h-[64px] items-center gap-2.5 px-3.5 py-3.5"
@@ -121,11 +123,13 @@ export function ItemTile({
                 pointerEvents: 'none',
               }
             : {
-                transform: `translateX(${swipe.dragX}px)`,
-                transition: swipe.dragging || swipe.deleteExiting
-                  ? 'none'
+                transform: exiting ? 'translateX(96px)' : `translateX(${swipe.dragX}px)`,
+                transition: swipe.dragging || swipe.deleteExiting || exiting
+                  ? exiting
+                    ? 'transform 0.28s var(--ease-spring), opacity 0.28s ease'
+                    : 'none'
                   : 'transform 0.22s var(--ease-spring), opacity 0.32s ease',
-                opacity: exiting ? 0 : 1,
+                opacity: exiting || swipe.deleteExiting ? 0 : 1,
                 touchAction: 'pan-y',
                 borderRadius: '12px',
               }),

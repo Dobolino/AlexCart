@@ -7,13 +7,17 @@ import { MoneyNumpad } from '@/components/MoneyNumpad'
 import { formatMoney } from '@/utils/currency'
 import { todayKey } from '@/utils/date'
 import { centsToAmount } from '@/utils/numpadInput'
+import { todayPricedEntries } from '@/utils/purchaseLog'
 
 export function CalculatorPage() {
   const entries = useStore((s) => s.calculatorEntries)
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const addCalculatorEntry = useStore((s) => s.addCalculatorEntry)
   const removeCalculatorEntry = useStore((s) => s.removeCalculatorEntry)
   const clearCalculator = useStore((s) => s.clearCalculator)
+  const clearTodayCheckoffs = useStore((s) => s.clearTodayCheckoffs)
+  const resetCalculatorSession = useStore((s) => s.resetCalculatorSession)
   const ensureCalculatorDay = useStore((s) => s.ensureCalculatorDay)
   const currency = useStore((s) => s.settings.currency)
   const [cents, setCents] = useState(0)
@@ -23,13 +27,14 @@ export function CalculatorPage() {
   }, [ensureCalculatorDay])
 
   const checkoffEntries = useMemo(() => {
-    const today = todayKey()
-    return purchaseLog.filter((e) => e.date === today && e.price && e.price > 0)
-  }, [purchaseLog])
+    const hidden = new Set(excludedIds)
+    return todayPricedEntries(purchaseLog, todayKey(), hidden)
+  }, [purchaseLog, excludedIds])
 
   const manualTotal = entries.reduce((sum, e) => sum + e.amount, 0)
   const checkoffTotal = checkoffEntries.reduce((sum, e) => sum + (e.price ?? 0), 0)
   const total = Math.round((manualTotal + checkoffTotal) * 100) / 100
+  const hasAnything = checkoffEntries.length > 0 || entries.length > 0
 
   function handleAdd() {
     const value = centsToAmount(cents)
@@ -38,9 +43,29 @@ export function CalculatorPage() {
     setCents(0)
   }
 
+  function handleResetAll() {
+    if (!window.confirm('Heutige Einkaufssumme zurücksetzen? Der Rechner wird geleert – die Statistik bleibt erhalten.')) return
+    resetCalculatorSession()
+    setCents(0)
+  }
+
   return (
     <>
-      <PageHeader title="Rechner" subtitle="Summe aus Liste und manuellen Einträgen" />
+      <PageHeader
+        title="Rechner"
+        subtitle="Laufende Einkaufssumme – nach dem Einkauf zurücksetzen"
+        right={
+          hasAnything ? (
+            <button
+              className="tap-scale rounded-full px-3 py-2 text-[12px] font-bold"
+              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              onClick={handleResetAll}
+            >
+              Zurücksetzen
+            </button>
+          ) : undefined
+        }
+      />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div
           className="mb-3 flex items-center justify-between rounded-3xl px-5 py-5"
@@ -58,16 +83,24 @@ export function CalculatorPage() {
           </span>
         </button>
         <p className="mb-4 px-1.5 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Ziffern nacheinander tippen (z. B. 1-0-2-2-5 = 102,25). Manuelle Einträge werden täglich zurückgesetzt.
+          Preise beim Abhaken landen unter „Aus Liste abgehakt“. Nach dem Einkauf oben auf Zurücksetzen tippen.
         </p>
 
         {checkoffEntries.length > 0 && (
           <>
-            <div
-              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-              style={{ color: 'var(--category-fg)' }}
-            >
-              Aus Liste abgehakt
+            <div className="mb-2 flex items-center justify-between px-1.5">
+              <div className="text-[13px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+                Aus Liste abgehakt
+              </div>
+              <button
+                className="tap-scale text-[12px] font-bold"
+                style={{ color: 'var(--danger)' }}
+                onClick={() => {
+                  if (window.confirm('Abhak-Preise im Rechner ausblenden? Die Statistik bleibt erhalten.')) clearTodayCheckoffs()
+                }}
+              >
+                Leeren
+              </button>
             </div>
             <div className="card-surface mb-4">
               {checkoffEntries.map((entry, index) => (
@@ -109,16 +142,16 @@ export function CalculatorPage() {
               ))}
             </div>
             <button
-              className="w-full rounded-2xl py-3 text-[13px] font-bold"
-              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              className="mb-3 w-full rounded-2xl py-3 text-[13px] font-bold"
+              style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
               onClick={clearCalculator}
             >
-              Manuelle Einträge löschen
+              Nur manuelle Einträge löschen
             </button>
           </>
         )}
 
-        {!checkoffEntries.length && !entries.length && (
+        {!hasAnything && (
           <p className="px-1.5 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
             Preise beim Abhaken der Liste erscheinen hier automatisch.
           </p>
