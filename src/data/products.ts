@@ -406,7 +406,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     "name": "Kichererbsen",
-    "category": "Getreide & Beilagen",
+    "category": "Konserven & Saucen",
     "icon": "linsen"
   },
   {
