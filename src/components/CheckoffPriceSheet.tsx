@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { MoneyNumpad } from './MoneyNumpad'
+import { Icon } from './Icon'
+import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { formatMoney } from '@/utils/currency'
-import type { CheckoffPriceData, Currency, ProductPriceProfile, ShoppingItem } from '@/types'
+import type { CheckoffPriceData, Currency, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
 
 const NEW_VARIANT = '__new__'
 
@@ -50,10 +52,17 @@ export function CheckoffPriceSheet({
   }, [profile, selection])
 
   useEffect(() => {
-    if (selectedVariant?.lastPrice && selectedVariant.lastPrice > 0) {
+    if (!selectedVariant) return
+    if (wasSale) {
+      if (selectedVariant.lastSalePrice && selectedVariant.lastSalePrice > 0) {
+        setCents(amountToCents(selectedVariant.lastSalePrice))
+      }
+      return
+    }
+    if (selectedVariant.lastPrice && selectedVariant.lastPrice > 0) {
       setCents(amountToCents(selectedVariant.lastPrice))
     }
-  }, [selectedVariant?.id])
+  }, [selectedVariant?.id, wasSale])
 
   function handleSave() {
     const price = centsToAmount(cents)
@@ -172,31 +181,12 @@ export function CheckoffPriceSheet({
 
       <MoneyNumpad cents={cents} onChange={(value) => { setCents(value); setError('') }} currency={currency} compact />
 
-      <button
-        type="button"
-        className="tap-scale mt-3 flex w-full items-center justify-between rounded-2xl px-4 py-3"
-        style={{
-          background: wasSale ? 'var(--accent-soft)' : 'var(--chip-bg)',
-          color: wasSale ? 'var(--accent)' : 'var(--text)',
-        }}
-        onClick={() => setWasSale((v) => !v)}
-      >
-        <span className="text-[14px] font-semibold">Aktion</span>
-        <span
-          className="relative h-7 w-12 rounded-full transition-colors"
-          style={{ background: wasSale ? 'var(--accent)' : 'var(--border)' }}
-        >
-          <span
-            className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform"
-            style={{ transform: wasSale ? 'translateX(22px)' : 'translateX(2px)' }}
-          />
-        </span>
-      </button>
-      {wasSale && (
-        <p className="mt-1.5 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          Aktionspreise werden separat erfasst und verfälschen nicht den Normal-Durchschnitt.
-        </p>
-      )}
+      <PriceTypePicker
+        wasSale={wasSale}
+        onChange={setWasSale}
+        variant={selectedVariant}
+        currency={currency}
+      />
 
       {error && (
         <p className="mb-2 mt-2 text-center text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
@@ -212,5 +202,64 @@ export function CheckoffPriceSheet({
         </button>
       </div>
     </Sheet>
+  )
+}
+
+function PriceTypePicker({
+  wasSale,
+  onChange,
+  variant,
+  currency,
+}: {
+  wasSale: boolean
+  onChange: (sale: boolean) => void
+  variant?: ProductVariant
+  currency: Currency
+}) {
+  const lastSaleHint =
+    variant?.lastSalePrice && variant.lastSalePrice > 0
+      ? `Zuletzt ${formatMoney(variant.lastSalePrice, currency)}`
+      : null
+
+  return (
+    <div className="mt-3">
+      <div className="mb-1.5 px-0.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+        Preisart
+      </div>
+      <div className="flex gap-1 rounded-2xl p-1" style={{ background: 'var(--chip-bg)' }}>
+        <button
+          type="button"
+          className="tap-scale flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold transition-colors"
+          style={{
+            background: !wasSale ? 'var(--surface)' : 'transparent',
+            color: !wasSale ? 'var(--text)' : 'var(--text-muted)',
+            boxShadow: !wasSale ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+          }}
+          onClick={() => onChange(false)}
+          aria-pressed={!wasSale}
+        >
+          Normalpreis
+        </button>
+        <button
+          type="button"
+          className="tap-scale flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold transition-colors"
+          style={{
+            background: wasSale ? 'var(--accent-soft)' : 'transparent',
+            color: wasSale ? 'var(--accent)' : 'var(--text-muted)',
+            boxShadow: wasSale ? '0 1px 4px rgba(255,149,0,0.2)' : 'none',
+          }}
+          onClick={() => onChange(true)}
+          aria-pressed={wasSale}
+        >
+          <Icon path={ICON_PATHS.flame} size={15} />
+          Aktion
+        </button>
+      </div>
+      <p className="mt-1.5 px-0.5 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+        {wasSale
+          ? `Aktionspreis – zählt nicht in den Normal-Durchschnitt.${lastSaleHint ? ` ${lastSaleHint}.` : ''}`
+          : 'Regulärer Ladenpreis für die Kostenschätzung.'}
+      </p>
+    </div>
   )
 }
