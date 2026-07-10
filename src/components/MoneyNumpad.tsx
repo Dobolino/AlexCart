@@ -7,6 +7,8 @@ interface MoneyNumpadProps {
   onChange: (cents: number) => void
   currency: Currency
   compact?: boolean
+  /** Noch kompakter für Preis-Sheet ohne Scrollen. */
+  dense?: boolean
   label?: string
   /** Wie die orangene Summen-Karte: Label links, Betrag rechts */
   display?: 'card' | 'summary'
@@ -17,10 +19,19 @@ export function MoneyNumpad({
   onChange,
   currency,
   compact = false,
+  dense = false,
   label = 'Eingabe',
   display = 'card',
 }: MoneyNumpadProps) {
   const amount = centsToAmount(cents) ?? 0
+  const padY = dense ? 'py-2' : compact ? 'py-3' : 'py-4'
+  const keySize = dense ? 'text-[17px]' : compact ? 'text-[20px]' : 'text-[22px]'
+  const displaySize = dense ? 22 : compact ? 24 : 26
+  const displayMinH = dense ? 48 : compact ? 56 : 64
+  const gridGap = dense ? 'gap-1.5' : 'gap-2'
+  const gridMb = dense ? 'mb-0' : compact ? 'mb-1' : 'mb-3'
+  const labelMb = dense ? 'mb-1' : 'mb-1.5'
+  const displayMb = dense ? 'mb-2' : 'mb-3'
 
   function pressKey(key: string) {
     onChange(applyFixedDecimalKey(cents, key))
@@ -45,29 +56,29 @@ export function MoneyNumpad({
       ) : (
         <>
           {label && (
-            <div className="mb-1.5 px-1 text-[13px] font-bold" style={{ color: 'var(--text-muted)' }}>
+            <div className={`${labelMb} px-1 text-[13px] font-bold`} style={{ color: 'var(--text-muted)' }}>
               {label}
             </div>
           )}
           <div
-            className="card-surface mb-3 flex items-center justify-end gap-2 px-5 py-4 font-bold tabular-nums"
-            style={{ color: 'var(--text)', minHeight: compact ? 56 : 64, fontSize: compact ? 24 : 26 }}
+            className={`card-surface ${displayMb} flex items-center justify-end gap-2 px-4 font-bold tabular-nums`}
+            style={{ color: 'var(--text)', minHeight: displayMinH, fontSize: displaySize }}
           >
             <span>{formatMoney(amount, currency)}</span>
           </div>
         </>
       )}
 
-      <div className={`grid grid-cols-3 gap-2 ${compact ? 'mb-1' : 'mb-3'}`}>
+      <div className={`grid grid-cols-3 ${gridGap} ${gridMb}`}>
         {NUMPAD_KEYS.map((key) => (
           <button
             key={key}
             type="button"
             data-testid="money-numpad-key"
-            className={`card-surface tap-scale font-bold ${compact ? 'py-3 text-[20px]' : 'py-4 text-[22px]'}`}
+            className={`card-surface tap-scale font-bold ${padY} ${keySize}`}
             style={{
               color: key === 'C' ? 'var(--danger)' : 'var(--text)',
-              fontSize: key === 'C' ? (compact ? 16 : 18) : undefined,
+              fontSize: key === 'C' ? (dense ? 14 : compact ? 16 : 18) : undefined,
             }}
             onClick={() => pressKey(key)}
           >

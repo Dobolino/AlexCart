@@ -7,9 +7,11 @@ import { useVisualViewportInset } from '@/hooks/useVisualViewportInset'
 interface SheetProps {
   onClose: () => void
   children: ReactNode
+  /** Volle Sheet-Höhe für kompakte, nicht scrollbare Inhalte (z. B. Preis-Sheet). */
+  tall?: boolean
 }
 
-export function Sheet({ onClose, children }: SheetProps) {
+export function Sheet({ onClose, children, tall = false }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const { bottom, height } = useVisualViewportInset()
 
@@ -36,7 +38,7 @@ export function Sheet({ onClose, children }: SheetProps) {
     return () => panel.removeEventListener('focusin', onFocusIn)
   }, [])
 
-  const maxPanelHeight = Math.min(height * 0.92, height - 8)
+  const maxPanelHeight = Math.min(height * (tall ? 0.96 : 0.92), height - 8)
 
   return createPortal(
     <div
@@ -55,6 +57,7 @@ export function Sheet({ onClose, children }: SheetProps) {
           right: 0,
           bottom,
           maxHeight: maxPanelHeight,
+          ...(tall ? { height: maxPanelHeight } : {}),
           background: 'var(--surface)',
           borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
           paddingBottom: 'calc(20px + var(--safe-bottom))',

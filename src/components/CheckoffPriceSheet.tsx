@@ -51,6 +51,8 @@ export function CheckoffPriceSheet({
     return profile ? findVariant(profile, selection) : undefined
   }, [profile, selection])
 
+  const showNewVariantName = selection === NEW_VARIANT
+
   useEffect(() => {
     if (!selectedVariant) return
     if (wasSale) {
@@ -71,7 +73,7 @@ export function CheckoffPriceSheet({
       return
     }
 
-    if (selection === NEW_VARIANT) {
+    if (showNewVariantName) {
       const name = variantName.trim()
       if (!name) {
         setError('Bitte einen Variantennamen eingeben.')
@@ -90,116 +92,132 @@ export function CheckoffPriceSheet({
   }
 
   return (
-    <Sheet onClose={onClose}>
-      <h2 className="mb-1 text-lg font-bold">Preis erfassen</h2>
-      <p className="mb-3 text-[14px]" style={{ color: 'var(--text-muted)' }}>
-        <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
-        {item.amount ? ` · ${item.amount}` : ''}
-      </p>
+    <Sheet onClose={onClose} tall>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="shrink-0">
+          <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
+          <p className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
+            {item.amount ? ` · ${item.amount}` : ''}
+          </p>
 
-      {hasVariants ? (
-        <div className="mb-3">
-          <label className="mb-1.5 block px-0.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-            Variante auswählen
-          </label>
-          <select
-            className="input w-full py-3 text-[15px]"
-            value={selection}
-            onChange={(e) => {
-              setSelection(e.target.value)
-              setError('')
-              if (e.target.value !== NEW_VARIANT) setVariantName('')
-            }}
-          >
-            {variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-            <option value={NEW_VARIANT}>+ Neue Variante</option>
-          </select>
+          {hasVariants ? (
+            <div className="mb-2">
+              <label className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+                Variante
+              </label>
+              <select
+                className="input w-full py-2.5 text-[14px]"
+                value={selection}
+                onChange={(e) => {
+                  setSelection(e.target.value)
+                  setError('')
+                  if (e.target.value !== NEW_VARIANT) setVariantName('')
+                }}
+              >
+                {variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+                <option value={NEW_VARIANT}>+ Neue Variante</option>
+              </select>
+            </div>
+          ) : (
+            <div className="mb-2">
+              <label className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+                Variante (Marke / Grösse)
+              </label>
+              <input
+                type="text"
+                className="input w-full py-2.5 text-[14px]"
+                placeholder="z. B. Coop Naturaplan Bio 1L"
+                value={variantName}
+                onChange={(e) => {
+                  setVariantName(e.target.value)
+                  setError('')
+                }}
+              />
+            </div>
+          )}
+
+          {showNewVariantName && hasVariants && (
+            <div className="mb-2">
+              <input
+                type="text"
+                className="input w-full py-2.5 text-[14px]"
+                placeholder="Name der neuen Variante"
+                value={variantName}
+                onChange={(e) => {
+                  setVariantName(e.target.value)
+                  setError('')
+                }}
+              />
+            </div>
+          )}
+
+          {selectedVariant && (
+            <div
+              className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl px-2.5 py-2 text-center text-[11px]"
+              style={{ background: 'var(--chip-bg)' }}
+            >
+              <div>
+                <div style={{ color: 'var(--text-muted)' }}>Zuletzt</div>
+                <div className="font-bold tabular-nums">
+                  {selectedVariant.lastPrice ? formatMoney(selectedVariant.lastPrice, currency) : '–'}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--text-muted)' }}>Ø normal</div>
+                <div className="font-bold tabular-nums">
+                  {selectedVariant.avgPrice ? formatMoney(selectedVariant.avgPrice, currency) : '–'}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--text-muted)' }}>Gekauft</div>
+                <div className="font-bold">{formatShortDate(selectedVariant.lastPurchaseDate)}</div>
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="mb-3">
-          <label className="mb-1.5 block px-0.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-            Variante (Marke / Grösse)
-          </label>
-          <input
-            type="text"
-            className="input w-full py-3 text-[15px]"
-            placeholder="z. B. Coop Naturaplan Bio 1L"
-            value={variantName}
-            onChange={(e) => {
-              setVariantName(e.target.value)
+
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <MoneyNumpad
+            cents={cents}
+            onChange={(value) => {
+              setCents(value)
               setError('')
             }}
+            currency={currency}
+            dense
+            label=""
+          />
+          <PriceTypePicker
+            wasSale={wasSale}
+            onChange={setWasSale}
+            variant={selectedVariant}
+            currency={currency}
           />
         </div>
-      )}
 
-      {selection === NEW_VARIANT && hasVariants && (
-        <div className="mb-3">
-          <label className="mb-1.5 block px-0.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-            Name der neuen Variante
-          </label>
-          <input
-            type="text"
-            className="input w-full py-3 text-[15px]"
-            placeholder="z. B. Emmi Vollmilch 1L"
-            value={variantName}
-            onChange={(e) => {
-              setVariantName(e.target.value)
-              setError('')
-            }}
-          />
-        </div>
-      )}
-
-      {selectedVariant && (
         <div
-          className="mb-3 grid grid-cols-3 gap-2 rounded-2xl px-3 py-2.5 text-center text-[12px]"
-          style={{ background: 'var(--chip-bg)' }}
+          className="shrink-0 border-t pt-2.5"
+          style={{ borderColor: 'var(--border)' }}
         >
-          <div>
-            <div style={{ color: 'var(--text-muted)' }}>Zuletzt</div>
-            <div className="font-bold tabular-nums">
-              {selectedVariant.lastPrice ? formatMoney(selectedVariant.lastPrice, currency) : '–'}
-            </div>
-          </div>
-          <div>
-            <div style={{ color: 'var(--text-muted)' }}>Ø normal</div>
-            <div className="font-bold tabular-nums">
-              {selectedVariant.avgPrice ? formatMoney(selectedVariant.avgPrice, currency) : '–'}
-            </div>
-          </div>
-          <div>
-            <div style={{ color: 'var(--text-muted)' }}>Zuletzt gekauft</div>
-            <div className="font-bold">{formatShortDate(selectedVariant.lastPurchaseDate)}</div>
+          {error && (
+            <p className="mb-2 text-center text-[12px] font-bold" style={{ color: 'var(--danger)' }}>
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button className="btn-soft flex-1 py-3 text-[14px]" onClick={onSkip}>
+              Überspringen
+            </button>
+            <button className="btn-primary flex-1 py-3 text-[14px]" onClick={handleSave}>
+              Speichern
+            </button>
           </div>
         </div>
-      )}
-
-      <MoneyNumpad cents={cents} onChange={(value) => { setCents(value); setError('') }} currency={currency} compact />
-
-      <PriceTypePicker
-        wasSale={wasSale}
-        onChange={setWasSale}
-        variant={selectedVariant}
-        currency={currency}
-      />
-
-      {error && (
-        <p className="mb-2 mt-2 text-center text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
-          {error}
-        </p>
-      )}
-      <div className="mt-3 flex gap-2.5">
-        <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={onSkip}>
-          Überspringen
-        </button>
-        <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={handleSave}>
-          Speichern
-        </button>
       </div>
     </Sheet>
   )
@@ -222,18 +240,15 @@ function PriceTypePicker({
       : null
 
   return (
-    <div className="mt-3">
-      <div className="mb-1.5 px-0.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-        Preisart
-      </div>
-      <div className="flex gap-1 rounded-2xl p-1" style={{ background: 'var(--chip-bg)' }}>
+    <div className="mt-1.5">
+      <div className="flex gap-1 rounded-xl p-0.5" style={{ background: 'var(--chip-bg)' }}>
         <button
           type="button"
-          className="tap-scale flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold transition-colors"
+          className="tap-scale flex flex-1 items-center justify-center rounded-lg py-2 text-[12px] font-bold transition-colors"
           style={{
             background: !wasSale ? 'var(--surface)' : 'transparent',
             color: !wasSale ? 'var(--text)' : 'var(--text-muted)',
-            boxShadow: !wasSale ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+            boxShadow: !wasSale ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
           }}
           onClick={() => onChange(false)}
           aria-pressed={!wasSale}
@@ -242,24 +257,24 @@ function PriceTypePicker({
         </button>
         <button
           type="button"
-          className="tap-scale flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-bold transition-colors"
+          className="tap-scale flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-bold transition-colors"
           style={{
             background: wasSale ? 'var(--accent-soft)' : 'transparent',
             color: wasSale ? 'var(--accent)' : 'var(--text-muted)',
-            boxShadow: wasSale ? '0 1px 4px rgba(255,149,0,0.2)' : 'none',
+            boxShadow: wasSale ? '0 1px 3px rgba(255,149,0,0.15)' : 'none',
           }}
           onClick={() => onChange(true)}
           aria-pressed={wasSale}
         >
-          <Icon path={ICON_PATHS.flame} size={15} />
+          <Icon path={ICON_PATHS.flame} size={13} />
           Aktion
         </button>
       </div>
-      <p className="mt-1.5 px-0.5 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>
-        {wasSale
-          ? `Aktionspreis – zählt nicht in den Normal-Durchschnitt.${lastSaleHint ? ` ${lastSaleHint}.` : ''}`
-          : 'Regulärer Ladenpreis für die Kostenschätzung.'}
-      </p>
+      {wasSale && (
+        <p className="mt-1 truncate px-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          Separat erfasst{lastSaleHint ? ` · ${lastSaleHint}` : ''}
+        </p>
+      )}
     </div>
   )
 }
