@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
+import { Sheet } from '@/components/Sheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { formatVariantLabel } from '@/utils/brands'
 import { isProduceCategory } from '@/utils/producePrice'
@@ -21,7 +22,7 @@ export function PriceProfilesSettingsSection() {
   const updatePriceProfileVariant = useStore((s) => s.updatePriceProfileVariant)
 
   const [newBrand, setNewBrand] = useState('')
-  const [editingBrandId, setEditingBrandId] = useState<string | null>(null)
+  const [editingBrand, setEditingBrand] = useState<GlobalBrand | null>(null)
   const [brandDraft, setBrandDraft] = useState('')
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null)
 
@@ -41,10 +42,10 @@ export function PriceProfilesSettingsSection() {
     setNewBrand('')
   }
 
-  function saveBrandEdit(id: string) {
-    if (!brandDraft.trim()) return
-    updateBrand(id, brandDraft)
-    setEditingBrandId(null)
+  function saveBrandEdit() {
+    if (!editingBrand || !brandDraft.trim()) return
+    updateBrand(editingBrand.id, brandDraft)
+    setEditingBrand(null)
     setBrandDraft('')
   }
 
@@ -132,15 +133,10 @@ export function PriceProfilesSettingsSection() {
               <BrandRow
                 key={brand.id}
                 brand={brand}
-                editing={editingBrandId === brand.id}
-                draft={brandDraft}
                 onStartEdit={() => {
-                  setEditingBrandId(brand.id)
+                  setEditingBrand(brand)
                   setBrandDraft(brand.name)
                 }}
-                onDraftChange={setBrandDraft}
-                onSave={() => saveBrandEdit(brand.id)}
-                onCancel={() => setEditingBrandId(null)}
                 onRemove={() => {
                   if (window.confirm(`Marke „${brand.name}" entfernen?`)) removeBrand(brand.id)
                 }}
@@ -149,6 +145,30 @@ export function PriceProfilesSettingsSection() {
           </div>
         )}
       </div>
+
+      {editingBrand && (
+        <Sheet onClose={() => setEditingBrand(null)}>
+          <h2 className="mb-3 text-lg font-bold">Marke umbenennen</h2>
+          <input
+            type="text"
+            className="input w-full py-3 text-[15px]"
+            value={brandDraft}
+            onChange={(e) => setBrandDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveBrandEdit()
+            }}
+            autoFocus
+          />
+          <div className="mt-4 flex gap-2.5">
+            <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setEditingBrand(null)}>
+              Abbrechen
+            </button>
+            <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={saveBrandEdit}>
+              Speichern
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       <div
         className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
@@ -187,21 +207,11 @@ export function PriceProfilesSettingsSection() {
 
 function BrandRow({
   brand,
-  editing,
-  draft,
   onStartEdit,
-  onDraftChange,
-  onSave,
-  onCancel,
   onRemove,
 }: {
   brand: GlobalBrand
-  editing: boolean
-  draft: string
   onStartEdit: () => void
-  onDraftChange: (v: string) => void
-  onSave: () => void
-  onCancel: () => void
   onRemove: () => void
 }) {
   return (
@@ -209,41 +219,13 @@ function BrandRow({
       className="flex items-center gap-2 border-b py-2.5 last:border-b-0"
       style={{ borderColor: 'var(--border)' }}
     >
-      {editing ? (
-        <>
-          <input
-            type="text"
-            className="input min-w-0 flex-1 py-1.5 text-[14px]"
-            value={draft}
-            onChange={(e) => onDraftChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onSave()
-              if (e.key === 'Escape') onCancel()
-            }}
-            onFocus={(e) => {
-              // iOS öffnet die Tastatur, ohne das fokussierte Feld verlässlich neu ins
-              // Bild zu scrollen (führt sonst zu einer scheinbar leeren Fläche über der
-              // Tastatur) - kurz warten, bis die Tastatur-Animation begonnen hat.
-              const target = e.currentTarget
-              window.setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
-            }}
-            autoFocus
-          />
-          <button type="button" className="tap-scale text-[12px] font-bold" style={{ color: 'var(--accent)' }} onClick={onSave}>
-            OK
-          </button>
-        </>
-      ) : (
-        <>
-          <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{brand.name}</span>
-          <button type="button" className="tap-scale p-1.5" style={{ color: 'var(--text-muted)' }} onClick={onStartEdit} aria-label={`${brand.name} bearbeiten`}>
-            <Icon path={ICON_PATHS.edit} size={16} />
-          </button>
-          <button type="button" className="tap-scale p-1.5" style={{ color: 'var(--danger)' }} onClick={onRemove} aria-label={`${brand.name} löschen`}>
-            <Icon path={ICON_PATHS.trash} size={16} />
-          </button>
-        </>
-      )}
+      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{brand.name}</span>
+      <button type="button" className="tap-scale p-1.5" style={{ color: 'var(--text-muted)' }} onClick={onStartEdit} aria-label={`${brand.name} bearbeiten`}>
+        <Icon path={ICON_PATHS.edit} size={16} />
+      </button>
+      <button type="button" className="tap-scale p-1.5" style={{ color: 'var(--danger)' }} onClick={onRemove} aria-label={`${brand.name} löschen`}>
+        <Icon path={ICON_PATHS.trash} size={16} />
+      </button>
     </div>
   )
 }
