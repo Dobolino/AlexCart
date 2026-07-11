@@ -7,13 +7,14 @@ import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budg
 import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { todayPricedTotalForList } from '@/utils/purchaseLog'
+import { adjustAmount } from '@/utils/amount'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
-import { AmountBadge } from '@/components/AmountBadge'
+import { ItemAmountColumn } from '@/components/ItemAmountColumn'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
@@ -21,6 +22,7 @@ export function ShoppingModePage() {
   const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
+  const updateItemInActiveList = useStore((s) => s.updateItemInActiveList)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const priceProfiles = useStore((s) => s.priceProfiles)
   const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
@@ -114,6 +116,14 @@ export function ShoppingModePage() {
       resetCalculatorSession()
     }
     navigate('/')
+  }
+
+  function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
+    if (!item.amount.trim() && direction > 0) {
+      updateItemInActiveList(item.id, { amount: '1 Stk' })
+      return
+    }
+    updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
   }
 
   return (
@@ -251,28 +261,38 @@ export function ShoppingModePage() {
               </div>
               <div className="flex flex-col gap-2">
                 {group.items.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    className="tap-scale flex min-h-[72px] items-center gap-3 rounded-2xl px-4 py-4 text-left shadow-sm"
+                    className="flex min-h-[72px] items-center gap-2 rounded-2xl px-3 py-3 shadow-sm"
                     style={{ background: 'var(--surface)' }}
-                    onClick={() => handleCheck(item)}
                   >
-                    <span
-                      className="flex h-11 w-11 flex-none items-center justify-center rounded-full border-2"
+                    <button
+                      type="button"
+                      className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full border-2"
                       style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                      onClick={() => handleCheck(item)}
+                      aria-label={`${item.name} abhaken`}
                     >
                       <Icon path={ICON_PATHS.check} size={22} />
-                    </span>
-                    <span className="min-w-0 flex-1">
+                    </button>
+                    <button
+                      type="button"
+                      className="tap-scale min-w-0 flex-1 text-left"
+                      onClick={() => handleCheck(item)}
+                    >
                       <span className="block truncate text-[18px] font-bold leading-tight">{item.name}</span>
                       {item.note && (
                         <span className="mt-0.5 block truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
                           {item.note}
                         </span>
                       )}
-                    </span>
-                    {item.amount && <AmountBadge amount={item.amount} prominent />}
-                  </button>
+                    </button>
+                    <ItemAmountColumn
+                      item={item}
+                      showStepper
+                      onAdjustAmount={handleAdjustAmount}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -321,6 +341,10 @@ export function ShoppingModePage() {
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}
           onSkip={handlePriceSkip}
+          onAmountChange={(amount) => {
+            updateItemInActiveList(priceSheetItem.id, { amount })
+            setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
+          }}
         />
       )}
     </div>

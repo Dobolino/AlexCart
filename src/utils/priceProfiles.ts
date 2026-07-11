@@ -1,5 +1,6 @@
-import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
+import { priceQuantityFromAmount } from './amount'
 import { normalize } from '@/utils/text'
+import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
 
 export function profileBaseKey(itemName: string, category: string): string {
   return `${normalize(itemName)}|${normalize(category)}`
@@ -143,13 +144,14 @@ export function recordVariantPurchase(
   }
 
   const wasSale = !!data.wasSale
+  const profilePrice = data.unitPrice ?? data.price
   let variant: ProductVariant | undefined
   let createdNewVariant = false
 
   if (data.variantId) {
     const idx = profileCopy.variants.findIndex((v) => v.id === data.variantId)
     if (idx >= 0) {
-      variant = applyPurchaseToVariant(profileCopy.variants[idx]!, data.price, date, wasSale)
+      variant = applyPurchaseToVariant(profileCopy.variants[idx]!, profilePrice, date, wasSale)
       profileCopy.variants[idx] = variant
     }
   }
@@ -157,7 +159,7 @@ export function recordVariantPurchase(
   if (!variant) {
     const name = (data.variantName || itemName).trim()
     if (!name) throw new Error('Variantenname fehlt')
-    const newVariant = applyPurchaseToVariant(createEmptyVariant(name, createId()), data.price, date, wasSale)
+    const newVariant = applyPurchaseToVariant(createEmptyVariant(name, createId()), profilePrice, date, wasSale)
     profileCopy.variants.push(newVariant)
     variant = newVariant
     createdNewVariant = true
@@ -218,7 +220,9 @@ export function estimateItemPrice(
   const profile = findPriceProfile(profiles, item.name, item.category)
   const variant = pickVariantForEstimate(profile, item)
   if (!variant) return null
-  return estimateVariantPrice(variant)
+  const unit = estimateVariantPrice(variant)
+  if (unit === null) return null
+  return roundMoney(unit * priceQuantityFromAmount(item.amount))
 }
 
 export interface ListCostEstimate {

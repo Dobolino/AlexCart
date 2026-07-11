@@ -93,7 +93,10 @@ export interface ProductPriceProfile {
 
 /** Preisdaten beim Abhaken oder nachträglich. */
 export interface CheckoffPriceData {
+  /** Gesamtpreis für Budget und Kaufprotokoll. */
   price: number
+  /** Stückpreis für Preisgedächtnis/Varianten – optional bei Mehrfachmengen. */
+  unitPrice?: number
   variantId?: string
   /** Pflicht bei neuer Variante. */
   variantName?: string

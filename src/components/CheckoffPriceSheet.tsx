@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { MoneyNumpad } from './MoneyNumpad'
+import { ItemAmountColumn } from './ItemAmountColumn'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
+import { adjustAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice, type CheckoffPriceMode } from '@/utils/amount'
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { formatMoney } from '@/utils/currency'
 import type { CheckoffPriceData, Currency, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
@@ -17,6 +19,7 @@ interface CheckoffPriceSheetProps {
   onClose: () => void
   onSave: (data: CheckoffPriceData) => void
   onSkip: () => void
+  onAmountChange?: (amount: string) => void
 }
 
 function formatShortDate(date?: string): string {
@@ -33,10 +36,12 @@ export function CheckoffPriceSheet({
   onClose,
   onSave,
   onSkip,
+  onAmountChange,
 }: CheckoffPriceSheetProps) {
   const variants = profile?.variants ?? []
   const hasVariants = variants.length > 0
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
+  const quantity = priceQuantityFromAmount(item.amount)
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
@@ -44,6 +49,7 @@ export function CheckoffPriceSheet({
   const [variantName, setVariantName] = useState('')
   const [cents, setCents] = useState(0)
   const [wasSale, setWasSale] = useState(false)
+  const [priceMode, setPriceMode] = useState<CheckoffPriceMode>(quantity > 1 ? 'unit' : 'total')
   const [error, setError] = useState('')
 
   const selectedVariant = useMemo(() => {
@@ -66,11 +72,37 @@ export function CheckoffPriceSheet({
     }
   }, [selectedVariant?.id, wasSale])
 
+  useEffect(() => {
+    if (quantity > 1) setPriceMode('unit')
+  }, [quantity])
+
+  const enteredAmount = centsToAmount(cents) ?? 0
+  const resolved = useMemo(
+    () => (enteredAmount > 0 ? resolveCheckoffTotalPrice(enteredAmount, item.amount, priceMode) : null),
+    [enteredAmount, item.amount, priceMode]
+  )
+
+  function handleAdjustAmount(direction: 1 | -1) {
+    if (!onAmountChange) return
+    if (!item.amount.trim() && direction > 0) {
+      onAmountChange('1 Stk')
+      return
+    }
+    onAmountChange(adjustAmount(item.amount, direction))
+  }
+
   function handleSave() {
     const price = centsToAmount(cents)
     if (price === null) {
       setError('Bitte einen gültigen Preis eingeben.')
       return
+    }
+
+    const { total, unitPrice } = resolveCheckoffTotalPrice(price, item.amount, priceMode)
+    const payload: CheckoffPriceData = {
+      price: total,
+      unitPrice: quantity > 1 || priceMode === 'unit' ? unitPrice : undefined,
+      wasSale,
     }
 
     if (showNewVariantName) {
@@ -79,7 +111,7 @@ export function CheckoffPriceSheet({
         setError('Bitte einen Variantennamen eingeben.')
         return
       }
-      onSave({ price, variantName: name, wasSale })
+      onSave({ ...payload, variantName: name })
       return
     }
 
@@ -88,7 +120,7 @@ export function CheckoffPriceSheet({
       return
     }
 
-    onSave({ price, variantId: selectedVariant.id, wasSale })
+    onSave({ ...payload, variantId: selectedVariant.id })
   }
 
   return (
@@ -98,8 +130,57 @@ export function CheckoffPriceSheet({
           <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
           <p className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
-            {item.amount ? ` · ${item.amount}` : ''}
           </p>
+
+          {onAmountChange && (
+            <div className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
+              <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Menge
+              </span>
+              <ItemAmountColumn
+                item={item}
+                showStepper
+                onAdjustAmount={(_, direction) => handleAdjustAmount(direction)}
+              />
+            </div>
+          )}
+
+          {quantity > 1 && (
+            <div className="mb-2 flex gap-1 rounded-xl p-0.5" style={{ background: 'var(--chip-bg)' }}>
+              <button
+                type="button"
+                className="tap-scale flex-1 rounded-lg py-2 text-[12px] font-bold"
+                style={{
+                  background: priceMode === 'unit' ? 'var(--surface)' : 'transparent',
+                  color: priceMode === 'unit' ? 'var(--text)' : 'var(--text-muted)',
+                }}
+                onClick={() => setPriceMode('unit')}
+                aria-pressed={priceMode === 'unit'}
+              >
+                Pro Stück
+              </button>
+              <button
+                type="button"
+                className="tap-scale flex-1 rounded-lg py-2 text-[12px] font-bold"
+                style={{
+                  background: priceMode === 'total' ? 'var(--surface)' : 'transparent',
+                  color: priceMode === 'total' ? 'var(--text)' : 'var(--text-muted)',
+                }}
+                onClick={() => setPriceMode('total')}
+                aria-pressed={priceMode === 'total'}
+              >
+                Gesamt
+              </button>
+            </div>
+          )}
+
+          {quantity > 1 && (
+            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {priceMode === 'unit'
+                ? `Stückpreis eingeben – wird mit ${quantity} multipliziert`
+                : 'Gesamtpreis aller Packungen am Kassenbon'}
+            </p>
+          )}
 
           {hasVariants ? (
             <div className="mb-2">
@@ -190,8 +271,18 @@ export function CheckoffPriceSheet({
             }}
             currency={currency}
             dense
-            label=""
+            label={quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
           />
+          {resolved && resolved.total > 0 && quantity > 1 && (
+            <div
+              className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            >
+              {priceMode === 'unit'
+                ? `${quantity} × ${formatMoney(resolved.unitPrice, currency)} = ${formatMoney(resolved.total, currency)}`
+                : `Gesamt: ${formatMoney(resolved.total, currency)}`}
+            </div>
+          )}
           <PriceTypePicker
             wasSale={wasSale}
             onChange={setWasSale}

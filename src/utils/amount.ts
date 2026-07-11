@@ -49,6 +49,67 @@ export function adjustAmount(amount: string, direction: 1 | -1): string {
   return joinAmount(formatNumber(next), parsed.unit)
 }
 
+const COUNT_UNITS = new Set([
+  '',
+  'stk',
+  'stück',
+  'stuck',
+  'st',
+  'x',
+  'paar',
+  'pack',
+  'packung',
+  'packungen',
+  'pkg',
+  'dose',
+  'dosen',
+  'becher',
+  'rolle',
+  'rollen',
+  'flasche',
+  'flaschen',
+])
+
+function normalizeUnit(unit: string): string {
+  return unit
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+}
+
+/** Anzahl für Preisberechnung – z. B. „2 Stk“ → 2, „500 g“ → 1 (Packungspreis). */
+export function priceQuantityFromAmount(amount: string): number {
+  const parsed = parseAmount(amount)
+  if (!parsed) {
+    const bare = String(amount).trim().match(/^(\d+)$/)
+    if (bare) return Math.max(1, Number(bare[1]))
+    return 1
+  }
+  const unit = normalizeUnit(parsed.unit)
+  if (COUNT_UNITS.has(unit)) return Math.max(1, Math.round(parsed.value))
+  return 1
+}
+
+export type CheckoffPriceMode = 'unit' | 'total'
+
+/** Berechnet den Gesamtpreis für Kaufprotokoll und Budget. */
+export function resolveCheckoffTotalPrice(
+  enteredPrice: number,
+  amount: string,
+  mode: CheckoffPriceMode
+): { total: number; unitPrice: number; quantity: number } {
+  const quantity = priceQuantityFromAmount(amount)
+  if (mode === 'total' || quantity <= 1) {
+    const total = Math.round(enteredPrice * 100) / 100
+    const unitPrice = quantity > 1 ? Math.round((total / quantity) * 100) / 100 : total
+    return { total, unitPrice, quantity }
+  }
+  const unitPrice = Math.round(enteredPrice * 100) / 100
+  const total = Math.round(unitPrice * quantity * 100) / 100
+  return { total, unitPrice, quantity }
+}
+
 export function combineAmounts(a: string, b: string): string {
   const pa = parseAmount(a)
   const pb = parseAmount(b)

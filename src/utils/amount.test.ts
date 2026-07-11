@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, combineAmounts, mergeItems, adjustAmount, stepForUnit, joinAmount } from './amount'
+import { parseAmount, combineAmounts, mergeItems, adjustAmount, stepForUnit, joinAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice } from './amount'
 
 describe('parseAmount', () => {
   it('splits value and unit', () => {
@@ -23,6 +23,35 @@ describe('joinAmount', () => {
   })
   it('returns just the value when no unit is given', () => {
     expect(joinAmount('3', '')).toBe('3')
+  })
+})
+
+describe('priceQuantityFromAmount', () => {
+  it('nutzt Stückzahlen als Multiplikator', () => {
+    expect(priceQuantityFromAmount('2 Stk')).toBe(2)
+    expect(priceQuantityFromAmount('3')).toBe(3)
+    expect(priceQuantityFromAmount('2 Packungen')).toBe(2)
+  })
+  it('behandelt Gewicht/Volumen als eine Packung', () => {
+    expect(priceQuantityFromAmount('500 g')).toBe(1)
+    expect(priceQuantityFromAmount('1 l')).toBe(1)
+  })
+})
+
+describe('resolveCheckoffTotalPrice', () => {
+  it('multipliziert Stückpreis mit Menge', () => {
+    expect(resolveCheckoffTotalPrice(2.5, '2 Stk', 'unit')).toEqual({
+      total: 5,
+      unitPrice: 2.5,
+      quantity: 2,
+    })
+  })
+  it('akzeptiert Gesamtpreis direkt', () => {
+    expect(resolveCheckoffTotalPrice(5, '2 Stk', 'total')).toEqual({
+      total: 5,
+      unitPrice: 2.5,
+      quantity: 2,
+    })
   })
 })
 

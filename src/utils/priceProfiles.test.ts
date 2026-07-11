@@ -80,6 +80,7 @@ describe('priceProfiles', () => {
     ]
 
     expect(estimateItemPrice(profiles, item())).toBe(2.8)
+    expect(estimateItemPrice(profiles, item({ amount: '2 Stk' }))).toBe(5.6)
     const est = estimateOpenListCost([item(), item({ id: '2', name: 'Unbekannt', category: 'Sonstiges' })], profiles)
     expect(est.total).toBe(2.8)
     expect(est.pricedItemCount).toBe(1)

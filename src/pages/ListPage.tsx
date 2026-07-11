@@ -432,6 +432,10 @@ export function ListPage() {
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}
           onSkip={handlePriceSkip}
+          onAmountChange={(amount) => {
+            updateItemInActiveList(priceSheetItem.id, { amount })
+            setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
+          }}
         />
       )}
 
