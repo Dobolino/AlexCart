@@ -8,7 +8,8 @@ import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
-import { isProduceCategory, adjustProduceGrams } from '@/utils/producePrice'
+import { ProduceWeightInput } from '@/components/ProduceWeightInput'
+import { isProduceCategory } from '@/utils/producePrice'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
@@ -125,19 +126,16 @@ export function ShoppingModePage() {
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
-    if (isProduceCategory(item.category)) {
-      if (!item.amount.trim() && direction > 0) {
-        updateItemInActiveList(item.id, { amount: '500 g' })
-        return
-      }
-      updateItemInActiveList(item.id, { amount: adjustProduceGrams(item.amount, direction) })
-      return
-    }
+    if (isProduceCategory(item.category)) return
     if (!item.amount.trim() && direction > 0) {
       updateItemInActiveList(item.id, { amount: '1 Stk' })
       return
     }
     updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
+  }
+
+  function handleProduceWeight(item: ShoppingItem, amount: string) {
+    updateItemInActiveList(item.id, { amount })
   }
 
   function handleDelete(item: ShoppingItem) {
@@ -315,11 +313,19 @@ export function ShoppingModePage() {
                         </span>
                       )}
                     </button>
-                    <ItemAmountColumn
-                      item={item}
-                      showStepper
-                      onAdjustAmount={handleAdjustAmount}
-                    />
+                    {isProduceCategory(item.category) ? (
+                      <ProduceWeightInput
+                        amount={item.amount}
+                        compact
+                        onChange={(amount) => handleProduceWeight(item, amount)}
+                      />
+                    ) : (
+                      <ItemAmountColumn
+                        item={item}
+                        showStepper
+                        onAdjustAmount={handleAdjustAmount}
+                      />
+                    )}
                     <button
                       type="button"
                       className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"

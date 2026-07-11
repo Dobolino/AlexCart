@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { MoneyNumpad } from './MoneyNumpad'
 import { ItemAmountColumn } from './ItemAmountColumn'
+import { ProduceWeightInput } from './ProduceWeightInput'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
@@ -9,7 +10,7 @@ import { adjustAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice, type 
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
-import { isProduceCategory, adjustProduceGrams, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams } from '@/utils/producePrice'
+import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput } from '@/utils/producePrice'
 import { formatMoney } from '@/utils/currency'
 import type { CheckoffPriceData, Currency, GlobalBrand, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
 
@@ -51,7 +52,7 @@ export function CheckoffPriceSheet({
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
   const quantity = priceQuantityFromAmount(item.amount)
   const isProduce = isProduceCategory(item.category)
-  const weightGrams = weightGramsFromAmount(item.amount) ?? (isProduce ? 500 : null)
+  const weightGrams = weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
@@ -100,15 +101,7 @@ export function CheckoffPriceSheet({
   }, [enteredAmount, item.amount, priceMode, isProduce, weightGrams])
 
   function handleAdjustAmount(direction: 1 | -1) {
-    if (!onAmountChange) return
-    if (isProduce) {
-      if (!item.amount.trim() && direction > 0) {
-        onAmountChange('500 g')
-        return
-      }
-      onAmountChange(adjustProduceGrams(item.amount, direction))
-      return
-    }
+    if (!onAmountChange || isProduce) return
     if (!item.amount.trim() && direction > 0) {
       onAmountChange('1 Stk')
       return
@@ -137,7 +130,11 @@ export function CheckoffPriceSheet({
 
     let payload: CheckoffPriceData
     if (isProduce) {
-      const grams = weightGramsFromAmount(item.amount) ?? 500
+      const grams = weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount) ?? 0
+      if (grams <= 0) {
+        setError('Bitte das abgewogene Gewicht in Gramm eingeben.')
+        return
+      }
       const produce = resolveProduceCheckoffPrice(price, grams)
       payload = {
         price: produce.total,
@@ -180,10 +177,22 @@ export function CheckoffPriceSheet({
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
           </p>
 
-          {onAmountChange && (
+          {onAmountChange && isProduce && (
+            <div className="mb-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
+              <div className="mb-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Abgewogenes Gewicht
+              </div>
+              <ProduceWeightInput
+                amount={item.amount}
+                onChange={onAmountChange}
+              />
+            </div>
+          )}
+
+          {onAmountChange && !isProduce && (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
               <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-                {isProduce ? 'Gewicht' : 'Menge'}
+                Menge
               </span>
               <ItemAmountColumn
                 item={item}
@@ -193,7 +202,13 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {isProduce && weightGrams && (
+          {isProduce && (
+            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Exaktes Gewicht vom Kassenbon eingeben – z. B. 347 g
+            </p>
+          )}
+
+          {isProduce && weightGrams && weightGrams > 0 && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Gesamtpreis eingeben – wird in {formatWeightGrams(weightGrams)} auf Kilopreis umgerechnet
             </p>
