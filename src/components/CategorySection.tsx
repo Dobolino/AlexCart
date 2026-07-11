@@ -17,6 +17,7 @@ interface CategorySectionProps {
   onAddToPantry: (item: ShoppingItem) => void
   onToggleFavorite: (id: string) => void
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
+  onProduceWeightChange?: (item: ShoppingItem, amount: string) => void
 }
 
 export function CategorySection({
@@ -30,6 +31,7 @@ export function CategorySection({
   onAddToPantry,
   onToggleFavorite,
   onAdjustAmount,
+  onProduceWeightChange,
 }: CategorySectionProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const itemIds = items.map((i) => i.id)
@@ -65,6 +67,7 @@ export function CategorySection({
                 onAddToPantry={onAddToPantry}
                 onToggleFavorite={onToggleFavorite}
                 onAdjustAmount={onAdjustAmount}
+                onProduceWeightChange={onProduceWeightChange}
                 dragHandleProps={dragProps}
                 isDragging={drag.dragId === item.id}
                 dragFixedPos={drag.dragId === item.id ? drag.dragFixedPos : null}
@@ -100,6 +103,7 @@ export function CategorySection({
               onAddToPantry={onAddToPantry}
               onToggleFavorite={onToggleFavorite}
               onAdjustAmount={onAdjustAmount}
+              onProduceWeightChange={onProduceWeightChange}
               dragHandleProps={dragProps}
               isDragging={drag.dragId === item.id}
               dragFixedPos={drag.dragId === item.id ? drag.dragFixedPos : null}

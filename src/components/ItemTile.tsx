@@ -9,6 +9,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
 import { getCategoryTileColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
+import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { hapticSuccess } from '@/utils/haptics'
 import { useItemSwipe } from '@/hooks/useItemSwipe'
 import type { DragFixedPosition } from '@/hooks/useDragReorder'
@@ -23,6 +24,7 @@ interface ItemTileProps {
   onAddToPantry: (item: ShoppingItem) => void
   onToggleFavorite: (id: string) => void
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
+  onProduceWeightChange?: (item: ShoppingItem, amount: string) => void
   dragHandleProps?: {
     onPointerDown: (e: React.PointerEvent, id: string) => void
     onPointerMove: (e: React.PointerEvent) => void
@@ -45,6 +47,7 @@ export function ItemTile({
   onAddToPantry,
   onToggleFavorite,
   onAdjustAmount,
+  onProduceWeightChange,
   dragHandleProps,
   isDragging = false,
   dragFixedPos = null,
@@ -57,7 +60,8 @@ export function ItemTile({
   const iconKey = getIconKey(item.name, item.category)
   const colors = getCategoryTileColor(category, item.done)
   const parsedAmount = parseAmount(item.amount)
-  const showStepper = parsedAmount && !item.done
+  const showProduceWeight = !item.done && shouldUseExactProduceWeight(item.category, item.amount)
+  const showStepper = parsedAmount && !item.done && !showProduceWeight
 
   function handleToggle() {
     if (item.done) {
@@ -187,6 +191,7 @@ export function ItemTile({
           item={item}
           showStepper={!!showStepper}
           onAdjustAmount={onAdjustAmount}
+          onProduceWeightChange={onProduceWeightChange}
           variant="tile"
           accentColor={colors.fg}
         />

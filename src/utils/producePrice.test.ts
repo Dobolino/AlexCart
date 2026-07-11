@@ -5,6 +5,7 @@ import {
   parseGramsInput,
   pricePerKgFromTotal,
   resolveProduceCheckoffPrice,
+  shouldUseExactProduceWeight,
   weightGramsFromAmount,
 } from './producePrice'
 
@@ -32,5 +33,12 @@ describe('producePrice', () => {
     const resolved = resolveProduceCheckoffPrice(2.47, 347)
     expect(resolved.pricePerKg).toBeCloseTo(7.12, 1)
     expect(resolved.total).toBe(2.47)
+  })
+
+  it('nutzt exakte Gramm-Eingabe nur bei Gewichtsangaben', () => {
+    expect(shouldUseExactProduceWeight('Früchte & Gemüse', '')).toBe(true)
+    expect(shouldUseExactProduceWeight('Früchte & Gemüse', '347 g')).toBe(true)
+    expect(shouldUseExactProduceWeight('Früchte & Gemüse', '2 Stück')).toBe(false)
+    expect(shouldUseExactProduceWeight('Milch & Käse', '500 g')).toBe(false)
   })
 })
