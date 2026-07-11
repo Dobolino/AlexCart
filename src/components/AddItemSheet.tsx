@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
+import { BrandPicker } from './BrandPicker'
 import { ICON_PATHS } from '@/constants/icons'
 import { DEFAULT_UNIT, getDefaultUnit } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
@@ -32,6 +33,8 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
   const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
   const importRecipeToActiveList = useStore((s) => s.importRecipeToActiveList)
+  const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
+  const brands = useStore((s) => s.brands)
   const activeList = useStore((s) => s.activeList())
 
   const [mode, setMode] = useState<Mode>('search')
@@ -41,6 +44,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const [formMode, setFormMode] = useState<FormMode>('new')
   const [editingCustomId, setEditingCustomId] = useState<string | null>(null)
   const [form, setForm] = useState<ProductFormValues>(EMPTY_FORM)
+  const [selectedBrandId, setSelectedBrandId] = useState('')
 
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
@@ -68,6 +72,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
     })
     setFormMode(result.isCustom ? 'confirm-custom' : 'confirm-builtin')
     setEditingCustomId(result.customId ?? null)
+    setSelectedBrandId('')
     setMode('form')
   }
 
@@ -76,6 +81,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
     setForm({ ...EMPTY_FORM, name: query, unit: getDefaultUnit(getIconKey(query, category)) })
     setFormMode('new')
     setEditingCustomId(null)
+    setSelectedBrandId('')
     setMode('form')
   }
 
@@ -94,10 +100,12 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       })
     }
 
-    addItemToActiveList({ name: form.name, amount, category: form.category, note: form.note })
+    const variantId = selectedBrandId ? ensureBrandVariant(form.name, form.category, selectedBrandId) : undefined
+    addItemToActiveList({ name: form.name, amount, category: form.category, note: form.note, variantId })
     setAddedCount((c) => c + 1)
     setQuery('')
     setForm(EMPTY_FORM)
+    setSelectedBrandId('')
     setMode('search')
   }
 
@@ -232,8 +240,15 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
       {mode === 'form' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <h2 className="mb-3 text-lg font-bold">{formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}</h2>
-          <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
-          <div className="mt-4 flex gap-2.5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
+            {brands.length > 0 && (
+              <div className="mt-3">
+                <BrandPicker brands={brands} value={selectedBrandId} onChange={setSelectedBrandId} />
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex shrink-0 gap-2.5">
             <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setMode('search')}>
               Zurück
             </button>

@@ -1,5 +1,5 @@
 import { normalize } from './text'
-import type { PurchaseLogEntry } from '@/types'
+import type { CompletedTrip, PurchaseLogEntry } from '@/types'
 
 export interface CountEntry {
   label: string
@@ -102,4 +102,35 @@ export function maxTripSpend(log: PurchaseLogEntry[]): number {
   const byDay = spendByDay(log)
   if (!byDay.size) return 0
   return Math.max(...byDay.values())
+}
+
+/** Ø Ausgaben pro vollständig abgeschlossener Einkaufsliste (nicht pro Einzelartikel). */
+export function avgSpendPerCompletedTrip(trips: CompletedTrip[]): number {
+  if (!trips.length) return 0
+  return trips.reduce((sum, t) => sum + t.totalSpent, 0) / trips.length
+}
+
+/** Ø Artikelanzahl pro vollständig abgeschlossener Einkaufsliste. */
+export function avgItemsPerCompletedTrip(trips: CompletedTrip[]): number {
+  if (!trips.length) return 0
+  return trips.reduce((sum, t) => sum + t.itemCount, 0) / trips.length
+}
+
+/** Anzahl abgeschlossener Einkaufslisten pro Woche, für die letzten `weeks` Wochen (älteste zuerst). */
+export function completedTripsPerWeek(trips: CompletedTrip[], weeks = 8): WeekBucket[] {
+  const buckets = new Map<string, number>()
+  for (const trip of trips) {
+    const key = isoWeekStart(new Date(trip.completedAt).toLocaleDateString('sv-SE'))
+    buckets.set(key, (buckets.get(key) || 0) + 1)
+  }
+
+  const result: WeekBucket[] = []
+  const now = new Date()
+  for (let i = weeks - 1; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i * 7)
+    const weekStart = isoWeekStart(d.toLocaleDateString('sv-SE'))
+    result.push({ weekStart, count: buckets.get(weekStart) || 0 })
+  }
+  return result
 }

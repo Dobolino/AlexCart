@@ -199,6 +199,43 @@ export function upsertPriceProfile(profiles: ProductPriceProfile[], updated: Pro
   return next
 }
 
+export interface EnsuredBrandVariant {
+  profiles: ProductPriceProfile[]
+  variantId: string
+}
+
+/** Findet oder legt eine markengebundene Variante an, ohne Kaufhistorie zu verändern -
+ *  für "Marke direkt beim Anlegen/Bearbeiten eines Artikels wählen", unabhängig vom
+ *  Preis-Checkoff-Flow (der Varianten automatisch erst beim Abhaken anlegt). */
+export function ensureBrandVariant(
+  profiles: ProductPriceProfile[],
+  itemName: string,
+  category: string,
+  brandId: string,
+  brandName: string,
+  createId: () => string
+): EnsuredBrandVariant {
+  const now = Date.now()
+  let profile = findPriceProfile(profiles, itemName, category)
+  let nextProfiles = profiles
+
+  if (!profile) {
+    profile = createPriceProfile(itemName, category, createId(), now)
+    nextProfiles = [...nextProfiles, profile]
+  }
+
+  const existing = profile.variants.find((v) => v.brandId === brandId)
+  if (existing) return { profiles: nextProfiles, variantId: existing.id }
+
+  const variant: ProductVariant = { ...createEmptyVariant(brandName, createId()), brandId }
+  const updatedProfile: ProductPriceProfile = {
+    ...profile,
+    variants: [...profile.variants, variant],
+    updatedAt: now,
+  }
+  return { profiles: upsertPriceProfile(nextProfiles, updatedProfile), variantId: variant.id }
+}
+
 /** Schätzpreis für eine Variante: letzter Normalpreis → Durchschnitt → nichts. */
 export function estimateVariantPrice(variant: ProductVariant): number | null {
   if (variant.lastPrice !== undefined && variant.lastPrice > 0) return variant.lastPrice

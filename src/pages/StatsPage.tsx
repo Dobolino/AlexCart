@@ -1,5 +1,18 @@
 import { useStore } from '@/store/useStore'
-import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek, totalSpent, avgSpendPerTrip, maxTripSpend, pricedPurchaseCount } from '@/utils/stats'
+import {
+  topItems,
+  categoryBreakdown,
+  avgItemsPerTrip,
+  distinctShoppingDays,
+  productsPerWeek,
+  totalSpent,
+  avgSpendPerTrip,
+  maxTripSpend,
+  pricedPurchaseCount,
+  avgSpendPerCompletedTrip,
+  avgItemsPerCompletedTrip,
+  completedTripsPerWeek,
+} from '@/utils/stats'
 import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
@@ -19,6 +32,7 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
 
 export function StatsPage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const completedTrips = useStore((s) => s.completedTrips)
   const stats = useStore((s) => s.stats)
   const lists = useStore((s) => s.lists)
   const currency = useStore((s) => s.settings.currency)
@@ -35,6 +49,9 @@ export function StatsPage() {
   const priceHistory = productPriceHistory(purchaseLog)
   const spendWeeks = spendPerWeek(purchaseLog, 8)
   const maxSpendWeek = Math.max(0.01, ...spendWeeks.map((w) => w.amount))
+  const hasCompletedTrips = completedTrips.length > 0
+  const tripWeeks = completedTripsPerWeek(completedTrips, 8)
+  const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
 
   return (
     <>
@@ -53,6 +70,39 @@ export function StatsPage() {
           <StatTile value={stats.importsCount} label="Importierte Listen" />
           <StatTile value={stats.manualProductsCreated} label="Eigene Produkte" />
         </div>
+
+        {hasCompletedTrips && (
+          <div className="mb-4.5 grid grid-cols-3 gap-2.5">
+            <StatTile value={completedTrips.length} label="Abgeschlossene Einkäufe" />
+            <StatTile value={avgItemsPerCompletedTrip(completedTrips).toFixed(1)} label="Ø Artikel/Liste" />
+            <StatTile value={formatMoney(avgSpendPerCompletedTrip(completedTrips), currency)} label="Ø Wert/Liste" />
+          </div>
+        )}
+
+        {hasCompletedTrips && (
+          <>
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Abgeschlossene Einkäufe pro Woche
+            </div>
+            <div className="card-surface mb-4.5 flex items-end gap-1.5 px-4 py-4" style={{ height: 100 }}>
+              {tripWeeks.map((w) => (
+                <div key={w.weekStart} className="flex flex-1 flex-col items-center justify-end gap-1">
+                  <div
+                    className="w-full rounded-t-md"
+                    style={{
+                      height: `${Math.max(4, (w.count / maxTripWeekCount) * 64)}px`,
+                      background: 'var(--accent)',
+                      opacity: w.count ? 1 : 0.25,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {hasPriceData && (
           <div className="mb-4.5 grid grid-cols-3 gap-2.5">

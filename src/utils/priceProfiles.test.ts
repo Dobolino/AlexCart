@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyPurchaseToVariant,
   buildProfilesFromPurchaseLog,
+  ensureBrandVariant,
   estimateItemPrice,
   estimateOpenListCost,
   estimateVariantPrice,
@@ -111,5 +112,28 @@ describe('priceProfiles', () => {
     )
     const profile = findPriceProfile(profiles, 'Milch', 'Milch & Käse')
     expect(profile?.variants.length).toBe(2)
+  })
+
+  it('ensureBrandVariant legt Profil+Variante ohne Kaufhistorie an', () => {
+    let n = 0
+    const createId = () => `id-${++n}`
+    const { profiles, variantId } = ensureBrandVariant([], 'Milch', 'Milch & Käse', 'brand-1', 'Migros', createId)
+    const profile = findPriceProfile(profiles, 'Milch', 'Milch & Käse')
+    expect(profile?.variants).toHaveLength(1)
+    const variant = profile?.variants[0]
+    expect(variant?.id).toBe(variantId)
+    expect(variant?.brandId).toBe('brand-1')
+    expect(variant?.name).toBe('Migros')
+    expect(variant?.purchaseCount).toBe(0)
+  })
+
+  it('ensureBrandVariant gibt bestehende Marken-Variante zurück statt Duplikat', () => {
+    let n = 0
+    const createId = () => `id-${++n}`
+    const first = ensureBrandVariant([], 'Milch', 'Milch & Käse', 'brand-1', 'Migros', createId)
+    const second = ensureBrandVariant(first.profiles, 'Milch', 'Milch & Käse', 'brand-1', 'Migros', createId)
+    const profile = findPriceProfile(second.profiles, 'Milch', 'Milch & Käse')
+    expect(profile?.variants).toHaveLength(1)
+    expect(second.variantId).toBe(first.variantId)
   })
 })

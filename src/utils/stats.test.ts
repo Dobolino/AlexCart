@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { topItems, categoryBreakdown, avgItemsPerTrip, distinctShoppingDays, productsPerWeek, totalSpent, avgSpendPerTrip, maxTripSpend, pricedPurchaseCount } from './stats'
+import {
+  topItems,
+  categoryBreakdown,
+  avgItemsPerTrip,
+  distinctShoppingDays,
+  productsPerWeek,
+  totalSpent,
+  avgSpendPerTrip,
+  maxTripSpend,
+  pricedPurchaseCount,
+  avgSpendPerCompletedTrip,
+  avgItemsPerCompletedTrip,
+  completedTripsPerWeek,
+} from './stats'
+import type { CompletedTrip } from '@/types'
 
 const log = [
   { name: 'Tomaten', category: 'Früchte & Gemüse', date: '2026-07-01' },
@@ -69,5 +83,32 @@ describe('spend stats', () => {
     expect(avgSpendPerTrip(pricedLog)).toBeCloseTo(6.75)
     expect(maxTripSpend(pricedLog)).toBeCloseTo(6.8)
     expect(pricedPurchaseCount(pricedLog)).toBe(3)
+  })
+})
+
+describe('completed trip stats', () => {
+  const trips: CompletedTrip[] = [
+    { id: '1', listId: 'l1', listName: 'Wocheneinkauf', completedAt: Date.parse('2026-07-01'), itemCount: 10, totalSpent: 40 },
+    { id: '2', listId: 'l1', listName: 'Wocheneinkauf', completedAt: Date.parse('2026-07-08'), itemCount: 6, totalSpent: 20 },
+  ]
+
+  it('averages spend and item count per completed trip', () => {
+    expect(avgSpendPerCompletedTrip(trips)).toBeCloseTo(30)
+    expect(avgItemsPerCompletedTrip(trips)).toBeCloseTo(8)
+  })
+
+  it('returns 0 for an empty list', () => {
+    expect(avgSpendPerCompletedTrip([])).toBe(0)
+    expect(avgItemsPerCompletedTrip([])).toBe(0)
+  })
+
+  it('buckets completed trips per week', () => {
+    const today = new Date().toLocaleDateString('sv-SE')
+    const sameWeekTrips: CompletedTrip[] = [
+      { id: '1', listId: 'l1', listName: 'A', completedAt: Date.parse(today), itemCount: 3, totalSpent: 10 },
+      { id: '2', listId: 'l1', listName: 'A', completedAt: Date.parse(today), itemCount: 2, totalSpent: 5 },
+    ]
+    const result = completedTripsPerWeek(sameWeekTrips, 1)
+    expect(result[0].count).toBe(2)
   })
 })

@@ -10,7 +10,7 @@ import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
 import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList, syncPurchaseLogForItemRename } from '@/utils/purchaseLog'
-import { buildProfilesFromPurchaseLog } from '@/utils/priceProfiles'
+import { buildProfilesFromPurchaseLog, ensureBrandVariant } from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
@@ -20,6 +20,7 @@ import type {
   AppStats,
   CalculatorEntry,
   CheckoffPriceData,
+  CompletedTrip,
   CustomProduct,
   GlobalBrand,
   ListViewMode,
@@ -33,7 +34,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 12
+const STORE_VERSION = 13
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -161,6 +162,8 @@ interface AppState {
   purchaseLog: PurchaseLogEntry[]
   priceProfiles: ProductPriceProfile[]
   brands: GlobalBrand[]
+  /** Ein Eintrag pro vollständig abgeschlossener Einkaufsliste (Statistik pro Liste, nicht pro Artikel). */
+  completedTrips: CompletedTrip[]
   stats: AppStats
   filtered: FilteredEntry[]
   settings: AppSettings
@@ -182,7 +185,7 @@ interface AppState {
     text: string,
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
-  addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string }) => void
+  addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string; variantId?: string }) => void
   updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note' | 'variantId'>>) => void
   toggleItemDone: (itemId: string, priceOrData?: number | CheckoffPriceData) => void
   updatePurchaseLogPrice: (item: ShoppingItem, priceOrData: number | CheckoffPriceData) => void
@@ -211,6 +214,9 @@ interface AppState {
 
   addBrand: (name: string) => void
   addHouseBrandPresets: (names?: string[]) => void
+  /** Findet/legt eine markengebundene Variante für ein Produkt an (ohne Kaufhistorie) - für
+   *  die Markenauswahl beim Anlegen/Bearbeiten eines Artikels. Gibt die variantId zurück. */
+  ensureBrandVariant: (itemName: string, category: string, brandId: string) => string
   updateBrand: (id: string, name: string) => void
   removeBrand: (id: string) => void
   updatePriceProfileVariant: (
@@ -236,6 +242,9 @@ interface AppState {
   ensureCalculatorDay: () => void
 
   resetStats: () => void
+
+  /** Loggt einen vollständig abgeschlossenen Einkauf – siehe ShoppingModePage.handleFinishShopping. */
+  logCompletedTrip: (entry: { listId: string; listName: string; itemCount: number; totalSpent: number }) => void
 }
 
 export const useStore = create<AppState>()(
@@ -248,6 +257,7 @@ export const useStore = create<AppState>()(
       purchaseLog: [],
       priceProfiles: [],
       brands: [],
+      completedTrips: [],
       stats: defaultStats(),
       filtered: [],
       settings: defaultSettings(),
@@ -347,6 +357,7 @@ export const useStore = create<AppState>()(
           amount: item.amount.trim(),
           category: normalizeCategory(item.category),
           note: item.note?.trim() || undefined,
+          variantId: item.variantId || undefined,
           done: false,
           favorite: false,
           addedAt: Date.now(),
@@ -641,6 +652,13 @@ export const useStore = create<AppState>()(
         set((state) => ({
           brands: mergeHouseBrandPresets(state.brands, uid, names),
         })),
+      ensureBrandVariant: (itemName, category, brandId) => {
+        const brand = get().brands.find((b) => b.id === brandId)
+        if (!itemName.trim() || !brand) return ''
+        const result = ensureBrandVariant(get().priceProfiles, itemName, category, brandId, brand.name, uid)
+        set({ priceProfiles: result.profiles })
+        return result.variantId
+      },
       updateBrand: (id, name) => {
         const trimmed = name.trim()
         if (!trimmed) return
@@ -703,6 +721,7 @@ export const useStore = create<AppState>()(
             purchaseLog: [],
             priceProfiles: [],
             brands: [],
+            completedTrips: [],
             stats: defaultStats(),
             filtered: [],
             settings: defaultSettings(),
@@ -761,7 +780,29 @@ export const useStore = create<AppState>()(
         })),
 
       resetStats: () =>
-        set({ purchaseLog: [], stats: defaultStats(), calculatorExcludedPurchaseIds: [] }),
+        set({
+          purchaseLog: [],
+          stats: defaultStats(),
+          calculatorExcludedPurchaseIds: [],
+          completedTrips: [],
+        }),
+
+      logCompletedTrip: (entry) => {
+        if (entry.itemCount <= 0) return
+        set((state) => ({
+          completedTrips: [
+            ...state.completedTrips,
+            {
+              id: uid(),
+              listId: entry.listId,
+              listName: entry.listName,
+              completedAt: Date.now(),
+              itemCount: entry.itemCount,
+              totalSpent: Math.round(entry.totalSpent * 100) / 100,
+            },
+          ],
+        }))
+      },
     }),
     {
       name: STORE_NAME,
@@ -832,6 +873,9 @@ export const useStore = create<AppState>()(
           if (version < 12) {
             state.brands = mergeHouseBrandPresets(state.brands ?? [], uid)
           }
+          if (version < 13) {
+            state.completedTrips = state.completedTrips ?? []
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)
@@ -846,6 +890,7 @@ export const useStore = create<AppState>()(
         purchaseLog: state.purchaseLog,
         priceProfiles: state.priceProfiles,
         brands: state.brands,
+        completedTrips: state.completedTrips,
         stats: state.stats,
         filtered: state.filtered,
         settings: state.settings,
@@ -873,6 +918,7 @@ export const useStore = create<AppState>()(
               purchaseLog: ensurePurchaseLogIds(persisted.purchaseLog ?? []),
               priceProfiles: persisted.priceProfiles ?? [],
               brands: persisted.brands ?? [],
+              completedTrips: persisted.completedTrips ?? [],
               calculatorExcludedPurchaseIds: persisted.calculatorExcludedPurchaseIds ?? [],
             }
           }

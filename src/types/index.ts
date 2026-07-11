@@ -158,3 +158,13 @@ export interface AppStats {
   manualProductsCreated: number
   itemsAddedTotal: number
 }
+
+/** Snapshot eines vollständig abgeschlossenen Einkaufs (nicht pro Artikel, sondern pro Liste). */
+export interface CompletedTrip {
+  id: string
+  listId: string
+  listName: string
+  completedAt: number
+  itemCount: number
+  totalSpent: number
+}

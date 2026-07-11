@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { ProductForm, type ProductFormValues } from './ProductForm'
+import { BrandPicker } from './BrandPicker'
 import { getDefaultUnit } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
 import { findPriceProfile } from '@/utils/priceProfiles'
@@ -16,7 +17,9 @@ interface EditItemSheetProps {
 /** Bearbeitet einen bestehenden Artikel der aktiven Einkaufsliste (nicht das Produkt selbst). */
 export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
   const updateItemInActiveList = useStore((s) => s.updateItemInActiveList)
+  const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
   const priceProfiles = useStore((s) => s.priceProfiles)
+  const brands = useStore((s) => s.brands)
   const parsed = parseAmount(item.amount)
   const profile = findPriceProfile(priceProfiles, item.name, item.category)
 
@@ -28,6 +31,14 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
     note: item.note || '',
   })
   const [variantId, setVariantId] = useState(item.variantId || '')
+  const [selectedBrandId, setSelectedBrandId] = useState(
+    profile?.variants.find((v) => v.id === item.variantId)?.brandId || ''
+  )
+
+  function handleBrandChange(brandId: string) {
+    setSelectedBrandId(brandId)
+    setVariantId(brandId ? ensureBrandVariant(form.name, form.category, brandId) : '')
+  }
 
   function handleSave() {
     if (!form.name.trim()) return
@@ -46,6 +57,12 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
       <h2 className="mb-3 text-lg font-bold">Artikel bearbeiten</h2>
       <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
 
+      {brands.length > 0 && (
+        <div className="mt-3">
+          <BrandPicker brands={brands} value={selectedBrandId} onChange={handleBrandChange} />
+        </div>
+      )}
+
       {profile && profile.variants.length > 0 && (
         <div className="mt-3">
           <label className="mb-1.5 block px-0.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
@@ -54,7 +71,11 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
           <select
             className="input w-full py-3 text-[15px]"
             value={variantId}
-            onChange={(e) => setVariantId(e.target.value)}
+            onChange={(e) => {
+              const nextId = e.target.value
+              setVariantId(nextId)
+              setSelectedBrandId(profile.variants.find((v) => v.id === nextId)?.brandId || '')
+            }}
           >
             <option value="">Automatisch (zuletzt gekauft)</option>
             {profile.variants.map((v) => (

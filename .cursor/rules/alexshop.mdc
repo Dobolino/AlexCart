@@ -10,12 +10,12 @@ Deutsche Einkaufslisten-PWA (React + TypeScript + Vite + Zustand). UI-Texte imme
 
 ## Architektur
 
-- **Store:** `src/store/useStore.ts`, persistiert als `alexshop-store` (localStorage), `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration
+- **Store:** `src/store/useStore.ts`, persistiert als `alexshop-store` (localStorage), `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration im selben `migrate()`-Switch ergänzen (nie eine alte Stufe umschreiben)
 - **Preise:** `priceProfiles` (Varianten pro Produkt), `purchaseLog` (Statistik/Budget), `purchaseCommit.ts` beim Abhaken
-- **Varianten:** Marke/Grösse pro Produkt; globale Marken in `brands[]` (Store v11); Dosen-Schnellwahl `400 ml` / `800 ml`
-- **Obst/Gemüse:** exakte Gramm-Eingabe (abgewogen) → Kilopreis (`ProduceWeightInput`, `producePrice.ts`)
+- **Varianten:** Marke/Grösse pro Produkt; globale Marken in `brands[]`, inkl. Hausmarken-Presets (`constants/houseBrands.ts`) – Hausmarken sind normale Einträge in `brands[]`, kein Sonderfall. Marke direkt beim Anlegen/Bearbeiten eines Artikels wählbar über `<BrandPicker>` + Store-Action `ensureBrandVariant` (legt bei Bedarf eine Variante ohne Kaufhistorie an, `src/utils/priceProfiles.ts`); Dosen-Schnellwahl `400 ml` / `800 ml`
+- **Obst/Gemüse:** exakte Gramm-Eingabe (abgewogen) → Kilopreis (`ProduceWeightInput`, `producePrice.ts`); in der Liste nur geplante Menge, im Einkaufsmodus erst beim Abhaken das tatsächliche Gewicht (`shouldUseExactProduceWeight`)
 - **Einstellungen:** Tab „Preise & Marken“ für Marken und Preisprofile
-- **Einkaufsmodus:** Löschen per Papierkorb, Rückgängig-Toast
+- **Einkaufsmodus:** Löschen per Papierkorb, Rückgängig-Toast; beim vollständigen Abschluss (`handleFinishShopping`, nur vom "Einkauf abgeschlossen!"-Screen erreichbar) wird ein `CompletedTrip`-Eintrag geloggt (`completedTrips[]`) – Grundlage für Statistik pro Einkaufsliste, nicht nur pro Einzelartikel
 - **Preis-Sheet:** `CheckoffPriceSheet.tsx` – Stückpreis × Menge, `highlightOptions` im Einkaufsmodus (orange Segmente)
 
 ## UX-Konventionen
@@ -25,6 +25,13 @@ Deutsche Einkaufslisten-PWA (React + TypeScript + Vite + Zustand). UI-Texte imme
 - Dosen (Icon `dose`, Konserven): Grössen-Chips **400 ml**, **800 ml** im Preis-Sheet
 - Mengen: `adjustAmount` / `ItemAmountColumn`; Stückpreis via `priceQuantityFromAmount` + `resolveCheckoffTotalPrice`
 - Kein echter Dateipfad – Speicherort in Einstellungen als localStorage-Pfad anzeigen
+
+## Präzision
+
+- Keine vagen Angaben in Code, gespeicherten Daten oder Texten – kein "1–2", "ca.", "ungefähr", "ein paar" o.ä.
+- Fehlt eine konkrete Angabe (Menge, Preis, Datum, Name): entweder gezielt nachfragen, oder einen eindeutigen, dokumentierten Standardwert verwenden – nie raten oder einen Bereich/eine Näherung eintragen
+- Beispiel für das gewünschte Muster: `getDefaultUnit`/`DEFAULT_UNIT` (`src/constants/units.ts`) liefert im Zweifel einen einzigen präzisen Default statt einer Bandbreite
+- Gilt auch für Commit-/PR-Texte und UI-Copy: konkrete Zahlen statt Näherungen, wenn die Zahl bekannt ist
 
 ## Qualität
 
@@ -42,3 +49,6 @@ Deutsche Einkaufslisten-PWA (React + TypeScript + Vite + Zustand). UI-Texte imme
 | Mengen/Preis | `src/utils/amount.ts` |
 | Einkaufsmodus | `src/pages/ShoppingModePage.tsx` |
 | Preis-Eingabe | `src/components/CheckoffPriceSheet.tsx` |
+| Hausmarken | `src/constants/houseBrands.ts`, `src/utils/houseBrands.ts` |
+| Marke am Artikel | `src/components/BrandPicker.tsx` |
+| Statistik | `src/utils/stats.ts`, `src/pages/StatsPage.tsx` |

@@ -72,7 +72,7 @@ export function commitItemPurchase(
     ? [...priceProfiles, purchase.profile]
     : upsertPriceProfile(priceProfiles, purchase.profile)
 
-  let purchaseLog = [...state.purchaseLog]
+  const purchaseLog = [...state.purchaseLog]
   const logIdx = findTodayLogIndex(purchaseLog, item, today)
   const entry: PurchaseLogEntry = {
     id: logIdx >= 0 ? purchaseLog[logIdx]!.id || uid() : uid(),

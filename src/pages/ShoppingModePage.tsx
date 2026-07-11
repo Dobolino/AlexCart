@@ -34,6 +34,7 @@ export function ShoppingModePage() {
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
   const resetCalculatorSession = useStore((s) => s.resetCalculatorSession)
+  const logCompletedTrip = useStore((s) => s.logCompletedTrip)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const currency = useStore((s) => s.settings.currency)
@@ -119,6 +120,9 @@ export function ShoppingModePage() {
   }
 
   function handleFinishShopping() {
+    if (list && doneCount > 0) {
+      logCompletedTrip({ listId: list.id, listName: list.name, itemCount: doneCount, totalSpent: tripTotal })
+    }
     if (tripTotal > 0 || calculatorEntries.length > 0) {
       resetCalculatorSession()
     }
