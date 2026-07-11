@@ -12,6 +12,7 @@ import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
+import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
 import { AmountBadge } from '@/components/AmountBadge'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
@@ -31,6 +32,7 @@ export function ShoppingModePage() {
   const currency = useStore((s) => s.settings.currency)
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const wakeLockActive = useWakeLock(true)
@@ -216,6 +218,14 @@ export function ShoppingModePage() {
               {showTripTotal ? ` Summe: ${formatMoney(tripTotal, currency)}.` : ''}
             </p>
             <div className="flex w-full max-w-xs flex-col gap-2.5">
+              <button
+                type="button"
+                className="tap-scale text-[13px] font-semibold"
+                style={{ color: 'var(--text-muted)' }}
+                onClick={() => setAddOpen(true)}
+              >
+                Noch etwas hinzufügen
+              </button>
               {showTripTotal && (
                 <button
                   className="w-full rounded-2xl py-3.5 text-[15px] font-bold"
@@ -270,18 +280,37 @@ export function ShoppingModePage() {
         )}
       </main>
 
-      {openItems.length > 0 && !lastChecked && (
+      {openItems.length > 0 && (
         <FloatingPortal>
           <div
-            className="glass fixed left-1/2 z-20 -translate-x-1/2 rounded-full px-4 py-2 text-[12px] font-semibold"
+            className="glass fixed left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full py-1.5 pl-4 pr-1"
             style={{
-              color: 'var(--text-muted)',
               bottom: 'calc(12px + var(--safe-bottom))',
             }}
           >
-            Tippen zum Abhaken
+            {!lastChecked && (
+              <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Tippen zum Abhaken
+              </span>
+            )}
+            <button
+              type="button"
+              className="tap-scale flex h-8 w-8 flex-none items-center justify-center rounded-full"
+              style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
+              onClick={() => setAddOpen(true)}
+              aria-label="Extra-Artikel hinzufügen"
+            >
+              <Icon path={ICON_PATHS.plus} size={16} />
+            </button>
           </div>
         </FloatingPortal>
+      )}
+
+      {addOpen && (
+        <ShoppingQuickAddSheet
+          onClose={() => setAddOpen(false)}
+          onAdded={() => hapticSuccess()}
+        />
       )}
 
       {priceSheetItem && (
