@@ -100,10 +100,11 @@ export function removeTodayPurchaseLogEntry(
 /** Entfernt heutige Kauf-Einträge für mehrere abgehakte Artikel. */
 export function removeTodayPurchaseLogEntriesForItems(
   purchaseLog: PurchaseLogEntry[],
-  items: { name: string; category: string; done: boolean }[]
+  items: { name: string; category: string; done: boolean }[],
+  today: string = todayKey()
 ): PurchaseLogEntry[] {
   return items.reduce(
-    (log, item) => (item.done ? removeTodayPurchaseLogEntry(log, item.name, item.category) : log),
+    (log, item) => (item.done ? removeTodayPurchaseLogEntry(log, item.name, item.category, today) : log),
     purchaseLog
   )
 }

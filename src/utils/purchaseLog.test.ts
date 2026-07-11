@@ -8,9 +8,11 @@ import {
   todayPricedTotalForList,
 } from './purchaseLog'
 
+const today = '2026-07-09'
+
 const log = [
-  { id: 'a', name: 'Milch', category: 'Milch & Käse', date: '2026-07-09', price: 2.5 },
-  { id: 'b', name: 'Brot', category: 'Brot & Backwaren', date: '2026-07-09', price: 3.2 },
+  { id: 'a', name: 'Milch', category: 'Milch & Käse', date: today, price: 2.5 },
+  { id: 'b', name: 'Brot', category: 'Brot & Backwaren', date: today, price: 3.2 },
   { id: 'c', name: 'Äpfel', category: 'Obst & Gemüse', date: '2026-07-08', price: 4.0 },
 ]
 
@@ -22,10 +24,14 @@ describe('purchaseLog', () => {
   })
 
   it('removeTodayPurchaseLogEntriesForItems ignoriert offene Artikel', () => {
-    const next = removeTodayPurchaseLogEntriesForItems(log, [
-      { name: 'Milch', category: 'Milch & Käse', done: true },
-      { name: 'Brot', category: 'Brot & Backwaren', done: false },
-    ])
+    const next = removeTodayPurchaseLogEntriesForItems(
+      log,
+      [
+        { name: 'Milch', category: 'Milch & Käse', done: true },
+        { name: 'Brot', category: 'Brot & Backwaren', done: false },
+      ],
+      today
+    )
     expect(next).toHaveLength(2)
     expect(next[0]?.name).toBe('Brot')
   })
