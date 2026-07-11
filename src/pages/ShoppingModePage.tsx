@@ -8,6 +8,7 @@ import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
+import { isProduceCategory, adjustProduceGrams } from '@/utils/producePrice'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
@@ -23,6 +24,9 @@ export function ShoppingModePage() {
   const list = useStore((s) => s.activeList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const updateItemInActiveList = useStore((s) => s.updateItemInActiveList)
+  const deleteItem = useStore((s) => s.deleteItem)
+  const restoreItem = useStore((s) => s.restoreItem)
+  const brands = useStore((s) => s.brands)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const priceProfiles = useStore((s) => s.priceProfiles)
   const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
@@ -35,7 +39,9 @@ export function ShoppingModePage() {
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [deletedItem, setDeletedItem] = useState<ShoppingItem | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const wakeLockActive = useWakeLock(true)
 
@@ -119,11 +125,33 @@ export function ShoppingModePage() {
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
+    if (isProduceCategory(item.category)) {
+      if (!item.amount.trim() && direction > 0) {
+        updateItemInActiveList(item.id, { amount: '500 g' })
+        return
+      }
+      updateItemInActiveList(item.id, { amount: adjustProduceGrams(item.amount, direction) })
+      return
+    }
     if (!item.amount.trim() && direction > 0) {
       updateItemInActiveList(item.id, { amount: '1 Stk' })
       return
     }
     updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
+  }
+
+  function handleDelete(item: ShoppingItem) {
+    deleteItem(item.id)
+    setDeletedItem(item)
+    if (deleteTimer.current) clearTimeout(deleteTimer.current)
+    deleteTimer.current = setTimeout(() => setDeletedItem(null), 4000)
+  }
+
+  function handleRestoreDeleted() {
+    if (!deletedItem) return
+    restoreItem(deletedItem)
+    setDeletedItem(null)
+    if (deleteTimer.current) clearTimeout(deleteTimer.current)
   }
 
   return (
@@ -292,6 +320,15 @@ export function ShoppingModePage() {
                       showStepper
                       onAdjustAmount={handleAdjustAmount}
                     />
+                    <button
+                      type="button"
+                      className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                      style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
+                      onClick={() => handleDelete(item)}
+                      aria-label={`${item.name} löschen`}
+                    >
+                      <Icon path={ICON_PATHS.trash} size={16} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -326,6 +363,28 @@ export function ShoppingModePage() {
         </FloatingPortal>
       )}
 
+      {deletedItem && (
+        <FloatingPortal>
+          <div
+            className="glass fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-2.5 pl-4 pr-2 text-[13px] font-semibold"
+            style={{
+              color: 'var(--text)',
+              bottom: 'calc(72px + var(--safe-bottom))',
+            }}
+          >
+            <span className="min-w-0 truncate">„{deletedItem.name}" gelöscht</span>
+            <button
+              type="button"
+              className="tap-scale shrink-0 rounded-full px-3 py-1.5 text-[12px] font-bold"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+              onClick={handleRestoreDeleted}
+            >
+              Rückgängig
+            </button>
+          </div>
+        </FloatingPortal>
+      )}
+
       {addOpen && (
         <ShoppingQuickAddSheet
           onClose={() => setAddOpen(false)}
@@ -337,6 +396,7 @@ export function ShoppingModePage() {
         <CheckoffPriceSheet
           item={priceSheetItem}
           profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
+          brands={brands}
           currency={currency}
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}

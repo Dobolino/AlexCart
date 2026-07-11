@@ -8,14 +8,17 @@ import { centsToAmount } from '@/utils/numpadInput'
 import { adjustAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice, type CheckoffPriceMode } from '@/utils/amount'
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
+import { formatVariantLabel } from '@/utils/brands'
+import { isProduceCategory, adjustProduceGrams, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams } from '@/utils/producePrice'
 import { formatMoney } from '@/utils/currency'
-import type { CheckoffPriceData, Currency, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
+import type { CheckoffPriceData, Currency, GlobalBrand, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
 
 const NEW_VARIANT = '__new__'
 
 interface CheckoffPriceSheetProps {
   item: ShoppingItem
   profile: ProductPriceProfile | null
+  brands: GlobalBrand[]
   currency: Currency
   onClose: () => void
   onSave: (data: CheckoffPriceData) => void
@@ -35,6 +38,7 @@ function formatShortDate(date?: string): string {
 export function CheckoffPriceSheet({
   item,
   profile,
+  brands,
   currency,
   onClose,
   onSave,
@@ -46,11 +50,14 @@ export function CheckoffPriceSheet({
   const hasVariants = variants.length > 0
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
   const quantity = priceQuantityFromAmount(item.amount)
+  const isProduce = isProduceCategory(item.category)
+  const weightGrams = weightGramsFromAmount(item.amount) ?? (isProduce ? 500 : null)
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
   )
   const [variantName, setVariantName] = useState('')
+  const [brandId, setBrandId] = useState(initialVariant?.brandId || '')
   const [cents, setCents] = useState(0)
   const [wasSale, setWasSale] = useState(false)
   const [priceMode, setPriceMode] = useState<CheckoffPriceMode>(quantity > 1 ? 'unit' : 'total')
@@ -66,29 +73,42 @@ export function CheckoffPriceSheet({
 
   useEffect(() => {
     if (!selectedVariant) return
+    setBrandId(selectedVariant.brandId || '')
     if (wasSale) {
       if (selectedVariant.lastSalePrice && selectedVariant.lastSalePrice > 0) {
         setCents(amountToCents(selectedVariant.lastSalePrice))
       }
       return
     }
-    if (selectedVariant.lastPrice && selectedVariant.lastPrice > 0) {
-      setCents(amountToCents(selectedVariant.lastPrice))
+    const prefilled = isProduce
+      ? selectedVariant.pricePerKg ?? selectedVariant.lastPrice
+      : selectedVariant.lastPrice
+    if (prefilled && prefilled > 0) {
+      setCents(amountToCents(prefilled))
     }
-  }, [selectedVariant?.id, wasSale])
+  }, [selectedVariant?.id, wasSale, isProduce])
 
   useEffect(() => {
-    if (quantity > 1) setPriceMode('unit')
-  }, [quantity])
+    if (!isProduce && quantity > 1) setPriceMode('unit')
+  }, [quantity, isProduce])
 
   const enteredAmount = centsToAmount(cents) ?? 0
-  const resolved = useMemo(
-    () => (enteredAmount > 0 ? resolveCheckoffTotalPrice(enteredAmount, item.amount, priceMode) : null),
-    [enteredAmount, item.amount, priceMode]
-  )
+  const resolved = useMemo(() => {
+    if (enteredAmount <= 0) return null
+    if (isProduce && weightGrams) return resolveProduceCheckoffPrice(enteredAmount, weightGrams)
+    return resolveCheckoffTotalPrice(enteredAmount, item.amount, priceMode)
+  }, [enteredAmount, item.amount, priceMode, isProduce, weightGrams])
 
   function handleAdjustAmount(direction: 1 | -1) {
     if (!onAmountChange) return
+    if (isProduce) {
+      if (!item.amount.trim() && direction > 0) {
+        onAmountChange('500 g')
+        return
+      }
+      onAmountChange(adjustProduceGrams(item.amount, direction))
+      return
+    }
     if (!item.amount.trim() && direction > 0) {
       onAmountChange('1 Stk')
       return
@@ -115,19 +135,30 @@ export function CheckoffPriceSheet({
       return
     }
 
-    const { total, unitPrice } = resolveCheckoffTotalPrice(price, item.amount, priceMode)
-    const payload: CheckoffPriceData = {
-      price: total,
-      unitPrice: quantity > 1 || priceMode === 'unit' ? unitPrice : undefined,
-      wasSale,
+    let payload: CheckoffPriceData
+    if (isProduce) {
+      const grams = weightGramsFromAmount(item.amount) ?? 500
+      const produce = resolveProduceCheckoffPrice(price, grams)
+      payload = {
+        price: produce.total,
+        unitPrice: produce.unitPrice,
+        pricePerKg: produce.pricePerKg,
+        weightGrams: produce.weightGrams,
+        wasSale,
+        brandId: brandId || undefined,
+      }
+    } else {
+      const { total, unitPrice } = resolveCheckoffTotalPrice(price, item.amount, priceMode)
+      payload = {
+        price: total,
+        unitPrice: quantity > 1 || priceMode === 'unit' ? unitPrice : undefined,
+        wasSale,
+        brandId: brandId || undefined,
+      }
     }
 
     if (showNewVariantName) {
-      const name = variantName.trim()
-      if (!name) {
-        setError('Bitte einen Variantennamen eingeben.')
-        return
-      }
+      const name = variantName.trim() || 'Standard'
       onSave({ ...payload, variantName: name })
       return
     }
@@ -152,7 +183,7 @@ export function CheckoffPriceSheet({
           {onAmountChange && (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
               <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-                Menge
+                {isProduce ? 'Gewicht' : 'Menge'}
               </span>
               <ItemAmountColumn
                 item={item}
@@ -162,7 +193,13 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {quantity > 1 && (
+          {isProduce && weightGrams && (
+            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Gesamtpreis eingeben – wird in {formatWeightGrams(weightGrams)} auf Kilopreis umgerechnet
+            </p>
+          )}
+
+          {!isProduce && quantity > 1 && (
             <OptionSegment
               highlight={highlightOptions}
               options={[
@@ -174,12 +211,32 @@ export function CheckoffPriceSheet({
             />
           )}
 
-          {quantity > 1 && (
+          {!isProduce && quantity > 1 && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
               {priceMode === 'unit'
                 ? `Stückpreis eingeben – wird mit ${quantity} multipliziert`
                 : 'Gesamtpreis aller Packungen am Kassenbon'}
             </p>
+          )}
+
+          {brands.length > 0 && (
+            <div className="mb-2">
+              <label className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+                Marke
+              </label>
+              <select
+                className="input w-full py-2.5 text-[14px]"
+                value={brandId}
+                onChange={(e) => setBrandId(e.target.value)}
+              >
+                <option value="">Keine Marke</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
           {sizePresets.length > 0 && (
@@ -229,7 +286,7 @@ export function CheckoffPriceSheet({
               >
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name}
+                    {formatVariantLabel(v, brands)}
                   </option>
                 ))}
                 <option value={NEW_VARIANT}>+ Neue Variante</option>
@@ -274,9 +331,17 @@ export function CheckoffPriceSheet({
               style={{ background: 'var(--chip-bg)' }}
             >
               <div>
-                <div style={{ color: 'var(--text-muted)' }}>Zuletzt</div>
+                <div style={{ color: 'var(--text-muted)' }}>{isProduce ? 'CHF/kg' : 'Zuletzt'}</div>
                 <div className="font-bold tabular-nums">
-                  {selectedVariant.lastPrice ? formatMoney(selectedVariant.lastPrice, currency) : '–'}
+                  {isProduce
+                    ? selectedVariant.pricePerKg
+                      ? formatMoney(selectedVariant.pricePerKg, currency)
+                      : selectedVariant.lastPrice
+                        ? formatMoney(selectedVariant.lastPrice, currency)
+                        : '–'
+                    : selectedVariant.lastPrice
+                      ? formatMoney(selectedVariant.lastPrice, currency)
+                      : '–'}
                 </div>
               </div>
               <div>
@@ -302,9 +367,19 @@ export function CheckoffPriceSheet({
             }}
             currency={currency}
             dense
-            label={quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
+            label={isProduce ? 'Preis am Kassenbon' : quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
           />
-          {resolved && resolved.total > 0 && quantity > 1 && (
+          {isProduce && enteredAmount > 0 && weightGrams && (
+            <div
+              className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            >
+              {formatMoney(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg, currency)}/kg
+              {' · '}
+              {formatWeightGrams(weightGrams)}
+            </div>
+          )}
+          {resolved && resolved.total > 0 && !isProduce && quantity > 1 && (
             <div
               className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
               style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}

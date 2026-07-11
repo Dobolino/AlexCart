@@ -12,8 +12,10 @@ Deutsche Einkaufslisten-PWA (React + TypeScript + Vite + Zustand). UI-Texte imme
 
 - **Store:** `src/store/useStore.ts`, persistiert als `alexshop-store` (localStorage), `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration
 - **Preise:** `priceProfiles` (Varianten pro Produkt), `purchaseLog` (Statistik/Budget), `purchaseCommit.ts` beim Abhaken
-- **Varianten:** Marke/Grösse pro Produkt; Dosen-Schnellwahl `400 ml` / `800 ml` via `src/utils/variantPresets.ts`
-- **Einkaufsmodus:** Route `/shop`, `ShoppingModePage.tsx` – grosse Karten, Wake Lock, Extra-Hinzufügen, Mengen-Stepper
+- **Varianten:** Marke/Grösse pro Produkt; globale Marken in `brands[]` (Store v11); Dosen-Schnellwahl `400 ml` / `800 ml`
+- **Obst/Gemüse:** Gramm eingeben → Kilopreis (`producePrice.ts`, `variant.pricePerKg`)
+- **Einstellungen:** Tab „Preise & Marken“ für Marken und Preisprofile
+- **Einkaufsmodus:** Löschen per Papierkorb, Rückgängig-Toast
 - **Preis-Sheet:** `CheckoffPriceSheet.tsx` – Stückpreis × Menge, `highlightOptions` im Einkaufsmodus (orange Segmente)
 
 ## UX-Konventionen

@@ -20,9 +20,11 @@ import type {
   CalculatorEntry,
   CheckoffPriceData,
   CustomProduct,
+  GlobalBrand,
   ListViewMode,
   PantryItem,
   ProductPriceProfile,
+  ProductVariant,
   PurchaseLogEntry,
   ShoppingItem,
   ShoppingList,
@@ -30,7 +32,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 10
+const STORE_VERSION = 11
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -157,6 +159,7 @@ interface AppState {
   customProducts: CustomProduct[]
   purchaseLog: PurchaseLogEntry[]
   priceProfiles: ProductPriceProfile[]
+  brands: GlobalBrand[]
   stats: AppStats
   filtered: FilteredEntry[]
   settings: AppSettings
@@ -205,6 +208,15 @@ interface AppState {
   updateCustomProduct: (id: string, patch: Partial<Omit<CustomProduct, 'id' | 'createdAt'>>) => void
   removeCustomProduct: (id: string) => void
 
+  addBrand: (name: string) => void
+  updateBrand: (id: string, name: string) => void
+  removeBrand: (id: string) => void
+  updatePriceProfileVariant: (
+    profileId: string,
+    variantId: string,
+    patch: Partial<Pick<ProductVariant, 'name' | 'brandId' | 'lastPrice' | 'pricePerKg'>>
+  ) => void
+
   setTheme: (theme: Theme) => void
   setListViewMode: (mode: ListViewMode) => void
   setAskPriceOnCheckoff: (ask: boolean) => void
@@ -233,6 +245,7 @@ export const useStore = create<AppState>()(
       customProducts: [],
       purchaseLog: [],
       priceProfiles: [],
+      brands: [],
       stats: defaultStats(),
       filtered: [],
       settings: defaultSettings(),
@@ -614,6 +627,50 @@ export const useStore = create<AppState>()(
       removeCustomProduct: (id) =>
         set((state) => ({ customProducts: state.customProducts.filter((p) => p.id !== id) })),
 
+      addBrand: (name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return
+        set((state) => {
+          if (state.brands.some((b) => normalize(b.name) === normalize(trimmed))) return state
+          return { brands: [...state.brands, { id: uid(), name: trimmed, createdAt: Date.now() }] }
+        })
+      },
+      updateBrand: (id, name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return
+        set((state) => ({
+          brands: state.brands.map((b) => (b.id === id ? { ...b, name: trimmed } : b)),
+        }))
+      },
+      removeBrand: (id) =>
+        set((state) => ({
+          brands: state.brands.filter((b) => b.id !== id),
+          priceProfiles: state.priceProfiles.map((profile) => ({
+            ...profile,
+            variants: profile.variants.map((v) => (v.brandId === id ? { ...v, brandId: undefined } : v)),
+          })),
+        })),
+      updatePriceProfileVariant: (profileId, variantId, patch) =>
+        set((state) => ({
+          priceProfiles: state.priceProfiles.map((profile) => {
+            if (profile.id !== profileId) return profile
+            return {
+              ...profile,
+              updatedAt: Date.now(),
+              variants: profile.variants.map((v) => {
+                if (v.id !== variantId) return v
+                return {
+                  ...v,
+                  ...(patch.name !== undefined ? { name: patch.name.trim() || v.name } : {}),
+                  ...(patch.brandId !== undefined ? { brandId: patch.brandId || undefined } : {}),
+                  ...(patch.lastPrice !== undefined ? { lastPrice: patch.lastPrice > 0 ? patch.lastPrice : undefined } : {}),
+                  ...(patch.pricePerKg !== undefined ? { pricePerKg: patch.pricePerKg > 0 ? patch.pricePerKg : undefined } : {}),
+                }
+              }),
+            }
+          }),
+        })),
+
       setTheme: (theme) => set((state) => ({ settings: { ...state.settings, theme } })),
       setListViewMode: (listViewMode) => set((state) => ({ settings: { ...state.settings, listViewMode } })),
       setAskPriceOnCheckoff: (askPriceOnCheckoff) =>
@@ -639,6 +696,7 @@ export const useStore = create<AppState>()(
             customProducts: [],
             purchaseLog: [],
             priceProfiles: [],
+            brands: [],
             stats: defaultStats(),
             filtered: [],
             settings: defaultSettings(),
@@ -762,6 +820,9 @@ export const useStore = create<AppState>()(
               state.purchaseLog = backfillPurchaseLogItemIds(state.purchaseLog, state.lists)
             }
           }
+          if (version < 11) {
+            state.brands = state.brands ?? []
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)
@@ -775,6 +836,7 @@ export const useStore = create<AppState>()(
         customProducts: state.customProducts,
         purchaseLog: state.purchaseLog,
         priceProfiles: state.priceProfiles,
+        brands: state.brands,
         stats: state.stats,
         filtered: state.filtered,
         settings: state.settings,
@@ -801,6 +863,7 @@ export const useStore = create<AppState>()(
               calculatorDate: calc.date,
               purchaseLog: ensurePurchaseLogIds(persisted.purchaseLog ?? []),
               priceProfiles: persisted.priceProfiles ?? [],
+              brands: persisted.brands ?? [],
               calculatorExcludedPurchaseIds: persisted.calculatorExcludedPurchaseIds ?? [],
             }
           }

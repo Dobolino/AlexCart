@@ -11,7 +11,15 @@ import { getCategoryColor } from '@/utils/categoryColor'
 import { parseMoneyInput, currencySymbol } from '@/utils/currency'
 import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
 import { getStorageInfo } from '@/utils/storageInfo'
+import { PriceProfilesSettingsSection } from '@/components/PriceProfilesSettingsSection'
 import type { Currency, CustomProduct, Theme } from '@/types'
+
+type SettingsTab = 'general' | 'prices'
+
+const SETTINGS_TABS: { value: SettingsTab; label: string }[] = [
+  { value: 'general', label: 'Allgemein' },
+  { value: 'prices', label: 'Preise & Marken' },
+]
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'light', label: 'Hell' },
@@ -40,6 +48,7 @@ export function SettingsPage() {
   const [backupMessage, setBackupMessage] = useState('')
   const [budgetInput, setBudgetInput] = useState(weeklyBudget > 0 ? String(weeklyBudget) : '')
   const [storageCopied, setStorageCopied] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const storageInfo = getStorageInfo()
 
@@ -103,8 +112,29 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Einstellungen" subtitle="Design, Produkte & Daten" />
+      <PageHeader title="Einstellungen" subtitle="Design, Preise & Daten" />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+        <div className="glass-card mb-4.5 flex p-1.5">
+          {SETTINGS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              className="tap-scale flex-1 rounded-xl py-2.5 text-[13px] font-bold"
+              style={{
+                background: settingsTab === tab.value ? 'var(--accent)' : 'transparent',
+                color: settingsTab === tab.value ? 'var(--accent-fg)' : 'var(--text)',
+              }}
+              onClick={() => setSettingsTab(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {settingsTab === 'prices' ? (
+          <PriceProfilesSettingsSection />
+        ) : (
+          <>
         <div
           className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
           style={{ color: 'var(--category-fg)' }}
@@ -375,6 +405,8 @@ export function SettingsPage() {
         <p className="mt-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
           AlexShop · alle Daten bleiben lokal auf deinem Gerät gespeichert
         </p>
+          </>
+        )}
       </main>
 
       {editing && <EditCustomProductSheet product={editing} onClose={() => setEditing(null)} />}

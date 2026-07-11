@@ -65,6 +65,10 @@ export interface PurchaseLogEntry {
 export interface ProductVariant {
   id: string
   name: string
+  /** Verknüpfung mit globaler Marke (Einstellungen → Preise & Marken). */
+  brandId?: string
+  /** Kilopreis für Obst/Gemüse – Vergleich über Einkäufe hinweg. */
+  pricePerKg?: number
   /** Für spätere Barcode-Erkennung. */
   barcode?: string
   /** Für spätere Filial-Zuordnung (Coop, Migros, …). */
@@ -91,12 +95,23 @@ export interface ProductPriceProfile {
   updatedAt: number
 }
 
+/** Globale Marke – gilt produktübergreifend (Coop, Migros, …). */
+export interface GlobalBrand {
+  id: string
+  name: string
+  createdAt: number
+}
+
 /** Preisdaten beim Abhaken oder nachträglich. */
 export interface CheckoffPriceData {
   /** Gesamtpreis für Budget und Kaufprotokoll. */
   price: number
   /** Stückpreis für Preisgedächtnis/Varianten – optional bei Mehrfachmengen. */
   unitPrice?: number
+  /** Kilopreis für Obst/Gemüse. */
+  pricePerKg?: number
+  weightGrams?: number
+  brandId?: string
   variantId?: string
   /** Pflicht bei neuer Variante. */
   variantName?: string

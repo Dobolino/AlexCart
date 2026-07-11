@@ -1,4 +1,5 @@
 import { priceQuantityFromAmount } from './amount'
+import { isProduceCategory, weightGramsFromAmount } from './producePrice'
 import { normalize } from '@/utils/text'
 import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
 
@@ -119,6 +120,13 @@ export interface ResolvedVariantPurchase {
   createdNewProfile: boolean
 }
 
+function withVariantMeta(variant: ProductVariant, data: CheckoffPriceData): ProductVariant {
+  const next = { ...variant }
+  if (data.brandId) next.brandId = data.brandId
+  if (data.pricePerKg !== undefined) next.pricePerKg = data.pricePerKg
+  return next
+}
+
 /** Legt bei Bedarf Profil/Variante an und wendet den Kauf an. */
 export function recordVariantPurchase(
   profiles: ProductPriceProfile[],
@@ -144,14 +152,17 @@ export function recordVariantPurchase(
   }
 
   const wasSale = !!data.wasSale
-  const profilePrice = data.unitPrice ?? data.price
+  const profilePrice = data.pricePerKg ?? data.unitPrice ?? data.price
   let variant: ProductVariant | undefined
   let createdNewVariant = false
 
   if (data.variantId) {
     const idx = profileCopy.variants.findIndex((v) => v.id === data.variantId)
     if (idx >= 0) {
-      variant = applyPurchaseToVariant(profileCopy.variants[idx]!, profilePrice, date, wasSale)
+      variant = withVariantMeta(
+        applyPurchaseToVariant(profileCopy.variants[idx]!, profilePrice, date, wasSale),
+        data
+      )
       profileCopy.variants[idx] = variant
     }
   }
@@ -159,7 +170,10 @@ export function recordVariantPurchase(
   if (!variant) {
     const name = (data.variantName || itemName).trim()
     if (!name) throw new Error('Variantenname fehlt')
-    const newVariant = applyPurchaseToVariant(createEmptyVariant(name, createId()), profilePrice, date, wasSale)
+    const newVariant = withVariantMeta(
+      applyPurchaseToVariant(createEmptyVariant(name, createId()), profilePrice, date, wasSale),
+      data
+    )
     profileCopy.variants.push(newVariant)
     variant = newVariant
     createdNewVariant = true
@@ -220,6 +234,15 @@ export function estimateItemPrice(
   const profile = findPriceProfile(profiles, item.name, item.category)
   const variant = pickVariantForEstimate(profile, item)
   if (!variant) return null
+
+  if (isProduceCategory(item.category)) {
+    const grams = weightGramsFromAmount(item.amount)
+    const perKg = variant.pricePerKg ?? variant.lastPrice ?? variant.avgPrice
+    if (grams && perKg) return roundMoney(perKg * (grams / 1000))
+    if (perKg) return perKg
+    return null
+  }
+
   const unit = estimateVariantPrice(variant)
   if (unit === null) return null
   return roundMoney(unit * priceQuantityFromAmount(item.amount))

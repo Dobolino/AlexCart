@@ -56,6 +56,7 @@ export function ListPage() {
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const priceProfiles = useStore((s) => s.priceProfiles)
+  const brands = useStore((s) => s.brands)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const currency = useStore((s) => s.settings.currency)
 
@@ -428,6 +429,7 @@ export function ListPage() {
         <CheckoffPriceSheet
           item={priceSheetItem}
           profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
+          brands={brands}
           currency={currency}
           onClose={() => setPriceSheetItem(null)}
           onSave={handlePriceSave}
