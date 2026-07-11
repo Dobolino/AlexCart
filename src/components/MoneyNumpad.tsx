@@ -37,6 +37,12 @@ export function MoneyNumpad({
     onChange(applyFixedDecimalKey(cents, key))
   }
 
+  function keyAriaLabel(key: string): string {
+    if (key === 'C') return 'Eingabe löschen'
+    if (key === '⌫') return 'Letzte Ziffer entfernen'
+    return `Ziffer ${key}`
+  }
+
   return (
     <>
       {display === 'summary' ? (
@@ -81,6 +87,7 @@ export function MoneyNumpad({
               fontSize: key === 'C' ? (dense ? 14 : compact ? 16 : 18) : undefined,
             }}
             onClick={() => pressKey(key)}
+            aria-label={keyAriaLabel(key)}
           >
             {key}
           </button>

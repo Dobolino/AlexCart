@@ -36,6 +36,7 @@ interface ToastState {
 export function ListPage() {
   const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
+  const lists = useStore((s) => s.lists)
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const updatePurchaseLogPrice = useStore((s) => s.updatePurchaseLogPrice)
@@ -243,6 +244,11 @@ export function ListPage() {
           </div>
         }
       />
+      {lists.length === 1 && (
+        <p className="px-4 pb-1 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          Tipp: Titel antippen für weitere Listen
+        </p>
+      )}
       {budget && <BudgetBar progress={budget} currency={currency} />}
       <InstallPrompt />
 

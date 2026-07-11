@@ -1,11 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /** Hält den Bildschirm während des Einkaufsmodus an (Screen Wake Lock API). */
-export function useWakeLock(enabled: boolean) {
+export function useWakeLock(enabled: boolean): boolean {
   const sentinelRef = useRef<WakeLockSentinel | null>(null)
+  const [active, setActive] = useState(false)
 
   useEffect(() => {
-    if (!enabled || !('wakeLock' in navigator)) return
+    if (!enabled || !('wakeLock' in navigator)) {
+      setActive(false)
+      return
+    }
 
     let cancelled = false
 
@@ -19,10 +23,15 @@ export function useWakeLock(enabled: boolean) {
           return
         }
         sentinelRef.current = lock
+        setActive(true)
         lock.addEventListener('release', () => {
-          if (sentinelRef.current === lock) sentinelRef.current = null
+          if (sentinelRef.current === lock) {
+            sentinelRef.current = null
+            setActive(false)
+          }
         })
       } catch {
+        setActive(false)
         /* Nicht unterstützt, Low Power Mode oder keine User-Geste */
       }
     }
@@ -30,6 +39,7 @@ export function useWakeLock(enabled: boolean) {
     function release() {
       const lock = sentinelRef.current
       sentinelRef.current = null
+      setActive(false)
       lock?.release().catch(() => {})
     }
 
@@ -47,4 +57,6 @@ export function useWakeLock(enabled: boolean) {
       release()
     }
   }, [enabled])
+
+  return active
 }

@@ -3,6 +3,7 @@ import {
   idsToExcludeTodayPricedCheckoffs,
   removeTodayPurchaseLogEntriesForItems,
   removeTodayPurchaseLogEntry,
+  syncPurchaseLogForItemRename,
   todayPricedEntries,
   todayPricedTotal,
   todayPricedTotalForList,
@@ -63,5 +64,33 @@ describe('purchaseLog', () => {
   it('idsToExcludeTodayPricedCheckoffs liefert nur heutige Preis-IDs', () => {
     const ids = idsToExcludeTodayPricedCheckoffs(log, '2026-07-09')
     expect(ids).toEqual(['a', 'b'])
+  })
+
+  it('syncPurchaseLogForItemRename aktualisiert verknüpfte Einträge', () => {
+    const linked = [
+      { id: 'x', itemId: 'item-1', name: 'Milch', category: 'Milch & Käse', date: today, price: 2.5 },
+      { id: 'y', name: 'Brot', category: 'Brot & Backwaren', date: today, price: 3.2 },
+    ]
+    const next = syncPurchaseLogForItemRename(
+      linked,
+      'item-1',
+      'Milch',
+      'Milch & Käse',
+      { name: 'Vollmilch' },
+      today
+    )
+    expect(next[0]?.name).toBe('Vollmilch')
+    expect(next[0]?.itemId).toBe('item-1')
+    expect(next[1]?.name).toBe('Brot')
+  })
+
+  it('removeTodayPurchaseLogEntry bevorzugt itemId bei Duplikaten', () => {
+    const dupLog = [
+      { id: 'a', itemId: 'item-a', name: 'Milch', category: 'Milch & Käse', date: today, price: 2.5 },
+      { id: 'b', itemId: 'item-b', name: 'Milch', category: 'Milch & Käse', date: today, price: 2.8 },
+    ]
+    const next = removeTodayPurchaseLogEntry(dupLog, 'Milch', 'Milch & Käse', today, 'item-b')
+    expect(next).toHaveLength(1)
+    expect(next[0]?.itemId).toBe('item-a')
   })
 })

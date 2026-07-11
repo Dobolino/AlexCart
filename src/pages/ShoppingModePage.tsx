@@ -33,7 +33,7 @@ export function ShoppingModePage() {
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useWakeLock(true)
+  const wakeLockActive = useWakeLock(true)
 
   const tripTotal = useMemo(() => {
     if (!list) return 0
@@ -161,7 +161,13 @@ export function ShoppingModePage() {
             Leeren
           </button>
         ) : (
-          <div className="w-10" />
+          <div className="flex w-10 items-center justify-center" title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}>
+            {wakeLockActive && (
+              <span style={{ color: 'var(--text-muted)' }} aria-label="Bildschirm bleibt an">
+                <Icon path={ICON_PATHS.sun} size={16} />
+              </span>
+            )}
+          </div>
         )}
       </header>
 

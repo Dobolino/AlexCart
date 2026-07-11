@@ -44,7 +44,7 @@ export function todayPricedTotalForList(
         e.date === today &&
         (e.price ?? 0) > 0 &&
         !excludedIds.has(purchaseLogEntryId(e, i)) &&
-        done.some((item) => item.name === e.name && item.category === e.category)
+        done.some((item) => matchesListItem(e, item))
     )
     .reduce((sum, e) => sum + (e.price ?? 0), 0)
   return Math.round(total * 100) / 100
@@ -73,9 +73,17 @@ export function idsToExcludeTodayPricedCheckoffsForList(
       ({ e }) =>
         e.date === today &&
         (e.price ?? 0) > 0 &&
-        done.some((item) => item.name === e.name && item.category === e.category)
+        done.some((item) => matchesListItem(e, item))
     )
     .map(({ e, i }) => purchaseLogEntryId(e, i))
+}
+
+function matchesListItem(
+  entry: PurchaseLogEntry,
+  item: { id: string; name: string; category: string }
+): boolean {
+  if (entry.itemId) return entry.itemId === item.id
+  return entry.name === item.name && entry.category === item.category
 }
 
 /** Entfernt den heutigen Kauf-Eintrag für name/category (z. B. beim Abhaken rückgängig). */
@@ -83,18 +91,49 @@ export function removeTodayPurchaseLogEntry(
   purchaseLog: PurchaseLogEntry[],
   name: string,
   category: string,
-  today: string = todayKey()
+  today: string = todayKey(),
+  itemId?: string
 ): PurchaseLogEntry[] {
   let idx = -1
   for (let i = purchaseLog.length - 1; i >= 0; i--) {
     const e = purchaseLog[i]!
-    if (e.name === name && e.category === category && e.date === today) {
+    if (e.date !== today) continue
+    if (itemId && e.itemId === itemId) {
+      idx = i
+      break
+    }
+    if (!itemId && e.name === name && e.category === category && !e.itemId) {
       idx = i
       break
     }
   }
   if (idx < 0) return purchaseLog
   return purchaseLog.filter((_, i) => i !== idx)
+}
+
+/** Passt Kauf-Einträge an, wenn ein Listen-Artikel umbenannt oder umkategorisiert wird. */
+export function syncPurchaseLogForItemRename(
+  purchaseLog: PurchaseLogEntry[],
+  itemId: string,
+  oldName: string,
+  oldCategory: string,
+  patch: { name?: string; category?: string },
+  today: string = todayKey()
+): PurchaseLogEntry[] {
+  const newName = patch.name?.trim() || oldName
+  const newCategory = patch.category || oldCategory
+  if (newName === oldName && newCategory === oldCategory) return purchaseLog
+
+  return purchaseLog.map((entry) => {
+    const linked =
+      entry.itemId === itemId ||
+      (!entry.itemId &&
+        entry.date === today &&
+        entry.name === oldName &&
+        entry.category === oldCategory)
+    if (!linked) return entry
+    return { ...entry, itemId, name: newName, category: newCategory }
+  })
 }
 
 /** Entfernt heutige Kauf-Einträge für mehrere abgehakte Artikel. */

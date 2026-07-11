@@ -41,6 +41,9 @@ export function BudgetBar({ progress, currency }: BudgetBarProps) {
       >
         {detail}
       </p>
+      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        Kalenderwoche Mo–So
+      </p>
     </div>
   )
 }

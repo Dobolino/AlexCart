@@ -9,7 +9,7 @@ import { replenishPantryItem } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
-import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList } from '@/utils/purchaseLog'
+import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList, syncPurchaseLogForItemRename } from '@/utils/purchaseLog'
 import { buildProfilesFromPurchaseLog } from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
@@ -30,7 +30,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 9
+const STORE_VERSION = 10
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -97,6 +97,29 @@ function mergeCalculatorExclusions(existing: string[], add: string[]): string[] 
 
 function ensurePurchaseLogIds(log: PurchaseLogEntry[]): PurchaseLogEntry[] {
   return log.map((entry) => (entry.id ? entry : { ...entry, id: uid() }))
+}
+
+/** Versucht itemId aus bestehenden Listen nachzutragen (Migration). */
+function backfillPurchaseLogItemIds(
+  log: PurchaseLogEntry[],
+  lists: ShoppingList[]
+): PurchaseLogEntry[] {
+  const byNameCategory = new Map<string, ShoppingItem[]>()
+  for (const list of lists) {
+    for (const item of list.items) {
+      const key = `${item.name}\0${item.category}`
+      const bucket = byNameCategory.get(key) ?? []
+      bucket.push(item)
+      byNameCategory.set(key, bucket)
+    }
+  }
+
+  return log.map((entry) => {
+    if (entry.itemId) return entry
+    const candidates = byNameCategory.get(`${entry.name}\0${entry.category}`) ?? []
+    if (candidates.length === 1) return { ...entry, itemId: candidates[0]!.id }
+    return entry
+  })
 }
 
 /** Stabile Referenz für den "keine gefilterten Items" Fall – ein neues [] bei jedem Aufruf
@@ -322,7 +345,16 @@ export const useStore = create<AppState>()(
       updateItemInActiveList: (itemId, patch) => {
         const list = get().activeList()
         if (!list) return
+        const item = list.items.find((i) => i.id === itemId)
+        if (!item) return
         set((state) => ({
+          purchaseLog: syncPurchaseLogForItemRename(
+            state.purchaseLog,
+            itemId,
+            item.name,
+            item.category,
+            patch
+          ),
           lists: state.lists.map((l) =>
             l.id !== list.id
               ? l
@@ -383,7 +415,7 @@ export const useStore = create<AppState>()(
               ),
               purchaseLog: [
                 ...state.purchaseLog,
-                { id: uid(), name: item.name, category: item.category, date: todayKey() },
+                { id: uid(), itemId, name: item.name, category: item.category, date: todayKey() },
               ],
               pantry: replenishPantryItem(state.pantry, item),
             }
@@ -724,6 +756,11 @@ export const useStore = create<AppState>()(
               state.priceProfiles && state.priceProfiles.length > 0
                 ? state.priceProfiles
                 : buildProfilesFromPurchaseLog(state.purchaseLog ?? [], uid)
+          }
+          if (version < 10) {
+            if (Array.isArray(state.purchaseLog) && Array.isArray(state.lists)) {
+              state.purchaseLog = backfillPurchaseLogItemIds(state.purchaseLog, state.lists)
+            }
           }
           return state as AppState
         } catch (err) {

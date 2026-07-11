@@ -36,7 +36,11 @@ export function parseCheckoffInput(input?: number | CheckoffPriceData): Checkoff
 function findTodayLogIndex(log: PurchaseLogEntry[], item: ShoppingItem, today: string): number {
   for (let i = log.length - 1; i >= 0; i--) {
     const e = log[i]!
-    if (e.name === item.name && e.category === item.category && e.date === today) return i
+    if (e.date === today && e.itemId === item.id) return i
+  }
+  for (let i = log.length - 1; i >= 0; i--) {
+    const e = log[i]!
+    if (e.date === today && !e.itemId && e.name === item.name && e.category === item.category) return i
   }
   return -1
 }
@@ -72,6 +76,7 @@ export function commitItemPurchase(
   const logIdx = findTodayLogIndex(purchaseLog, item, today)
   const entry: PurchaseLogEntry = {
     id: logIdx >= 0 ? purchaseLog[logIdx]!.id || uid() : uid(),
+    itemId: opts.itemId,
     name: item.name,
     category: item.category,
     date: today,

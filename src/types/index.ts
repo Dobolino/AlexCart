@@ -48,6 +48,8 @@ export interface PantryItem {
 export interface PurchaseLogEntry {
   /** Wird beim Abhaken gesetzt; ältere Einträge erhalten eine ID bei der Migration. */
   id?: string
+  /** Verknüpft den Eintrag mit einem Listen-Artikel – wichtig bei Umbenennung und Duplikaten. */
+  itemId?: string
   name: string
   category: string
   date: string

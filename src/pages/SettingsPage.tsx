@@ -10,6 +10,7 @@ import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { parseMoneyInput, currencySymbol } from '@/utils/currency'
 import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
+import { getStorageInfo } from '@/utils/storageInfo'
 import type { Currency, CustomProduct, Theme } from '@/types'
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
@@ -38,7 +39,9 @@ export function SettingsPage() {
   const [editing, setEditing] = useState<CustomProduct | null>(null)
   const [backupMessage, setBackupMessage] = useState('')
   const [budgetInput, setBudgetInput] = useState(weeklyBudget > 0 ? String(weeklyBudget) : '')
+  const [storageCopied, setStorageCopied] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const storageInfo = getStorageInfo()
 
   async function handleExportBackup() {
     const json = readBackupJSON()
@@ -74,6 +77,26 @@ export function SettingsPage() {
     const parsed = parseMoneyInput(budgetInput)
     setWeeklyBudget(parsed ?? 0)
     setBudgetInput(parsed ? String(parsed) : '')
+  }
+
+  async function copyStoragePath() {
+    const text = storageInfo.storagePath
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setStorageCopied(true)
+      setTimeout(() => setStorageCopied(false), 2000)
+    } catch {
+      setBackupMessage('Pfad konnte nicht kopiert werden.')
+    }
   }
 
   const BUDGET_PRESETS = [100, 150, 200, 250]
@@ -156,7 +179,7 @@ export function SettingsPage() {
           <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
             <span className="block text-[15px] font-semibold">Wochenbudget</span>
             <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              Ausgaben der aktuellen Woche im Listen-Header verfolgen
+              Ausgaben der aktuellen Kalenderwoche (Montag–Sonntag) im Listen-Header verfolgen
             </span>
             <div className="flex items-center gap-2">
               <span className="text-[14px] font-bold" style={{ color: 'var(--text-muted)' }}>
@@ -276,6 +299,37 @@ export function SettingsPage() {
           style={{ color: 'var(--category-fg)' }}
         >
           Daten
+        </div>
+        <div className="card-surface mb-3 px-3.5 py-3.5">
+          <span className="block text-[15px] font-semibold">Speicherort</span>
+          <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            Die App speichert alles lokal im Browser – kein Server, kein echter Dateipfad auf dem Gerät.
+          </span>
+          <div
+            className="mb-2 rounded-xl px-3 py-2.5 font-mono text-[11px] leading-relaxed break-all"
+            style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+          >
+            {storageInfo.storagePath}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <span>Belegung: {storageInfo.sizeLabel}</span>
+            {storageInfo.legacyKeysPresent.length > 0 && (
+              <span>· Legacy: {storageInfo.legacyKeysPresent.join(', ')}</span>
+            )}
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+              style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+              onClick={() => void copyStoragePath()}
+            >
+              {storageCopied ? 'Kopiert' : 'Pfad kopieren'}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            Export-Dateiname: {storageInfo.exportFilenamePattern} (z. B. {backupFilename()})
+          </p>
         </div>
         <div className="card-surface mb-3 flex flex-col">
           <button
