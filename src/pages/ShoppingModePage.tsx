@@ -5,6 +5,7 @@ import { groupByCategory } from '@/utils/group'
 import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import { hapticSuccess } from '@/utils/haptics'
+import { useWakeLock } from '@/hooks/useWakeLock'
 import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
@@ -31,6 +32,8 @@ export function ShoppingModePage() {
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useWakeLock(true)
 
   const tripTotal = useMemo(() => {
     if (!list) return 0
