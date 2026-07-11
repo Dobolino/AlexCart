@@ -8,7 +8,6 @@ import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
-import { ProduceWeightInput } from '@/components/ProduceWeightInput'
 import { isProduceCategory } from '@/utils/producePrice'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
@@ -17,6 +16,7 @@ import { FloatingPortal } from '@/components/FloatingPortal'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
 import { ItemAmountColumn } from '@/components/ItemAmountColumn'
+import { AmountBadge } from '@/components/AmountBadge'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
@@ -132,10 +132,6 @@ export function ShoppingModePage() {
       return
     }
     updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
-  }
-
-  function handleProduceWeight(item: ShoppingItem, amount: string) {
-    updateItemInActiveList(item.id, { amount })
   }
 
   function handleDelete(item: ShoppingItem) {
@@ -314,11 +310,7 @@ export function ShoppingModePage() {
                       )}
                     </button>
                     {isProduceCategory(item.category) ? (
-                      <ProduceWeightInput
-                        amount={item.amount}
-                        compact
-                        onChange={(amount) => handleProduceWeight(item, amount)}
-                      />
+                      item.amount ? <AmountBadge amount={item.amount} prominent /> : null
                     ) : (
                       <ItemAmountColumn
                         item={item}
