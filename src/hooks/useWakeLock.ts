@@ -6,10 +6,10 @@ export function useWakeLock(enabled: boolean): boolean {
   const [active, setActive] = useState(false)
 
   useEffect(() => {
-    if (!enabled || !('wakeLock' in navigator)) {
-      setActive(false)
-      return
-    }
+    // `active` is already false initially, and any prior lock was already released (and
+    // `active` reset to false) by this effect's own cleanup when `enabled` last changed -
+    // so there's nothing to reset here, just nothing to acquire.
+    if (!enabled || !('wakeLock' in navigator)) return
 
     let cancelled = false
 

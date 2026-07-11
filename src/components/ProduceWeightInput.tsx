@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { gramsToAmount, parseGramsInput, weightGramsFromAmount } from '@/utils/producePrice'
 
 interface ProduceWeightInputProps {
@@ -11,11 +11,14 @@ interface ProduceWeightInputProps {
 export function ProduceWeightInput({ amount, onChange, compact = false }: ProduceWeightInputProps) {
   const grams = weightGramsFromAmount(amount)
   const [draft, setDraft] = useState(grams !== null ? String(grams) : '')
-
-  useEffect(() => {
-    const g = weightGramsFromAmount(amount)
-    setDraft(g !== null ? String(g) : '')
-  }, [amount])
+  // Draft neu von `amount` übernehmen, wenn es sich von aussen ändert (z. B. Reset) - während
+  // des Renderns statt in einem Effect, damit ein Tastendruck nicht erst einen Extra-Render
+  // durchläuft, bevor die Eingabe sichtbar wird.
+  const [syncedAmount, setSyncedAmount] = useState(amount)
+  if (amount !== syncedAmount) {
+    setSyncedAmount(amount)
+    setDraft(grams !== null ? String(grams) : '')
+  }
 
   function commit(value: string) {
     const parsed = parseGramsInput(value)

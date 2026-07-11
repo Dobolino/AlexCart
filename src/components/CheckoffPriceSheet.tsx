@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { MoneyNumpad } from './MoneyNumpad'
 import { ItemAmountColumn } from './ItemAmountColumn'
@@ -72,26 +72,36 @@ export function CheckoffPriceSheet({
   const showNewVariantName = selection === NEW_VARIANT
   const sizePresets = getVariantSizePresets(item.name, item.category, item.amount)
 
-  useEffect(() => {
-    if (!selectedVariant) return
+  // Preis-/Marken-Vorbelegung bei Variantenwahl oder Aktion/Normalpreis-Wechsel neu anwenden -
+  // während des Renderns statt in einem Effect (React-Muster "Zustand beim Ändern eines Werts
+  // anpassen"). appliedPrefillKey startet bei null, damit die erste Vorbelegung auch beim
+  // initialen Mount greift (bisher übernahm das der erste Effect-Lauf).
+  const prefillKey = `${selectedVariant?.id ?? ''}|${wasSale}`
+  const [appliedPrefillKey, setAppliedPrefillKey] = useState<string | null>(null)
+  if (selectedVariant && prefillKey !== appliedPrefillKey) {
+    setAppliedPrefillKey(prefillKey)
     setBrandId(selectedVariant.brandId || '')
     if (wasSale) {
       if (selectedVariant.lastSalePrice && selectedVariant.lastSalePrice > 0) {
         setCents(amountToCents(selectedVariant.lastSalePrice))
       }
-      return
+    } else {
+      const prefilled = isProduce
+        ? selectedVariant.pricePerKg ?? selectedVariant.lastPrice
+        : selectedVariant.lastPrice
+      if (prefilled && prefilled > 0) {
+        setCents(amountToCents(prefilled))
+      }
     }
-    const prefilled = isProduce
-      ? selectedVariant.pricePerKg ?? selectedVariant.lastPrice
-      : selectedVariant.lastPrice
-    if (prefilled && prefilled > 0) {
-      setCents(amountToCents(prefilled))
-    }
-  }, [selectedVariant?.id, wasSale, isProduce])
+  }
 
-  useEffect(() => {
+  // Stückpreis-Anzeige auf "Pro Stück" umschalten, wenn die Menge (z. B. per Stepper) auf >1
+  // wechselt - initialer Wert kommt schon aus useState oben, hier nur Folgeänderungen.
+  const [syncedQuantity, setSyncedQuantity] = useState(quantity)
+  if (quantity !== syncedQuantity) {
+    setSyncedQuantity(quantity)
     if (!isProduce && quantity > 1) setPriceMode('unit')
-  }, [quantity, isProduce])
+  }
 
   const enteredAmount = centsToAmount(cents) ?? 0
   const resolved = useMemo(() => {
