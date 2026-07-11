@@ -15,6 +15,36 @@ export function isProduceCategory(category: string): boolean {
   return normalizeCategory(category) === PRODUCE_CATEGORY
 }
 
+const PRODUCE_PIECE_UNITS = new Set([
+  'stück',
+  'stk',
+  'stck',
+  'bund',
+  'packung',
+  'pack',
+  'beutel',
+  'tüte',
+  'dose',
+  'glas',
+  'becher',
+  'prise',
+])
+
+/** Obst/Gemüse nach Gewicht: freie Gramm-Eingabe statt +/- in 50-g-Schritten. */
+export function shouldUseExactProduceWeight(category: string, amount: string): boolean {
+  if (!isProduceCategory(category)) return false
+  if (!amount.trim()) return true
+
+  const parsed = parseAmount(amount)
+  if (!parsed) return parseGramsInput(amount) !== null
+
+  const unit = normalizeUnit(parsed.unit)
+  if (unit === 'g' || unit === 'gramm' || unit === 'gr' || unit === 'kg') return true
+  if (PRODUCE_PIECE_UNITS.has(unit)) return false
+
+  return parseGramsInput(amount) !== null
+}
+
 /** Gramm aus Mengenangabe – z. B. „750 g“, „1.2 kg“, „347g“. */
 export function weightGramsFromAmount(amount: string): number | null {
   const parsed = parseAmount(amount)

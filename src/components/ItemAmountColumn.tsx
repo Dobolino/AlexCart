@@ -1,11 +1,14 @@
 import { Icon } from './Icon'
+import { ProduceWeightInput } from './ProduceWeightInput'
 import { ICON_PATHS } from '@/constants/icons'
+import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import type { ShoppingItem } from '@/types'
 
 interface ItemAmountColumnProps {
   item: ShoppingItem
   showStepper: boolean
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
+  onProduceWeightChange?: (item: ShoppingItem, amount: string) => void
   /** Kachel-Ansicht: helle Buttons auf farbigem Grund */
   variant?: 'row' | 'tile'
   accentColor?: string
@@ -15,10 +18,24 @@ export function ItemAmountColumn({
   item,
   showStepper,
   onAdjustAmount,
+  onProduceWeightChange,
   variant = 'row',
   accentColor,
 }: ItemAmountColumnProps) {
-  if (!item.amount && !showStepper) return null
+  const useProduceWeight =
+    !item.done && shouldUseExactProduceWeight(item.category, item.amount) && !!onProduceWeightChange
+
+  if (!item.amount && !showStepper && !useProduceWeight) return null
+
+  if (useProduceWeight) {
+    return (
+      <ProduceWeightInput
+        amount={item.amount}
+        compact
+        onChange={(amount) => onProduceWeightChange(item, amount)}
+      />
+    )
+  }
 
   const isTile = variant === 'tile'
   const textColor = isTile ? accentColor : 'var(--text-muted)'

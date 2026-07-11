@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
+import { isProduceCategory } from '@/utils/producePrice'
 import { buildShareText } from '@/utils/shareText'
 import { CategorySection } from '@/components/CategorySection'
 import { ProductIconSlot } from '@/components/ProductIconSlot'
@@ -174,7 +175,12 @@ export function ListPage() {
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
+    if (isProduceCategory(item.category)) return
     updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
+  }
+
+  function handleProduceWeight(item: ShoppingItem, amount: string) {
+    updateItemInActiveList(item.id, { amount })
   }
 
   async function handleShareList() {
@@ -302,6 +308,7 @@ export function ListPage() {
                 onAddToPantry={handleAddToPantry}
                 onToggleFavorite={toggleItemFavorite}
                 onAdjustAmount={handleAdjustAmount}
+                onProduceWeightChange={handleProduceWeight}
               />
             ))}
 
