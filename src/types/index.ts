@@ -177,4 +177,6 @@ export interface CompletedTrip {
   listName: string
   completedAt: number
   items: CompletedTripItem[]
+  /** Einkaufszentrum/Filiale – optional, nachträglich in der Quittung editierbar. */
+  store?: string
 }

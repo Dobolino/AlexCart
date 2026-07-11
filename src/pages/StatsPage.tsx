@@ -41,6 +41,7 @@ export function StatsPage() {
   const currency = useStore((s) => s.settings.currency)
   const resetStats = useStore((s) => s.resetStats)
   const updateCompletedTripItemPrice = useStore((s) => s.updateCompletedTripItemPrice)
+  const updateCompletedTripStore = useStore((s) => s.updateCompletedTripStore)
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
 
   const top = topItems(purchaseLog)
@@ -125,7 +126,10 @@ export function StatsPage() {
                   onClick={() => setSelectedTripId(trip.id)}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">{trip.listName}</span>
+                    <span className="block truncate text-[14px] font-semibold">
+                      {trip.listName}
+                      {trip.store && <span style={{ color: 'var(--text-muted)' }}> · {trip.store}</span>}
+                    </span>
                     <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
                       {new Date(trip.completedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} ·{' '}
                       {trip.items.length} Artikel
@@ -286,6 +290,7 @@ export function StatsPage() {
           currency={currency}
           onClose={() => setSelectedTripId(null)}
           onUpdatePrice={(itemId, price) => updateCompletedTripItemPrice(selectedTrip.id, itemId, price)}
+          onUpdateStore={(store) => updateCompletedTripStore(selectedTrip.id, store)}
         />
       )}
     </>

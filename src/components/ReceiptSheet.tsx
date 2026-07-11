@@ -9,6 +9,7 @@ interface ReceiptSheetProps {
   currency: Currency
   onClose: () => void
   onUpdatePrice: (itemId: string, price: number | undefined) => void
+  onUpdateStore: (store: string | undefined) => void
 }
 
 function formatTripDate(completedAt: number): string {
@@ -19,10 +20,22 @@ function formatTripDate(completedAt: number): string {
   )}`
 }
 
-/** Quittung eines abgeschlossenen Einkaufs - Preise pro Artikel lassen sich hier nachträglich
- *  korrigieren, z. B. wenn beim Abhaken etwas falsch eingegeben wurde. */
-export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice }: ReceiptSheetProps) {
+/** Quittung eines abgeschlossenen Einkaufs - Preise pro Artikel und das Einkaufszentrum lassen
+ *  sich hier nachträglich korrigieren, z. B. wenn beim Abhaken etwas falsch eingegeben wurde. */
+export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore }: ReceiptSheetProps) {
   const total = tripTotalSpent(trip)
+  const [storeInput, setStoreInput] = useState(trip.store ?? '')
+  const [storeId, setStoreId] = useState(trip.id)
+
+  if (storeId !== trip.id) {
+    setStoreId(trip.id)
+    setStoreInput(trip.store ?? '')
+  }
+
+  function saveStore() {
+    const trimmed = storeInput.trim()
+    if (trimmed !== (trip.store ?? '')) onUpdateStore(trimmed || undefined)
+  }
 
   return (
     <Sheet onClose={onClose} tall>
@@ -32,6 +45,20 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice }: Receipt
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             {formatTripDate(trip.completedAt)} · {trip.items.length} Artikel
           </p>
+          <input
+            type="text"
+            className="input mb-3 w-full py-2 text-[14px]"
+            placeholder="Einkaufszentrum (optional)"
+            value={storeInput}
+            onChange={(e) => setStoreInput(e.target.value)}
+            onBlur={saveStore}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                saveStore()
+                ;(e.target as HTMLInputElement).blur()
+              }
+            }}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">

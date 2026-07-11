@@ -248,6 +248,8 @@ interface AppState {
   logCompletedTrip: (entry: { listId: string; listName: string; items: CompletedTripItem[] }) => void
   /** Nachträgliche Preiskorrektur auf der Quittung eines abgeschlossenen Einkaufs. */
   updateCompletedTripItemPrice: (tripId: string, itemId: string, price: number | undefined) => void
+  /** Einkaufszentrum/Filiale nachträglich auf der Quittung erfassen. */
+  updateCompletedTripStore: (tripId: string, store: string | undefined) => void
 }
 
 export const useStore = create<AppState>()(
@@ -819,6 +821,13 @@ export const useStore = create<AppState>()(
                       : { ...item, price: price !== undefined && price > 0 ? price : undefined }
                   ),
                 }
+          ),
+        })),
+
+      updateCompletedTripStore: (tripId, store) =>
+        set((state) => ({
+          completedTrips: state.completedTrips.map((trip) =>
+            trip.id !== tripId ? trip : { ...trip, store: store?.trim() || undefined }
           ),
         })),
     }),
