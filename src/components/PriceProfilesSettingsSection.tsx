@@ -220,6 +220,13 @@ function BrandRow({
               if (e.key === 'Enter') onSave()
               if (e.key === 'Escape') onCancel()
             }}
+            onFocus={(e) => {
+              // iOS öffnet die Tastatur, ohne das fokussierte Feld verlässlich neu ins
+              // Bild zu scrollen (führt sonst zu einer scheinbar leeren Fläche über der
+              // Tastatur) - kurz warten, bis die Tastatur-Animation begonnen hat.
+              const target = e.currentTarget
+              window.setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
+            }}
             autoFocus
           />
           <button type="button" className="tap-scale text-[12px] font-bold" style={{ color: 'var(--accent)' }} onClick={onSave}>
