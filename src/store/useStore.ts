@@ -14,6 +14,7 @@ import { buildProfilesFromPurchaseLog } from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
+import { mergeHouseBrandPresets } from '@/utils/houseBrands'
 import type {
   AppSettings,
   AppStats,
@@ -32,7 +33,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 11
+const STORE_VERSION = 12
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -209,6 +210,7 @@ interface AppState {
   removeCustomProduct: (id: string) => void
 
   addBrand: (name: string) => void
+  addHouseBrandPresets: (names?: string[]) => void
   updateBrand: (id: string, name: string) => void
   removeBrand: (id: string) => void
   updatePriceProfileVariant: (
@@ -635,6 +637,10 @@ export const useStore = create<AppState>()(
           return { brands: [...state.brands, { id: uid(), name: trimmed, createdAt: Date.now() }] }
         })
       },
+      addHouseBrandPresets: (names) =>
+        set((state) => ({
+          brands: mergeHouseBrandPresets(state.brands, uid, names),
+        })),
       updateBrand: (id, name) => {
         const trimmed = name.trim()
         if (!trimmed) return
@@ -822,6 +828,9 @@ export const useStore = create<AppState>()(
           }
           if (version < 11) {
             state.brands = state.brands ?? []
+          }
+          if (version < 12) {
+            state.brands = mergeHouseBrandPresets(state.brands ?? [], uid)
           }
           return state as AppState
         } catch (err) {

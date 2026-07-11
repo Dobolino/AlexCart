@@ -6,6 +6,8 @@ import { ICON_PATHS } from '@/constants/icons'
 import { formatVariantLabel } from '@/utils/brands'
 import { isProduceCategory } from '@/utils/producePrice'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
+import { HOUSE_BRAND_PRESETS } from '@/constants/houseBrands'
+import { isBrandNameTaken } from '@/utils/houseBrands'
 import type { Currency, GlobalBrand, ProductPriceProfile, ProductVariant } from '@/types'
 
 export function PriceProfilesSettingsSection() {
@@ -13,6 +15,7 @@ export function PriceProfilesSettingsSection() {
   const priceProfiles = useStore((s) => s.priceProfiles)
   const currency = useStore((s) => s.settings.currency)
   const addBrand = useStore((s) => s.addBrand)
+  const addHouseBrandPresets = useStore((s) => s.addHouseBrandPresets)
   const updateBrand = useStore((s) => s.updateBrand)
   const removeBrand = useStore((s) => s.removeBrand)
   const updatePriceProfileVariant = useStore((s) => s.updatePriceProfileVariant)
@@ -25,6 +28,11 @@ export function PriceProfilesSettingsSection() {
   const sortedProfiles = useMemo(
     () => [...priceProfiles].sort((a, b) => a.itemName.localeCompare(b.itemName, 'de')),
     [priceProfiles]
+  )
+
+  const missingHouseBrands = useMemo(
+    () => HOUSE_BRAND_PRESETS.filter((name) => !isBrandNameTaken(brands, name)),
+    [brands]
   )
 
   function submitNewBrand() {
@@ -50,8 +58,55 @@ export function PriceProfilesSettingsSection() {
       </div>
       <div className="card-surface mb-4.5 px-3.5 py-3.5">
         <p className="mb-3 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Marken gelten für alle Produkte – z. B. Coop, Migros, Denner.
+          Marken gelten für alle Produkte – beim Abhaken, in Varianten und in der Kostenschätzung.
         </p>
+
+        <div className="mb-3">
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+            Hausmarken
+          </div>
+          <p className="mb-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            Schnellauswahl für gängige Eigenmarken – z. B. M Classic, Prix Garantie, Gut &amp; Günstig.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {HOUSE_BRAND_PRESETS.map((name) => {
+              const active = isBrandNameTaken(brands, name)
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                  style={{
+                    background: active ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                    color: active ? 'var(--accent)' : 'var(--text)',
+                    outline: active ? '2px solid var(--accent)' : 'none',
+                  }}
+                  onClick={() => {
+                    if (!active) addBrand(name)
+                  }}
+                  aria-pressed={active}
+                  disabled={active}
+                >
+                  {active ? `✓ ${name}` : `+ ${name}`}
+                </button>
+              )
+            })}
+          </div>
+          {missingHouseBrands.length > 0 && (
+            <button
+              type="button"
+              className="tap-scale mt-2 text-[12px] font-bold"
+              style={{ color: 'var(--accent)' }}
+              onClick={() => addHouseBrandPresets()}
+            >
+              Alle Hausmarken hinzufügen ({missingHouseBrands.length})
+            </button>
+          )}
+        </div>
+
+        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+          Eigene Marken
+        </div>
         <div className="mb-3 flex gap-2">
           <input
             type="text"
