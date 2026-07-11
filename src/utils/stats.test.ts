@@ -12,6 +12,7 @@ import {
   avgSpendPerCompletedTrip,
   avgItemsPerCompletedTrip,
   completedTripsPerWeek,
+  tripTotalSpent,
 } from './stats'
 import type { CompletedTrip } from '@/types'
 
@@ -86,15 +87,29 @@ describe('spend stats', () => {
   })
 })
 
+/** `n` Quittungszeilen, deren Preise sich zu `total` aufsummieren. */
+function makeItems(n: number, total: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `i${i}`,
+    name: `Artikel ${i}`,
+    amount: '',
+    price: i === 0 ? total : undefined,
+  }))
+}
+
 describe('completed trip stats', () => {
   const trips: CompletedTrip[] = [
-    { id: '1', listId: 'l1', listName: 'Wocheneinkauf', completedAt: Date.parse('2026-07-01'), itemCount: 10, totalSpent: 40 },
-    { id: '2', listId: 'l1', listName: 'Wocheneinkauf', completedAt: Date.parse('2026-07-08'), itemCount: 6, totalSpent: 20 },
+    { id: '1', listId: 'l1', listName: 'Wocheneinkauf', completedAt: Date.parse('2026-07-01'), items: makeItems(10, 40) },
+    { id: '2', listId: 'l1', listName: 'Wocheneinkauf', completedAt: Date.parse('2026-07-08'), items: makeItems(6, 20) },
   ]
 
   it('averages spend and item count per completed trip', () => {
     expect(avgSpendPerCompletedTrip(trips)).toBeCloseTo(30)
     expect(avgItemsPerCompletedTrip(trips)).toBeCloseTo(8)
+  })
+
+  it('tripTotalSpent sums item prices, ignoring unpriced items', () => {
+    expect(tripTotalSpent(trips[0]!)).toBe(40)
   })
 
   it('returns 0 for an empty list', () => {
@@ -105,8 +120,8 @@ describe('completed trip stats', () => {
   it('buckets completed trips per week', () => {
     const today = new Date().toLocaleDateString('sv-SE')
     const sameWeekTrips: CompletedTrip[] = [
-      { id: '1', listId: 'l1', listName: 'A', completedAt: Date.parse(today), itemCount: 3, totalSpent: 10 },
-      { id: '2', listId: 'l1', listName: 'A', completedAt: Date.parse(today), itemCount: 2, totalSpent: 5 },
+      { id: '1', listId: 'l1', listName: 'A', completedAt: Date.parse(today), items: makeItems(3, 10) },
+      { id: '2', listId: 'l1', listName: 'A', completedAt: Date.parse(today), items: makeItems(2, 5) },
     ]
     const result = completedTripsPerWeek(sameWeekTrips, 1)
     expect(result[0].count).toBe(2)

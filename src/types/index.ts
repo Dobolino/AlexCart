@@ -159,12 +159,22 @@ export interface AppStats {
   itemsAddedTotal: number
 }
 
-/** Snapshot eines vollständig abgeschlossenen Einkaufs (nicht pro Artikel, sondern pro Liste). */
+/** Einzelposten auf der Quittung eines abgeschlossenen Einkaufs. */
+export interface CompletedTripItem {
+  id: string
+  name: string
+  amount: string
+  /** Fehlt, wenn beim Abhaken kein Preis erfasst wurde. */
+  price?: number
+}
+
+/** Snapshot eines vollständig abgeschlossenen Einkaufs (nicht pro Artikel, sondern pro Liste) -
+ *  itemCount/totalSpent werden aus `items` abgeleitet, nicht separat gespeichert, damit eine
+ *  nachträgliche Preiskorrektur nie aus dem Takt geraten kann. */
 export interface CompletedTrip {
   id: string
   listId: string
   listName: string
   completedAt: number
-  itemCount: number
-  totalSpent: number
+  items: CompletedTripItem[]
 }

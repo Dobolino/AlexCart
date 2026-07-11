@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   idsToExcludeTodayPricedCheckoffs,
+  receiptItemsForList,
   removeTodayPurchaseLogEntriesForItems,
   removeTodayPurchaseLogEntry,
   syncPurchaseLogForItemRename,
@@ -92,5 +93,22 @@ describe('purchaseLog', () => {
     const next = removeTodayPurchaseLogEntry(dupLog, 'Milch', 'Milch & Käse', today, 'item-b')
     expect(next).toHaveLength(1)
     expect(next[0]?.itemId).toBe('item-a')
+  })
+
+  it('receiptItemsForList baut Quittungszeilen nur für abgehakte Artikel, Preis optional', () => {
+    const listItems = [
+      { id: 'item-1', name: 'Milch', amount: '1 l', category: 'Milch & Käse', done: true, favorite: false, addedAt: 0 },
+      { id: 'item-2', name: 'Brot', amount: '1 Stk', category: 'Brot & Backwaren', done: true, favorite: false, addedAt: 0 },
+      { id: 'item-3', name: 'Eier', amount: '6 Stk', category: 'Sonstiges', done: false, favorite: false, addedAt: 0 },
+    ]
+    const withItemIds = [
+      { id: 'x', itemId: 'item-1', name: 'Milch', category: 'Milch & Käse', date: today, price: 2.5 },
+      { id: 'y', itemId: 'item-2', name: 'Brot', category: 'Brot & Backwaren', date: today },
+    ]
+    const receipt = receiptItemsForList(withItemIds, listItems, today)
+    expect(receipt).toEqual([
+      { id: 'item-1', name: 'Milch', amount: '1 l', price: 2.5 },
+      { id: 'item-2', name: 'Brot', amount: '1 Stk', price: undefined },
+    ])
   })
 })

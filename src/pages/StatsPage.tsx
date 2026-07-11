@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import {
   topItems,
@@ -12,11 +13,13 @@ import {
   avgSpendPerCompletedTrip,
   avgItemsPerCompletedTrip,
   completedTripsPerWeek,
+  tripTotalSpent,
 } from '@/utils/stats'
 import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
+import { ReceiptSheet } from '@/components/ReceiptSheet'
 import { ICON_PATHS } from '@/constants/icons'
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -37,6 +40,8 @@ export function StatsPage() {
   const lists = useStore((s) => s.lists)
   const currency = useStore((s) => s.settings.currency)
   const resetStats = useStore((s) => s.resetStats)
+  const updateCompletedTripItemPrice = useStore((s) => s.updateCompletedTripItemPrice)
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
 
   const top = topItems(purchaseLog)
   const categories = categoryBreakdown(purchaseLog)
@@ -52,6 +57,8 @@ export function StatsPage() {
   const hasCompletedTrips = completedTrips.length > 0
   const tripWeeks = completedTripsPerWeek(completedTrips, 8)
   const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
+  const recentTrips = [...completedTrips].sort((a, b) => b.completedAt - a.completedAt).slice(0, 10)
+  const selectedTrip = completedTrips.find((t) => t.id === selectedTripId) ?? null
 
   return (
     <>
@@ -99,6 +106,35 @@ export function StatsPage() {
                     }}
                   />
                 </div>
+              ))}
+            </div>
+
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Letzte Einkäufe
+            </div>
+            <div className="card-surface mb-4.5">
+              {recentTrips.map((trip) => (
+                <button
+                  key={trip.id}
+                  type="button"
+                  className="tap-scale flex w-full items-center justify-between border-b px-3.5 py-3 text-left last:border-b-0"
+                  style={{ borderColor: 'var(--border)' }}
+                  onClick={() => setSelectedTripId(trip.id)}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold">{trip.listName}</span>
+                    <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                      {new Date(trip.completedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} ·{' '}
+                      {trip.items.length} Artikel
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[14px] font-bold tabular-nums">
+                    {formatMoney(tripTotalSpent(trip), currency)}
+                  </span>
+                </button>
               ))}
             </div>
           </>
@@ -243,6 +279,15 @@ export function StatsPage() {
           </>
         )}
       </main>
+
+      {selectedTrip && (
+        <ReceiptSheet
+          trip={selectedTrip}
+          currency={currency}
+          onClose={() => setSelectedTripId(null)}
+          onUpdatePrice={(itemId, price) => updateCompletedTripItemPrice(selectedTrip.id, itemId, price)}
+        />
+      )}
     </>
   )
 }

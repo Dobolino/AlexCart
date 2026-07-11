@@ -104,16 +104,21 @@ export function maxTripSpend(log: PurchaseLogEntry[]): number {
   return Math.max(...byDay.values())
 }
 
+/** Summe der erfassten Preise einer Quittung - Artikel ohne Preis zählen als 0. */
+export function tripTotalSpent(trip: CompletedTrip): number {
+  return Math.round(trip.items.reduce((sum, i) => sum + (i.price ?? 0), 0) * 100) / 100
+}
+
 /** Ø Ausgaben pro vollständig abgeschlossener Einkaufsliste (nicht pro Einzelartikel). */
 export function avgSpendPerCompletedTrip(trips: CompletedTrip[]): number {
   if (!trips.length) return 0
-  return trips.reduce((sum, t) => sum + t.totalSpent, 0) / trips.length
+  return trips.reduce((sum, t) => sum + tripTotalSpent(t), 0) / trips.length
 }
 
 /** Ø Artikelanzahl pro vollständig abgeschlossener Einkaufsliste. */
 export function avgItemsPerCompletedTrip(trips: CompletedTrip[]): number {
   if (!trips.length) return 0
-  return trips.reduce((sum, t) => sum + t.itemCount, 0) / trips.length
+  return trips.reduce((sum, t) => sum + t.items.length, 0) / trips.length
 }
 
 /** Anzahl abgeschlossener Einkaufslisten pro Woche, für die letzten `weeks` Wochen (älteste zuerst). */

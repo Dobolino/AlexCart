@@ -78,12 +78,28 @@ export function idsToExcludeTodayPricedCheckoffsForList(
     .map(({ e, i }) => purchaseLogEntryId(e, i))
 }
 
-function matchesListItem(
+export function matchesListItem(
   entry: PurchaseLogEntry,
   item: { id: string; name: string; category: string }
 ): boolean {
   if (entry.itemId) return entry.itemId === item.id
   return entry.name === item.name && entry.category === item.category
+}
+
+/** Quittungs-Zeilen für die abgehakten Artikel einer Liste - für CompletedTrip beim Abschluss
+ *  des Einkaufsmodus. Preis fehlt, wenn beim Abhaken keiner erfasst wurde. */
+export function receiptItemsForList(
+  purchaseLog: PurchaseLogEntry[],
+  listItems: ShoppingItem[],
+  today: string = todayKey()
+): { id: string; name: string; amount: string; price?: number }[] {
+  return listItems
+    .filter((item) => item.done)
+    .map((item) => {
+      const entry = purchaseLog.find((e) => e.date === today && matchesListItem(e, item))
+      const price = entry?.price && entry.price > 0 ? entry.price : undefined
+      return { id: item.id, name: item.name, amount: item.amount, price }
+    })
 }
 
 /** Entfernt den heutigen Kauf-Eintrag für name/category (z. B. beim Abhaken rückgängig). */

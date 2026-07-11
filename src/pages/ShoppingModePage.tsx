@@ -6,7 +6,7 @@ import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
-import { todayPricedTotalForList } from '@/utils/purchaseLog'
+import { receiptItemsForList, todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
 import { isProduceCategory } from '@/utils/producePrice'
 import { todayKey } from '@/utils/date'
@@ -121,7 +121,11 @@ export function ShoppingModePage() {
 
   function handleFinishShopping() {
     if (list && doneCount > 0) {
-      logCompletedTrip({ listId: list.id, listName: list.name, itemCount: doneCount, totalSpent: tripTotal })
+      logCompletedTrip({
+        listId: list.id,
+        listName: list.name,
+        items: receiptItemsForList(purchaseLog, list.items),
+      })
     }
     if (tripTotal > 0 || calculatorEntries.length > 0) {
       resetCalculatorSession()

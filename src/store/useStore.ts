@@ -21,6 +21,7 @@ import type {
   CalculatorEntry,
   CheckoffPriceData,
   CompletedTrip,
+  CompletedTripItem,
   CustomProduct,
   GlobalBrand,
   ListViewMode,
@@ -34,7 +35,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 13
+const STORE_VERSION = 14
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -244,7 +245,9 @@ interface AppState {
   resetStats: () => void
 
   /** Loggt einen vollständig abgeschlossenen Einkauf – siehe ShoppingModePage.handleFinishShopping. */
-  logCompletedTrip: (entry: { listId: string; listName: string; itemCount: number; totalSpent: number }) => void
+  logCompletedTrip: (entry: { listId: string; listName: string; items: CompletedTripItem[] }) => void
+  /** Nachträgliche Preiskorrektur auf der Quittung eines abgeschlossenen Einkaufs. */
+  updateCompletedTripItemPrice: (tripId: string, itemId: string, price: number | undefined) => void
 }
 
 export const useStore = create<AppState>()(
@@ -788,7 +791,7 @@ export const useStore = create<AppState>()(
         }),
 
       logCompletedTrip: (entry) => {
-        if (entry.itemCount <= 0) return
+        if (!entry.items.length) return
         set((state) => ({
           completedTrips: [
             ...state.completedTrips,
@@ -797,12 +800,27 @@ export const useStore = create<AppState>()(
               listId: entry.listId,
               listName: entry.listName,
               completedAt: Date.now(),
-              itemCount: entry.itemCount,
-              totalSpent: Math.round(entry.totalSpent * 100) / 100,
+              items: entry.items,
             },
           ],
         }))
       },
+
+      updateCompletedTripItemPrice: (tripId, itemId, price) =>
+        set((state) => ({
+          completedTrips: state.completedTrips.map((trip) =>
+            trip.id !== tripId
+              ? trip
+              : {
+                  ...trip,
+                  items: trip.items.map((item) =>
+                    item.id !== itemId
+                      ? item
+                      : { ...item, price: price !== undefined && price > 0 ? price : undefined }
+                  ),
+                }
+          ),
+        })),
     }),
     {
       name: STORE_NAME,
@@ -875,6 +893,21 @@ export const useStore = create<AppState>()(
           }
           if (version < 13) {
             state.completedTrips = state.completedTrips ?? []
+          }
+          if (version < 14) {
+            // Frühe Kurzform dieser Version speicherte nur itemCount/totalSpent statt
+            // Einzelposten - als eine Sammel-Zeile übernehmen, damit die Summe erhalten bleibt.
+            state.completedTrips = (state.completedTrips ?? []).map((trip) => {
+              const legacy = trip as unknown as { items?: CompletedTripItem[]; itemCount?: number; totalSpent?: number }
+              if (Array.isArray(legacy.items)) return trip
+              return {
+                ...trip,
+                items:
+                  legacy.itemCount && legacy.itemCount > 0
+                    ? [{ id: uid(), name: 'Diverse Artikel', amount: '', price: legacy.totalSpent || undefined }]
+                    : [],
+              }
+            })
           }
           return state as AppState
         } catch (err) {
