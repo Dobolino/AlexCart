@@ -7,6 +7,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
 import { adjustAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice, type CheckoffPriceMode } from '@/utils/amount'
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
+import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatMoney } from '@/utils/currency'
 import type { CheckoffPriceData, Currency, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
 
@@ -20,6 +21,8 @@ interface CheckoffPriceSheetProps {
   onSave: (data: CheckoffPriceData) => void
   onSkip: () => void
   onAmountChange?: (amount: string) => void
+  /** Einkaufsmodus: Optionen (Pro Stück/Gesamt, Aktion) farblich hervorheben. */
+  highlightOptions?: boolean
 }
 
 function formatShortDate(date?: string): string {
@@ -37,6 +40,7 @@ export function CheckoffPriceSheet({
   onSave,
   onSkip,
   onAmountChange,
+  highlightOptions = false,
 }: CheckoffPriceSheetProps) {
   const variants = profile?.variants ?? []
   const hasVariants = variants.length > 0
@@ -58,6 +62,7 @@ export function CheckoffPriceSheet({
   }, [profile, selection])
 
   const showNewVariantName = selection === NEW_VARIANT
+  const sizePresets = getVariantSizePresets(item.name, item.category, item.amount)
 
   useEffect(() => {
     if (!selectedVariant) return
@@ -89,6 +94,18 @@ export function CheckoffPriceSheet({
       return
     }
     onAmountChange(adjustAmount(item.amount, direction))
+  }
+
+  function applySizePreset(preset: string) {
+    const existingId = profile ? findVariantIdByName(profile.variants, preset) : undefined
+    if (existingId) {
+      setSelection(existingId)
+      setVariantName('')
+    } else {
+      setSelection(NEW_VARIANT)
+      setVariantName(preset)
+    }
+    setError('')
   }
 
   function handleSave() {
@@ -146,32 +163,15 @@ export function CheckoffPriceSheet({
           )}
 
           {quantity > 1 && (
-            <div className="mb-2 flex gap-1 rounded-xl p-0.5" style={{ background: 'var(--chip-bg)' }}>
-              <button
-                type="button"
-                className="tap-scale flex-1 rounded-lg py-2 text-[12px] font-bold"
-                style={{
-                  background: priceMode === 'unit' ? 'var(--surface)' : 'transparent',
-                  color: priceMode === 'unit' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-                onClick={() => setPriceMode('unit')}
-                aria-pressed={priceMode === 'unit'}
-              >
-                Pro Stück
-              </button>
-              <button
-                type="button"
-                className="tap-scale flex-1 rounded-lg py-2 text-[12px] font-bold"
-                style={{
-                  background: priceMode === 'total' ? 'var(--surface)' : 'transparent',
-                  color: priceMode === 'total' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-                onClick={() => setPriceMode('total')}
-                aria-pressed={priceMode === 'total'}
-              >
-                Gesamt
-              </button>
-            </div>
+            <OptionSegment
+              highlight={highlightOptions}
+              options={[
+                { value: 'unit', label: 'Pro Stück' },
+                { value: 'total', label: 'Gesamt' },
+              ]}
+              value={priceMode}
+              onChange={(v) => setPriceMode(v as CheckoffPriceMode)}
+            />
           )}
 
           {quantity > 1 && (
@@ -180,6 +180,37 @@ export function CheckoffPriceSheet({
                 ? `Stückpreis eingeben – wird mit ${quantity} multipliziert`
                 : 'Gesamtpreis aller Packungen am Kassenbon'}
             </p>
+          )}
+
+          {sizePresets.length > 0 && (
+            <div className="mb-2">
+              <div className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+                Grösse
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sizePresets.map((preset) => {
+                  const active =
+                    (selectedVariant && selectedVariant.name === preset) ||
+                    (showNewVariantName && variantName === preset)
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                      style={{
+                        background: active ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                        color: active ? 'var(--accent)' : 'var(--text)',
+                        outline: active ? '2px solid var(--accent)' : 'none',
+                      }}
+                      onClick={() => applySizePreset(preset)}
+                      aria-pressed={active}
+                    >
+                      {preset}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           )}
 
           {hasVariants ? (
@@ -288,6 +319,7 @@ export function CheckoffPriceSheet({
             onChange={setWasSale}
             variant={selectedVariant}
             currency={currency}
+            highlight={highlightOptions}
           />
         </div>
 
@@ -314,16 +346,59 @@ export function CheckoffPriceSheet({
   )
 }
 
+function OptionSegment({
+  options,
+  value,
+  onChange,
+  highlight = false,
+}: {
+  options: { value: string; label: string }[]
+  value: string
+  onChange: (value: string) => void
+  highlight?: boolean
+}) {
+  return (
+    <div className="mb-2 flex gap-1 rounded-xl p-0.5" style={{ background: 'var(--chip-bg)' }}>
+      {options.map((opt) => {
+        const active = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            className="tap-scale flex flex-1 items-center justify-center rounded-lg py-2 text-[12px] font-bold transition-colors"
+            style={{
+              background: active
+                ? highlight
+                  ? 'var(--accent-soft)'
+                  : 'var(--surface)'
+                : 'transparent',
+              color: active ? (highlight ? 'var(--accent)' : 'var(--text)') : 'var(--text-muted)',
+              boxShadow: active && !highlight ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              outline: active && highlight ? '2px solid var(--accent)' : 'none',
+            }}
+            onClick={() => onChange(opt.value)}
+            aria-pressed={active}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function PriceTypePicker({
   wasSale,
   onChange,
   variant,
   currency,
+  highlight = false,
 }: {
   wasSale: boolean
   onChange: (sale: boolean) => void
   variant?: ProductVariant
   currency: Currency
+  highlight?: boolean
 }) {
   const lastSaleHint =
     variant?.lastSalePrice && variant.lastSalePrice > 0
@@ -337,9 +412,10 @@ function PriceTypePicker({
           type="button"
           className="tap-scale flex flex-1 items-center justify-center rounded-lg py-2 text-[12px] font-bold transition-colors"
           style={{
-            background: !wasSale ? 'var(--surface)' : 'transparent',
-            color: !wasSale ? 'var(--text)' : 'var(--text-muted)',
-            boxShadow: !wasSale ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            background: !wasSale ? (highlight ? 'var(--accent-soft)' : 'var(--surface)') : 'transparent',
+            color: !wasSale ? (highlight ? 'var(--accent)' : 'var(--text)') : 'var(--text-muted)',
+            boxShadow: !wasSale && !highlight ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            outline: !wasSale && highlight ? '2px solid var(--accent)' : 'none',
           }}
           onClick={() => onChange(false)}
           aria-pressed={!wasSale}
@@ -353,6 +429,7 @@ function PriceTypePicker({
             background: wasSale ? 'var(--accent-soft)' : 'transparent',
             color: wasSale ? 'var(--accent)' : 'var(--text-muted)',
             boxShadow: wasSale ? '0 1px 3px rgba(255,149,0,0.15)' : 'none',
+            outline: wasSale && highlight ? '2px solid var(--accent)' : 'none',
           }}
           onClick={() => onChange(true)}
           aria-pressed={wasSale}

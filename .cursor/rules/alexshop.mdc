@@ -1,0 +1,42 @@
+---
+description: AlexShop PWA – Architektur, UX-Konventionen und Agent-Hinweise
+globs:
+  - "**/*.{ts,tsx}"
+---
+
+# AlexShop Agent-Kontext
+
+Deutsche Einkaufslisten-PWA (React + TypeScript + Vite + Zustand). UI-Texte immer auf Deutsch.
+
+## Architektur
+
+- **Store:** `src/store/useStore.ts`, persistiert als `alexshop-store` (localStorage), `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration
+- **Preise:** `priceProfiles` (Varianten pro Produkt), `purchaseLog` (Statistik/Budget), `purchaseCommit.ts` beim Abhaken
+- **Varianten:** Marke/Grösse pro Produkt; Dosen-Schnellwahl `400 ml` / `800 ml` via `src/utils/variantPresets.ts`
+- **Einkaufsmodus:** Route `/shop`, `ShoppingModePage.tsx` – grosse Karten, Wake Lock, Extra-Hinzufügen, Mengen-Stepper
+- **Preis-Sheet:** `CheckoffPriceSheet.tsx` – Stückpreis × Menge, `highlightOptions` im Einkaufsmodus (orange Segmente)
+
+## UX-Konventionen
+
+- Einkaufsmodus-Button auf der Liste: **volles Orange** (`var(--accent)`), nicht nur accent-soft
+- Preis-Optionen im Einkaufsmodus: **farblich** (Pro Stück/Gesamt, Normalpreis/Aktion) mit `highlightOptions`
+- Dosen (Icon `dose`, Konserven): Grössen-Chips **400 ml**, **800 ml** im Preis-Sheet
+- Mengen: `adjustAmount` / `ItemAmountColumn`; Stückpreis via `priceQuantityFromAmount` + `resolveCheckoffTotalPrice`
+- Kein echter Dateipfad – Speicherort in Einstellungen als localStorage-Pfad anzeigen
+
+## Qualität
+
+- `npm test` und `npm run build` vor Merge
+- Publish: `npm run publish:pages` (legacy GitHub Pages + dist artifact)
+- Branch-Namen für Agent: `cursor/<beschreibung>-4c5f`
+- Minimale Diffs, bestehende Patterns wiederverwenden
+
+## Wichtige Dateien
+
+| Bereich | Datei |
+|---------|-------|
+| Typen | `src/types/index.ts` |
+| Preisvarianten | `src/utils/priceProfiles.ts`, `src/utils/variantPresets.ts` |
+| Mengen/Preis | `src/utils/amount.ts` |
+| Einkaufsmodus | `src/pages/ShoppingModePage.tsx` |
+| Preis-Eingabe | `src/components/CheckoffPriceSheet.tsx` |

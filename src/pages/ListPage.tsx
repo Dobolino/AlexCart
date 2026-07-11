@@ -203,8 +203,8 @@ export function ListPage() {
           <div className="flex items-center gap-1">
             {activeItems.length > 0 && (
               <button
-                className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
+                className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full shadow-sm"
+                style={{ color: 'var(--accent-fg)', background: 'var(--accent)' }}
                 onClick={() => navigate('/shop')}
                 aria-label="Einkaufsmodus starten"
               >

@@ -345,6 +345,7 @@ export function ShoppingModePage() {
             updateItemInActiveList(priceSheetItem.id, { amount })
             setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
           }}
+          highlightOptions
         />
       )}
     </div>

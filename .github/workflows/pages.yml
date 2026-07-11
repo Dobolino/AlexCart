@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/alexshop-pwa-build-8ecx2c
     paths-ignore:
       - 'assets/**'
       - 'icons/**'

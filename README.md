@@ -16,8 +16,9 @@ npm run lint      # ESLint
 
 ## Deployment
 
-Push auf `main` oder `claude/alexshop-pwa-build-8ecx2c` baut die App via GitHub Actions und
-deployed sie automatisch auf GitHub Pages.
+Push auf `main` baut die App via GitHub Actions und deployed sie automatisch auf GitHub Pages.
+
+Agent-/Claude-Kontext: siehe `.cursor/rules/alexshop.mdc`.
 
 ## Datenformat für den Wochenplan-Import
 
