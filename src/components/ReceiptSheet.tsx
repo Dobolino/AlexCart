@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
+import { Icon } from './Icon'
+import { ICON_PATHS } from '@/constants/icons'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
 import { tripTotalSpent } from '@/utils/stats'
 import type { CompletedTrip, Currency } from '@/types'
@@ -24,17 +26,17 @@ function formatTripDate(completedAt: number): string {
  *  sich hier nachträglich korrigieren, z. B. wenn beim Abhaken etwas falsch eingegeben wurde. */
 export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore }: ReceiptSheetProps) {
   const total = tripTotalSpent(trip)
-  const [storeInput, setStoreInput] = useState(trip.store ?? '')
-  const [storeId, setStoreId] = useState(trip.id)
+  const [editingStore, setEditingStore] = useState(false)
+  const [storeDraft, setStoreDraft] = useState('')
 
-  if (storeId !== trip.id) {
-    setStoreId(trip.id)
-    setStoreInput(trip.store ?? '')
+  function startEditStore() {
+    setStoreDraft(trip.store ?? '')
+    setEditingStore(true)
   }
 
   function saveStore() {
-    const trimmed = storeInput.trim()
-    if (trimmed !== (trip.store ?? '')) onUpdateStore(trimmed || undefined)
+    onUpdateStore(storeDraft.trim() || undefined)
+    setEditingStore(false)
   }
 
   return (
@@ -45,20 +47,22 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             {formatTripDate(trip.completedAt)} · {trip.items.length} Artikel
           </p>
-          <input
-            type="text"
-            className="input mb-3 w-full py-2 text-[14px]"
-            placeholder="Einkaufszentrum (optional)"
-            value={storeInput}
-            onChange={(e) => setStoreInput(e.target.value)}
-            onBlur={saveStore}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                saveStore()
-                ;(e.target as HTMLInputElement).blur()
-              }
-            }}
-          />
+          <button
+            type="button"
+            className="tap-scale mb-3 flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-left text-[14px]"
+            style={{ borderColor: 'var(--border)' }}
+            onClick={startEditStore}
+          >
+            <span
+              className="truncate"
+              style={{ color: trip.store ? 'var(--text)' : 'var(--text-muted)', fontWeight: trip.store ? 600 : 400 }}
+            >
+              {trip.store || 'Einkaufszentrum hinzufügen'}
+            </span>
+            <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
+              <Icon path={ICON_PATHS.edit} size={15} />
+            </span>
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -74,6 +78,31 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
           </div>
         </div>
       </div>
+
+      {editingStore && (
+        <Sheet onClose={() => setEditingStore(false)}>
+          <h2 className="mb-3 text-lg font-bold">Einkaufszentrum</h2>
+          <input
+            type="text"
+            className="input w-full py-3 text-[15px]"
+            placeholder="z. B. Migros Zürich HB"
+            value={storeDraft}
+            onChange={(e) => setStoreDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveStore()
+            }}
+            autoFocus
+          />
+          <div className="mt-4 flex gap-2.5">
+            <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setEditingStore(false)}>
+              Abbrechen
+            </button>
+            <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={saveStore}>
+              Speichern
+            </button>
+          </div>
+        </Sheet>
+      )}
     </Sheet>
   )
 }

@@ -121,6 +121,45 @@ export function avgItemsPerCompletedTrip(trips: CompletedTrip[]): number {
   return trips.reduce((sum, t) => sum + t.items.length, 0) / trips.length
 }
 
+/** ISO-8601-Kalenderwoche (KW) für ein Datum. */
+export function isoWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - dayNum + 3)
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+  const firstDayNum = (firstThursday.getUTCDay() + 6) % 7
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3)
+  return 1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000))
+}
+
+export interface TripMonthGroup {
+  key: string
+  label: string
+  subtotal: number
+  trips: CompletedTrip[]
+}
+
+/** Abgeschlossene Einkäufe nach Kalendermonat gruppiert (neuester Monat zuerst), inkl. Monats-Subtotal. */
+export function tripsByMonth(trips: CompletedTrip[]): TripMonthGroup[] {
+  const groups = new Map<string, CompletedTrip[]>()
+  for (const trip of trips) {
+    const d = new Date(trip.completedAt)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const list = groups.get(key)
+    if (list) list.push(trip)
+    else groups.set(key, [trip])
+  }
+  return Array.from(groups.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, groupTrips]) => {
+      const sorted = [...groupTrips].sort((a, b) => b.completedAt - a.completedAt)
+      const [year, month] = key.split('-').map(Number)
+      const label = new Date(year!, month! - 1, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      const subtotal = Math.round(sorted.reduce((sum, t) => sum + tripTotalSpent(t), 0) * 100) / 100
+      return { key, label, subtotal, trips: sorted }
+    })
+}
+
 /** Anzahl abgeschlossener Einkaufslisten pro Woche, für die letzten `weeks` Wochen (älteste zuerst). */
 export function completedTripsPerWeek(trips: CompletedTrip[], weeks = 8): WeekBucket[] {
   const buckets = new Map<string, number>()

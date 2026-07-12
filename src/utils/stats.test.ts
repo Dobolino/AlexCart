@@ -13,6 +13,8 @@ import {
   avgItemsPerCompletedTrip,
   completedTripsPerWeek,
   tripTotalSpent,
+  isoWeekNumber,
+  tripsByMonth,
 } from './stats'
 import type { CompletedTrip } from '@/types'
 
@@ -125,5 +127,39 @@ describe('completed trip stats', () => {
     ]
     const result = completedTripsPerWeek(sameWeekTrips, 1)
     expect(result[0].count).toBe(2)
+  })
+})
+
+describe('isoWeekNumber', () => {
+  it('returns ISO week 1 for the first Monday-anchored week of the year', () => {
+    expect(isoWeekNumber(new Date(2021, 0, 4))).toBe(1)
+  })
+
+  it('returns ISO week 53 for the last days of a 53-week year', () => {
+    expect(isoWeekNumber(new Date(2020, 11, 31))).toBe(53)
+  })
+})
+
+describe('tripsByMonth', () => {
+  const trips: CompletedTrip[] = [
+    { id: '1', listId: 'l1', listName: 'A', completedAt: new Date(2026, 5, 5).getTime(), items: makeItems(1, 10) },
+    { id: '2', listId: 'l1', listName: 'A', completedAt: new Date(2026, 6, 1).getTime(), items: makeItems(1, 20) },
+    { id: '3', listId: 'l1', listName: 'A', completedAt: new Date(2026, 6, 8).getTime(), items: makeItems(1, 30) },
+  ]
+
+  it('groups trips by calendar month, newest month first', () => {
+    const groups = tripsByMonth(trips)
+    expect(groups.map((g) => g.key)).toEqual(['2026-07', '2026-06'])
+  })
+
+  it('sorts trips within a month newest first and sums the month subtotal', () => {
+    const groups = tripsByMonth(trips)
+    const july = groups.find((g) => g.key === '2026-07')!
+    expect(july.trips.map((t) => t.id)).toEqual(['3', '2'])
+    expect(july.subtotal).toBe(50)
+  })
+
+  it('returns an empty array for no trips', () => {
+    expect(tripsByMonth([])).toEqual([])
   })
 })

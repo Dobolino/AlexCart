@@ -14,6 +14,8 @@ import {
   avgItemsPerCompletedTrip,
   completedTripsPerWeek,
   tripTotalSpent,
+  tripsByMonth,
+  isoWeekNumber,
 } from '@/utils/stats'
 import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
@@ -58,7 +60,7 @@ export function StatsPage() {
   const hasCompletedTrips = completedTrips.length > 0
   const tripWeeks = completedTripsPerWeek(completedTrips, 8)
   const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
-  const recentTrips = [...completedTrips].sort((a, b) => b.completedAt - a.completedAt).slice(0, 10)
+  const tripMonths = tripsByMonth(completedTrips)
   const selectedTrip = completedTrips.find((t) => t.id === selectedTripId) ?? null
 
   return (
@@ -114,33 +116,45 @@ export function StatsPage() {
               className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
               style={{ color: 'var(--category-fg)' }}
             >
-              Letzte Einkäufe
+              Einkaufsverlauf
             </div>
-            <div className="card-surface mb-4.5">
-              {recentTrips.map((trip) => (
-                <button
-                  key={trip.id}
-                  type="button"
-                  className="tap-scale flex w-full items-center justify-between border-b px-3.5 py-3 text-left last:border-b-0"
-                  style={{ borderColor: 'var(--border)' }}
-                  onClick={() => setSelectedTripId(trip.id)}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">
-                      {trip.listName}
-                      {trip.store && <span style={{ color: 'var(--text-muted)' }}> · {trip.store}</span>}
-                    </span>
-                    <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      {new Date(trip.completedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} ·{' '}
-                      {trip.items.length} Artikel
-                    </span>
+            {tripMonths.map((group) => (
+              <div key={group.key} className="mb-4.5">
+                <div className="mb-1.5 flex items-center justify-between px-1.5">
+                  <span className="text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                    {group.label}
                   </span>
-                  <span className="shrink-0 text-[14px] font-bold tabular-nums">
-                    {formatMoney(tripTotalSpent(trip), currency)}
+                  <span className="text-[12px] font-bold tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    {formatMoney(group.subtotal, currency)}
                   </span>
-                </button>
-              ))}
-            </div>
+                </div>
+                <div className="card-surface">
+                  {group.trips.map((trip) => (
+                    <button
+                      key={trip.id}
+                      type="button"
+                      className="tap-scale flex w-full items-center justify-between border-b px-3.5 py-3 text-left last:border-b-0"
+                      style={{ borderColor: 'var(--border)' }}
+                      onClick={() => setSelectedTripId(trip.id)}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-semibold">
+                          KW {isoWeekNumber(new Date(trip.completedAt))} ·{' '}
+                          {new Date(trip.completedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                        <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          {trip.listName}
+                          {trip.store && ` · ${trip.store}`} · {trip.items.length} Artikel
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-[14px] font-bold tabular-nums">
+                        {formatMoney(tripTotalSpent(trip), currency)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </>
         )}
 
