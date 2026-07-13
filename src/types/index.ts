@@ -179,4 +179,14 @@ export interface CompletedTrip {
   items: CompletedTripItem[]
   /** Einkaufszentrum/Filiale – optional, nachträglich in der Quittung editierbar. */
   store?: string
+  /** Aktive Einkaufszeit in ms (ohne Pausen). */
+  durationMs?: number
+}
+
+/** Laufende Einkaufssession im Einkaufsmodus (Timer + Pause). */
+export interface ShoppingSession {
+  listId: string
+  startedAt: number
+  pausedAt?: number
+  totalPausedMs: number
 }

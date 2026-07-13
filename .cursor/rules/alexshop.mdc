@@ -72,6 +72,7 @@ Before generating or modifying code on a fresh session:
 | Erledigte Kategorien einklappen, nächste öffnen | ✅ (`ShoppingCategoryBlock`) |
 | Completed Trip mit Quittung | ✅ (`completedTrips[]`, `ReceiptSheet`) |
 | Filiale pro Trip (optional) | ✅ |
+| Pause/Fortsetzen + aktive Dauer (ohne Pausen) | ✅ (`shoppingSession`, `ShoppingPausedOverlay`) |
 | Schnell-Hinzufügen (+), Löschen, Preis-Sheet | ✅ |
 
 ## 3. Price & Variant Management
@@ -153,7 +154,7 @@ interface ProductVariant {
 1. **Fix & verify:** `npm test` + `npm run build` vor Merge
 2. **Shopping Mode UX** und **Varianten-Modell** als Kern – keine parallelen Datenmodelle einführen
 3. **Minimale Diffs** – bestehende Patterns wiederverwenden
-4. Geplante Features (Dexie-Migration, Delta-Badges, Pause/Resume, Rezept-Review) nur bei expliziter Anforderung
+4. Geplante Features (Dexie-Migration, Rezept-Review) nur bei expliziter Anforderung
 
 ---
 
