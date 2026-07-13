@@ -1,54 +1,172 @@
 ---
-description: AlexShop PWA – Architektur, UX-Konventionen und Agent-Hinweise
+description: AlexShop PWA – Rolle, Architektur, Feature-Spec und Agent-Hinweise
 globs:
   - "**/*.{ts,tsx}"
 ---
 
-# AlexShop Agent-Kontext
+# Role & Context
 
-Deutsche Einkaufslisten-PWA (React + TypeScript + Vite + Zustand). UI-Texte immer auf Deutsch.
+You are an expert Frontend Engineer and PWA specialist building **AlexShop** – a highly optimized, local-first shopping assistant PWA for **iOS Safari (Standalone Mode)**. The app combines lists, live budgeting, price tracking, pantry inventory, and statistics.
 
-## Architektur
+**UI language:** Always German for user-facing text.
 
-- **Store:** `src/store/useStore.ts`, persistiert als `alexshop-store` (localStorage), `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration im selben `migrate()`-Switch ergänzen (nie eine alte Stufe umschreiben)
-- **Preise:** `priceProfiles` (Varianten pro Produkt), `purchaseLog` (Statistik/Budget), `purchaseCommit.ts` beim Abhaken
-- **Varianten:** Marke/Grösse pro Produkt; globale Marken in `brands[]`, inkl. Hausmarken-Presets (`constants/houseBrands.ts`) – Hausmarken sind normale Einträge in `brands[]`, kein Sonderfall. Marke direkt beim Anlegen/Bearbeiten eines Artikels wählbar über `<BrandPicker>` + Store-Action `ensureBrandVariant` (legt bei Bedarf eine Variante ohne Kaufhistorie an, `src/utils/priceProfiles.ts`); Dosen-Schnellwahl `400 ml` / `800 ml`
-- **Obst/Gemüse:** exakte Gramm-Eingabe (abgewogen) → Kilopreis (`ProduceWeightInput`, `producePrice.ts`); in der Liste nur geplante Menge, im Einkaufsmodus erst beim Abhaken das tatsächliche Gewicht (`shouldUseExactProduceWeight`)
-- **Einstellungen:** Tab „Preise & Marken“ für Marken und Preisprofile
-- **Einkaufsmodus:** Löschen per Papierkorb, Rückgängig-Toast; beim vollständigen Abschluss (`handleFinishShopping`, nur vom "Einkauf abgeschlossen!"-Screen erreichbar) wird ein `CompletedTrip`-Eintrag geloggt (`completedTrips[]`) – Grundlage für Statistik pro Einkaufsliste, nicht nur pro Einzelartikel
-- **Preis-Sheet:** `CheckoffPriceSheet.tsx` – Stückpreis × Menge, `highlightOptions` im Einkaufsmodus (orange Segmente)
+## IMMEDIATE ACTION (Git & Branch Cleanup)
 
-## UX-Konventionen
+Before generating or modifying code on a fresh session:
 
-- Einkaufsmodus-Button auf der Liste: **volles Orange** (`var(--accent)`), nicht nur accent-soft
-- Preis-Optionen im Einkaufsmodus: **farblich** (Pro Stück/Gesamt, Normalpreis/Aktion) mit `highlightOptions`
-- Dosen (Icon `dose`, Konserven): Grössen-Chips **400 ml**, **800 ml** im Preis-Sheet
-- Mengen: `adjustAmount` / `ItemAmountColumn`; Stückpreis via `priceQuantityFromAmount` + `resolveCheckoffTotalPrice`
-- Kein echter Dateipfad – Speicherort in Einstellungen als localStorage-Pfad anzeigen
+1. Review recent changes for bugs, architectural consistency, and TypeScript errors. Fix immediately.
+2. Merge verified work into `main`.
+3. Prefer a single clean `main` branch – delete merged feature branches (local + remote).
+4. Agent branches: `cursor/<beschreibung>-4c5f`
 
-## Präzision
+---
 
-- Keine vagen Angaben in Code, gespeicherten Daten oder Texten – kein "1–2", "ca.", "ungefähr", "ein paar" o.ä.
-- Fehlt eine konkrete Angabe (Menge, Preis, Datum, Name): entweder gezielt nachfragen, oder einen eindeutigen, dokumentierten Standardwert verwenden – nie raten oder einen Bereich/eine Näherung eintragen
-- Beispiel für das gewünschte Muster: `getDefaultUnit`/`DEFAULT_UNIT` (`src/constants/units.ts`) liefert im Zweifel einen einzigen präzisen Default statt einer Bandbreite
-- Gilt auch für Commit-/PR-Texte und UI-Copy: konkrete Zahlen statt Näherungen, wenn die Zahl bekannt ist
+# Architecture & Tech Stack (aktuell)
 
-## Qualität
+| Bereich | Ist-Zustand |
+|---------|-------------|
+| Framework | **Vite + React** (SPA, React Router) – kein Next.js |
+| Styling | Tailwind CSS, mobile-first, min. 44×44px touch targets, Light/Dark |
+| State & DB | **Zustand** + `persist` → **localStorage** (`alexshop-store`). `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration in `migrate()` |
+| PWA | Vite PWA plugin, Service Worker, `autoUpdate`, iOS install prompt |
+| Tests | Vitest (`npm test`), Build (`npm run build`), Publish (`npm run publish:pages`) |
 
-- `npm test` und `npm run build` vor Merge
-- Publish: `npm run publish:pages` (legacy GitHub Pages + dist artifact)
-- Branch-Namen für Agent: `cursor/<beschreibung>-4c5f`
-- Minimale Diffs, bestehende Patterns wiederverwenden
+> **Hinweis:** Die Spezifikation nennt IndexedDB/Dexie.js als Ziel – aktuell noch **localStorage**. Kein Dexie-Refactor ohne explizite Anforderung. Speicherort in Einstellungen als localStorage-Pfad anzeigen (`storageInfo.ts`).
 
-## Wichtige Dateien
+### Store-Kern (`src/store/useStore.ts`)
+
+- `lists[]`, `priceProfiles[]`, `purchaseLog[]`, `brands[]`, `completedTrips[]`, `pantry[]`, `settings`
+- Preis-Commit: `src/store/purchaseCommit.ts` beim Abhaken
+- Varianten: `src/utils/priceProfiles.ts`, Presets `src/utils/variantPresets.ts`
+- Obst/Gemüse: `src/utils/producePrice.ts`, `ProduceWeightInput`, `shouldUseExactProduceWeight`
+
+---
+
+# Feature Specification
+
+## 1. Shopping List & Intelligent Input
+
+| Feature | Status |
+|---------|--------|
+| Smart Add (Autocomplete, Kategorien, Mengen, Notizen) | ✅ |
+| Rezept-Parser (Text → Artikel) | ✅ |
+| Rezept Review-Screen (Split links/rechts vor Commit) | ❌ geplant |
+| Kategorien, List/Tile-Ansicht, mehrere Listen | ✅ |
+| Inline +/- Mengen-Stepper | ✅ (nicht bei Obst/Gemüse-Gewicht) |
+| Swipe löschen + Undo-Toast | ✅ |
+| Long-press Quick Actions (Edit, Fav, Pantry) | ✅ |
+| „Letzte Woche wiederholen“ | ✅ |
+| Frequenz-Hinweise („vor X Tagen gekauft“) | ❌ geplant |
+
+## 2. Supercharged Shopping Mode (In-Store UX)
+
+| Feature | Status |
+|---------|--------|
+| One-handed Layout, große Zeilen | ✅ |
+| Erledigte Artikel ausblenden / Fokus auf Offene | ✅ |
+| Wake Lock API | ✅ (`useWakeLock`) |
+| Geplante Menge anzeigen, tatsächliches Gewicht beim Abhaken | ✅ |
+| Kilopreis aus exaktem Gewicht | ✅ |
+| Live-Budget / Trip-Total + Schätzung | ✅ |
+| Last Price + Delta-Badge (🔺/🔻) | ❌ geplant |
+| Pause/Resume Session | ❌ geplant |
+| Completed Trip mit Quittung | ✅ (`completedTrips[]`, `ReceiptSheet`) |
+| Filiale pro Trip (optional) | ✅ |
+| Schnell-Hinzufügen (+), Löschen, Preis-Sheet | ✅ |
+
+## 3. Price & Variant Management
+
+| Feature | Status |
+|---------|--------|
+| Varianten pro Produkt (`priceProfiles`) | ✅ |
+| Globale Marken + Hausmarken-Presets | ✅ (`houseBrands.ts`) |
+| Marke am Artikel (`BrandPicker`, `ensureBrandVariant`) | ✅ |
+| Stückpreis × Menge, Normalpreis/Aktion | ✅ |
+| Dosen 400 ml / 800 ml Chips | ✅ |
+| CHF/kg für Obst/Gemüse | ✅ |
+| Einstellungen → Preise & Marken | ✅ |
+| Filial-Zuordnung pro Variante (`ProductVariant.store`) | ⚠️ Typ vorhanden, kein CRUD |
+| Automatisch häufigste Variante vorauswählen | ✅ (`pickVariantForEstimate`) |
+
+### Varianten-Datenmodell (vereinfacht)
+
+```typescript
+interface ProductVariant {
+  id: string
+  name: string
+  brandId?: string
+  lastPrice?: number
+  pricePerKg?: number
+  avgPrice?: number
+  lastSalePrice?: number
+  lastPurchaseDate?: string
+  purchaseCount?: number
+  store?: string // für spätere Filial-Zuordnung
+}
+```
+
+## 4. Pantry & Inventory
+
+| Feature | Status |
+|---------|--------|
+| Vorrat mit Mindestbestand | ✅ |
+| Low-Stock Vorschläge | ✅ |
+| Auto-Nachfüllen beim Abhaken | ✅ |
+| Manuell „-1 verbraucht“ | ❌ geplant |
+| Ablauf/Resttage-Prognose | ❌ geplant |
+
+## 5. Analytics & Insights
+
+| Feature | Status |
+|---------|--------|
+| Top-Artikel, Kategorien, Wochen-Charts | ✅ (`StatsPage`) |
+| Completed-Trip-Statistik (Monatsliste) | ✅ |
+| Quittung nachträglich bearbeiten | ✅ (`ReceiptSheet`) |
+| Filial-Vergleich, Promo-Ersparnis-Tracker | ❌ geplant |
+| Preis-Trends pro Produkt (Charts) | ⚠️ Basis in `priceHistory.ts` |
+
+## 6. PWA, Settings & QoL
+
+| Feature | Status |
+|---------|--------|
+| `viewport-fit=cover`, Safe Areas, fixed Nav | ✅ |
+| JSON Backup Export/Import | ✅ |
+| Speicherort-Anzeige | ✅ |
+| Onboarding | ✅ |
+| Update-Banner bei neuer Version | ⚠️ autoUpdate, kein manueller Toggle |
+| Rubber-banding verhindern | ✅ (iOS viewport helpers) |
+
+---
+
+# UX-Konventionen
+
+- Einkaufsmodus-Button auf Liste: **volles Orange** (`var(--accent)`)
+- Preis-Optionen im Einkaufsmodus: **farblich** mit `highlightOptions`
+- Obst/Gemüse: Liste = geplante Menge; Einkauf = Gewicht erst beim Abhaken
+- Exakte Gramm (347 g), **keine** 50-g-Schritte bei Gewichtsangaben
+- Keine vagen Angaben („ca.“, „ungefähr“, „1–2“) – konkrete Werte oder dokumentierter Default
+
+---
+
+# Execution Priorities
+
+1. **Fix & verify:** `npm test` + `npm run build` vor Merge
+2. **Shopping Mode UX** und **Varianten-Modell** als Kern – keine parallelen Datenmodelle einführen
+3. **Minimale Diffs** – bestehende Patterns wiederverwenden
+4. Geplante Features (Dexie-Migration, Delta-Badges, Pause/Resume, Rezept-Review) nur bei expliziter Anforderung
+
+---
+
+# Wichtige Dateien
 
 | Bereich | Datei |
 |---------|-------|
 | Typen | `src/types/index.ts` |
-| Preisvarianten | `src/utils/priceProfiles.ts`, `src/utils/variantPresets.ts` |
-| Mengen/Preis | `src/utils/amount.ts` |
+| Store | `src/store/useStore.ts` |
 | Einkaufsmodus | `src/pages/ShoppingModePage.tsx` |
 | Preis-Eingabe | `src/components/CheckoffPriceSheet.tsx` |
-| Hausmarken | `src/constants/houseBrands.ts`, `src/utils/houseBrands.ts` |
+| Hausmarken | `src/constants/houseBrands.ts` |
 | Marke am Artikel | `src/components/BrandPicker.tsx` |
-| Statistik | `src/utils/stats.ts`, `src/pages/StatsPage.tsx` |
+| Quittungen | `src/components/ReceiptSheet.tsx` |
+| Statistik | `src/pages/StatsPage.tsx` |
+| Einstellungen | `src/pages/SettingsPage.tsx`, `PriceProfilesSettingsSection.tsx` |
