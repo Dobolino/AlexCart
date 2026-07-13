@@ -68,7 +68,7 @@ Before generating or modifying code on a fresh session:
 | Geplante Menge anzeigen, tatsächliches Gewicht beim Abhaken | ✅ |
 | Kilopreis aus exaktem Gewicht | ✅ |
 | Live-Budget / Trip-Total + Schätzung | ✅ |
-| Last Price + Delta-Badge (🔺/🔻) | ❌ geplant |
+| Last Price + Delta-Badge (🔺/🔻) | ✅ (`priceDelta.ts`, `PriceDeltaBadge`) |
 | Pause/Resume Session | ❌ geplant |
 | Completed Trip mit Quittung | ✅ (`completedTrips[]`, `ReceiptSheet`) |
 | Filiale pro Trip (optional) | ✅ |
