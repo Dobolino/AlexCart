@@ -102,7 +102,7 @@ export function RecipeReviewSheet({
                   />
                   <button
                     type="button"
-                    className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                    className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
                     style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
                     onClick={() => removeItem(item.id)}
                     aria-label={`${item.name} entfernen`}

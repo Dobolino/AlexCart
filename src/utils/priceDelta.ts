@@ -1,5 +1,5 @@
 import type { CheckoffPriceMode } from '@/utils/amount'
-import { productPriceHistory } from '@/utils/priceHistory'
+import { productPriceHistory, type ProductPriceStats } from '@/utils/priceHistory'
 import { resolveProduceCheckoffPrice } from '@/utils/producePrice'
 import { formatMoney } from '@/utils/currency'
 import { normalize } from '@/utils/text'
@@ -17,6 +17,8 @@ export interface PriceDeltaInput {
   weightGrams?: number | null
   selectedVariant?: ProductVariant
   purchaseLog: PurchaseLogEntry[]
+  /** Vorberechnete Kaufhistorie – vermeidet Neuaufbau bei jedem Tastendruck. */
+  priceHistory?: ProductPriceStats[]
   currency: Currency
 }
 
@@ -34,7 +36,7 @@ function roundMoney(value: number): number {
 
 /** Letzter bekannter Preis – zuerst Variante, sonst Kaufhistorie. */
 export function resolveReferencePrice(input: Omit<PriceDeltaInput, 'enteredAmount' | 'currency'>): number | null {
-  const { selectedVariant, wasSale, isProduce, item, purchaseLog } = input
+  const { selectedVariant, wasSale, isProduce, item, purchaseLog, priceHistory } = input
 
   if (selectedVariant) {
     if (wasSale && selectedVariant.lastSalePrice && selectedVariant.lastSalePrice > 0) {
@@ -49,7 +51,7 @@ export function resolveReferencePrice(input: Omit<PriceDeltaInput, 'enteredAmoun
     }
   }
 
-  const history = productPriceHistory(purchaseLog)
+  const history = priceHistory ?? productPriceHistory(purchaseLog)
   const entry = history.find((row) => normalize(row.name) === normalize(item.name))
   if (!entry || entry.lastPrice <= 0) return null
   return entry.lastPrice

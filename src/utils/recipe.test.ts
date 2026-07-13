@@ -12,6 +12,13 @@ describe('parseRecipeLine', () => {
     expect(parseRecipeLine('Zutaten')).toBeNull()
     expect(parseRecipeLine('')).toBeNull()
   })
+
+  it('nimmt bei Mengen-Spannen den höheren Wert', () => {
+    expect(parseRecipeLine('1-2 Bund Petersilie')).toEqual({ name: 'Petersilie', amount: '2 Bund' })
+    expect(parseRecipeLine('- 2-3 Stück Zwiebeln')).toEqual({ name: 'Zwiebeln', amount: '3 Stück' })
+    expect(parseRecipeLine('1–2 EL Olivenöl')).toEqual({ name: 'Olivenöl', amount: '2 EL' })
+    expect(parseRecipeLine('2 - 4 Eier')).toEqual({ name: 'Eier', amount: '4' })
+  })
 })
 
 describe('parseRecipeText', () => {

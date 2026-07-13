@@ -13,6 +13,7 @@ import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPrese
 import { formatVariantLabel } from '@/utils/brands'
 import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput } from '@/utils/producePrice'
 import { computePriceDelta } from '@/utils/priceDelta'
+import { productPriceHistory } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
 import { useStore } from '@/store/useStore'
 import type { CheckoffPriceData, Currency, GlobalBrand, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
@@ -114,6 +115,9 @@ export function CheckoffPriceSheet({
     return resolveCheckoffTotalPrice(enteredAmount, item.amount, priceMode)
   }, [enteredAmount, item.amount, priceMode, isProduce, weightGrams])
 
+  // Kaufhistorie nur bei Log-Änderung aufbauen, nicht bei jedem Numpad-Tastendruck.
+  const priceHistory = useMemo(() => productPriceHistory(purchaseLog), [purchaseLog])
+
   const priceDelta = useMemo(() => {
     if (!highlightOptions || enteredAmount <= 0) return null
     return computePriceDelta({
@@ -126,6 +130,7 @@ export function CheckoffPriceSheet({
       weightGrams,
       selectedVariant,
       purchaseLog,
+      priceHistory,
       currency,
     })
   }, [
@@ -139,6 +144,7 @@ export function CheckoffPriceSheet({
     weightGrams,
     selectedVariant,
     purchaseLog,
+    priceHistory,
     currency,
   ])
 

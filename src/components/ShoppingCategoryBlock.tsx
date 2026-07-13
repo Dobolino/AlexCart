@@ -97,7 +97,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                   )}
                   <button
                     type="button"
-                    className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                    className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
                     style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
                     onClick={() => onDelete(item)}
                     aria-label={`${item.name} löschen`}

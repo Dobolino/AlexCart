@@ -1,5 +1,5 @@
 import { normalize } from './text'
-import { parseAmount, combineAmounts, joinAmount, formatNumber } from './amount'
+import { parseAmount, combineAmounts, joinAmount, formatNumber, stepForUnit } from './amount'
 import type { PantryItem, ShoppingItem, ShoppingList } from '@/types'
 
 export function matchesPantryName(shoppingName: string, pantryName: string): boolean {
@@ -76,11 +76,12 @@ export function buildLowStockSuggestions(pantry: PantryItem[], list: ShoppingLis
   return suggestions.sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }
 
-/** Verringert den Bestand um genau 1 in derselben Einheit; Minimum ist 0. */
+/** Verringert den Bestand um einen einheitengerechten Schritt (Stück 1er, g/ml 50er,
+ *  kg/l 0.5er – gleiche Logik wie der +/- Stepper); Minimum ist 0. */
 export function decrementPantryAmount(amount: string | undefined): string | null {
   const parsed = parseAmount(amount || '')
   if (!parsed || parsed.value <= 0) return null
-  const next = Math.max(0, parsed.value - 1)
+  const next = Math.max(0, parsed.value - stepForUnit(parsed.unit))
   return joinAmount(formatNumber(next), parsed.unit)
 }
 

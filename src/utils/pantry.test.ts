@@ -89,13 +89,16 @@ describe('replenishPantryItem', () => {
 })
 
 describe('decrementPantryAmount', () => {
-  it('reduces stock by 1 in the same unit', () => {
+  it('reduces stock by a unit-appropriate step', () => {
     expect(decrementPantryAmount('3 Stück')).toBe('2 Stück')
-    expect(decrementPantryAmount('1.5 l')).toBe('0,5 l')
+    expect(decrementPantryAmount('1.5 l')).toBe('1 l')
+    expect(decrementPantryAmount('2 kg')).toBe('1,5 kg')
+    expect(decrementPantryAmount('500 g')).toBe('450 g')
   })
 
   it('does not go below zero', () => {
     expect(decrementPantryAmount('1 Stück')).toBe('0 Stück')
+    expect(decrementPantryAmount('0.5 l')).toBe('0 l')
     expect(decrementPantryAmount('0 Stück')).toBeNull()
     expect(decrementPantryAmount(undefined)).toBeNull()
   })

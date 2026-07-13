@@ -45,9 +45,9 @@ export function PantryItemRow({ item, flash = false, onEdit, onRemove, onDecreme
 
       <button
         type="button"
-        className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full text-[13px] font-extrabold tabular-nums disabled:opacity-35"
+        className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full disabled:opacity-35"
         style={{
-          background: canDecrement ? 'var(--chip-bg)' : 'var(--chip-bg)',
+          background: 'var(--chip-bg)',
           color: canDecrement ? 'var(--accent)' : 'var(--text-muted)',
         }}
         onClick={(e) => {
@@ -55,9 +55,9 @@ export function PantryItemRow({ item, flash = false, onEdit, onRemove, onDecreme
           if (canDecrement) onDecrement()
         }}
         disabled={!canDecrement}
-        aria-label={`${item.name}: 1 verbrauchen`}
+        aria-label={`${item.name}: Bestand verringern`}
       >
-        −1
+        <Icon path={ICON_PATHS.minus} size={18} />
       </button>
 
       <button

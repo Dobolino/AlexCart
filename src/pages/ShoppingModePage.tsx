@@ -27,6 +27,9 @@ import {
 } from '@/utils/shoppingDuration'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
+/** Trennzeichen für den Kategorie-Key (kommt in Kategorienamen nicht vor). */
+const CATEGORY_SEP = '\u0000'
+
 export function ShoppingModePage() {
   const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
@@ -58,7 +61,6 @@ export function ShoppingModePage() {
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollTargetRef = useRef<HTMLDivElement | null>(null)
-  const prevCategoryOrderRef = useRef<string[]>([])
   const [clock, setClock] = useState(() => Date.now())
 
   const sessionForList =
@@ -104,26 +106,25 @@ export function ShoppingModePage() {
   const groups = useMemo(() => groupByCategory(openItems), [openItems])
   const categoryNames = useMemo(() => groups.map((g) => g.category), [groups])
 
-  useEffect(() => {
+  // Aufgeklappte Kategorie nachführen, wenn sich die offenen Kategorien ändern (z. B. letzte
+  // abgehakt) – während des Renderns statt in einem Effect (React-Muster „Zustand beim Ändern
+  // eines Werts anpassen“; vermeidet set-state-in-effect / kaskadierende Renders). Die vorige
+  // Reihenfolge steckt im gemerkten Key, damit im Render kein Ref gelesen werden muss.
+  const categoryKey = categoryNames.join(CATEGORY_SEP)
+  const [prevCategoryKey, setPrevCategoryKey] = useState<string | null>(null)
+  if (categoryKey !== prevCategoryKey) {
     if (!categoryNames.length) {
       setExpandedCategory(null)
-      prevCategoryOrderRef.current = categoryNames
-      return
-    }
-
-    setExpandedCategory((current) => {
-      if (current && categoryNames.includes(current)) return current
-
-      if (current) {
-        const next = nextOpenCategory(prevCategoryOrderRef.current, current)
-        if (next && categoryNames.includes(next)) return next
+    } else if (!expandedCategory || !categoryNames.includes(expandedCategory)) {
+      let nextCat: string | null = null
+      if (expandedCategory && prevCategoryKey) {
+        const candidate = nextOpenCategory(prevCategoryKey.split(CATEGORY_SEP), expandedCategory)
+        if (candidate && categoryNames.includes(candidate)) nextCat = candidate
       }
-
-      return categoryNames[0]!
-    })
-
-    prevCategoryOrderRef.current = categoryNames
-  }, [categoryNames])
+      setExpandedCategory(nextCat ?? categoryNames[0]!)
+    }
+    setPrevCategoryKey(categoryKey)
+  }
 
   useEffect(() => {
     if (!expandedCategory || !scrollTargetRef.current) return
@@ -247,7 +248,7 @@ export function ShoppingModePage() {
         }}
       >
         <button
-          className="tap-scale flex h-10 w-10 items-center justify-center rounded-full"
+          className="tap-scale flex h-11 w-11 items-center justify-center rounded-full"
           style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
           onClick={handleExitShopping}
           aria-label="Einkaufsmodus beenden"
@@ -269,7 +270,7 @@ export function ShoppingModePage() {
           {!isPaused && (
             <button
               type="button"
-              className="tap-scale flex h-10 w-10 items-center justify-center rounded-full text-[18px]"
+              className="tap-scale flex h-11 w-11 items-center justify-center rounded-full text-[18px]"
               style={{ background: 'var(--chip-bg)' }}
               onClick={pauseShopping}
               aria-label="Einkauf pausieren"
@@ -279,15 +280,16 @@ export function ShoppingModePage() {
           )}
           {lastChecked ? (
             <button
-              className="tap-scale flex h-10 items-center justify-center rounded-full px-3 text-[12px] font-bold"
+              className="tap-scale flex h-11 items-center justify-center rounded-full px-3.5 text-[12px] font-bold"
               style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
               onClick={handleUndo}
+              aria-label="Abhaken rückgängig"
             >
               <Icon path={ICON_PATHS.undo} size={14} />
             </button>
           ) : showTripTotal ? (
             <button
-              className="tap-scale flex h-10 items-center justify-center rounded-full px-2.5 text-[11px] font-bold"
+              className="tap-scale flex h-11 items-center justify-center rounded-full px-3 text-[11px] font-bold"
               style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
               onClick={handleResetTrip}
               aria-label="Einkaufssumme zurücksetzen"
@@ -295,7 +297,7 @@ export function ShoppingModePage() {
               Leeren
             </button>
           ) : (
-            <div className="flex w-10 items-center justify-center" title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}>
+            <div className="flex h-11 w-11 items-center justify-center" title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}>
               {wakeLockActive && (
                 <span style={{ color: 'var(--text-muted)' }} aria-label="Bildschirm bleibt an">
                   <Icon path={ICON_PATHS.sun} size={16} />

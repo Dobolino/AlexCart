@@ -1,5 +1,5 @@
 import { normalize } from './text'
-import { parseAmount, joinAmount } from './amount'
+import { parseAmount, joinAmount, formatNumber } from './amount'
 import { searchProducts } from './search'
 import { normalizeCategory } from './icon'
 import type { CustomProduct, ImportItemPayload } from '@/types'
@@ -11,10 +11,18 @@ const UNITS =
   'g|kg|ml|l|cl|dl|EL|TL|Stück|Stk|Dose|Packung|Bund|Becher|Glas|Flasche|Prise|Tasse|Zehe|Scheibe|x|×'
 
 export function parseRecipeLine(line: string): ImportItemPayload | null {
-  const text = line
+  const stripped = line
     .replace(/^\s*[-*•·]\s*/, '')
     .replace(/^\s*\d+[.)]\s*/, '')
     .trim()
+
+  // Mengen-Spanne am Zeilenanfang ("1-2 Bund", "2–3 Stück") auf den höheren Wert festlegen –
+  // eine präzise Menge statt der vagen Angabe (siehe Präzisions-Regel in .cursor/rules).
+  const text = stripped.replace(
+    /^(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)(?=\s|$)/,
+    (_m, low: string, high: string) =>
+      formatNumber(Math.max(parseFloat(low.replace(',', '.')), parseFloat(high.replace(',', '.'))))
+  )
 
   if (!text || text.length < 2) return null
   if (SKIP_LINE.test(text)) return null
