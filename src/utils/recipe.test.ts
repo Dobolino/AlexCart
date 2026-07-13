@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRecipeLine, parseRecipeText } from './recipe'
+import { parseRecipeLine, parseRecipeText, truncateRecipeSnippet } from './recipe'
 
 describe('parseRecipeLine', () => {
   it('parses common ingredient formats', () => {
@@ -24,5 +24,14 @@ describe('parseRecipeText', () => {
     const items = parseRecipeText(text)
     expect(items.map((i) => i.name)).toEqual(['Mehl', 'Eier', 'Milch'])
     expect(items[2]?.category).toBe('Milch & Käse')
+  })
+})
+
+describe('truncateRecipeSnippet', () => {
+  it('kürzt lange Rezepttexte für die Vorschau', () => {
+    const long = 'Zutaten\n' + '- Mehl\n'.repeat(30)
+    const snippet = truncateRecipeSnippet(long, 40)
+    expect(snippet.length).toBeLessThanOrEqual(40)
+    expect(snippet.endsWith('…')).toBe(true)
   })
 })

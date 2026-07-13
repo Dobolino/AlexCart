@@ -76,3 +76,11 @@ export function parseRecipeText(text: string, customProducts: CustomProduct[] = 
 
   return items
 }
+
+/** Kurzer Auszug aus dem Original-Rezepttext für den Review-Screen. */
+export function truncateRecipeSnippet(text: string, maxLen = 140): string {
+  const compact = text.replace(/\s+/g, ' ').trim()
+  if (!compact) return ''
+  if (compact.length <= maxLen) return compact
+  return `${compact.slice(0, maxLen - 1)}…`
+}

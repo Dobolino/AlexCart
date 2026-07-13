@@ -24,6 +24,7 @@ import type {
   CompletedTripItem,
   CustomProduct,
   GlobalBrand,
+  ImportItemPayload,
   ListViewMode,
   PantryItem,
   ProductPriceProfile,
@@ -187,6 +188,10 @@ interface AppState {
   repeatLastWeekToActiveList: () => { ok: boolean; error?: string; addedCount: number }
   importRecipeToActiveList: (
     text: string,
+    mode?: ImportMode
+  ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
+  importRecipeItemsToActiveList: (
+    items: ImportItemPayload[],
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string; variantId?: string }) => void
@@ -365,6 +370,11 @@ export const useStore = create<AppState>()(
       importRecipeToActiveList: (text, mode = 'append') => {
         const items = parseRecipeText(text, get().customProducts)
         if (!items.length) return { ok: false, error: 'Keine Zutaten im Text erkannt.' }
+        return get().importRecipeItemsToActiveList(items, mode)
+      },
+
+      importRecipeItemsToActiveList: (items, mode = 'append') => {
+        if (!items.length) return { ok: false, error: 'Keine Zutaten ausgewählt.' }
         return get().importIntoActiveList(JSON.stringify({ items }), mode)
       },
 
