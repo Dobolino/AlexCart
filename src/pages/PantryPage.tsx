@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
-import { isLowStock } from '@/utils/pantry'
 import { joinAmount } from '@/utils/amount'
 import { CATEGORIES } from '@/data/products'
 import { UNITS, getDefaultUnit, getDefaultUnitForCategory } from '@/constants/units'
@@ -9,7 +8,8 @@ import { getIconKey } from '@/utils/icon'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { EditPantrySheet } from '@/components/EditPantrySheet'
-import { Icon } from '@/components/Icon'
+import { PantryItemRow } from '@/components/PantryItemRow'
+import { FloatingPortal } from '@/components/FloatingPortal'
 import { ICON_PATHS } from '@/constants/icons'
 import type { PantryItem } from '@/types'
 
@@ -17,6 +17,7 @@ export function PantryPage() {
   const pantry = useStore((s) => s.pantry)
   const addPantryItem = useStore((s) => s.addPantryItem)
   const removePantryItem = useStore((s) => s.removePantryItem)
+  const decrementPantryItem = useStore((s) => s.decrementPantryItem)
   const [name, setName] = useState('')
   const [category, setCategory] = useState(CATEGORIES[0])
   const [amountValue, setAmountValue] = useState('')
@@ -24,8 +25,12 @@ export function PantryPage() {
   const [minValue, setMinValue] = useState('')
   const [minUnit, setMinUnit] = useState(() => getDefaultUnitForCategory(CATEGORIES[0]))
   const [editing, setEditing] = useState<PantryItem | null>(null)
+  const [flashId, setFlashId] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const amountUnitTouched = useRef(false)
   const minUnitTouched = useRef(false)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const groups = groupByCategory(pantry)
 
@@ -62,6 +67,23 @@ export function PantryPage() {
     setMinUnit(getDefaultUnitForCategory(category))
     amountUnitTouched.current = false
     minUnitTouched.current = false
+  }
+
+  function showToast(message: string) {
+    setToast(message)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2200)
+  }
+
+  function handleDecrement(item: PantryItem) {
+    const addedToList = decrementPantryItem(item.id)
+    setFlashId(item.id)
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    flashTimer.current = setTimeout(() => setFlashId(null), 280)
+
+    if (addedToList) {
+      showToast(`„${item.name}" auf Einkaufsliste`)
+    }
   }
 
   return (
@@ -155,51 +177,16 @@ export function PantryPage() {
                 {g.category}
               </div>
               <div className="card-surface">
-                {g.items.map((item) => {
-                  const low = isLowStock(item)
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-3 border-b px-3.5 py-3.5 last:border-b-0"
-                      style={{ borderColor: 'var(--border)' }}
-                    >
-                      <button
-                        className="tap-scale min-w-0 flex-1 text-left"
-                        onClick={() => setEditing(item)}
-                      >
-                        <span className="block truncate text-[15px] font-semibold">{item.name}</span>
-                        <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                          {item.amount ? `Bestand: ${item.amount}` : 'Kein Bestand erfasst'}
-                          {item.minAmount ? ` · min ${item.minAmount}` : ''}
-                        </span>
-                      </button>
-                      {low && (
-                        <span
-                          className="flex-none rounded-full px-2 py-0.5 text-[11px] font-bold"
-                          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-                        >
-                          Nachkauf
-                        </span>
-                      )}
-                      <button
-                        className="tap-scale flex-none p-1"
-                        style={{ color: 'var(--text-muted)' }}
-                        onClick={() => setEditing(item)}
-                        aria-label={`${item.name} bearbeiten`}
-                      >
-                        <Icon path={ICON_PATHS.edit} size={18} />
-                      </button>
-                      <button
-                        className="tap-scale flex-none p-1"
-                        style={{ color: 'var(--danger)' }}
-                        onClick={() => removePantryItem(item.id)}
-                        aria-label={`${item.name} entfernen`}
-                      >
-                        <Icon path={ICON_PATHS.close} size={18} />
-                      </button>
-                    </div>
-                  )
-                })}
+                {g.items.map((item) => (
+                  <PantryItemRow
+                    key={item.id}
+                    item={item}
+                    flash={flashId === item.id}
+                    onEdit={() => setEditing(item)}
+                    onRemove={() => removePantryItem(item.id)}
+                    onDecrement={() => handleDecrement(item)}
+                  />
+                ))}
               </div>
             </div>
           ))
@@ -207,6 +194,20 @@ export function PantryPage() {
       </main>
 
       {editing && <EditPantrySheet item={editing} onClose={() => setEditing(null)} />}
+
+      {toast && (
+        <FloatingPortal>
+          <div
+            className="glass fixed left-1/2 z-40 max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-full px-4 py-2.5 text-center text-[13px] font-semibold"
+            style={{
+              color: 'var(--text)',
+              bottom: 'calc(72px + var(--safe-bottom))',
+            }}
+          >
+            {toast}
+          </div>
+        </FloatingPortal>
+      )}
     </>
   )
 }

@@ -76,6 +76,34 @@ export function buildLowStockSuggestions(pantry: PantryItem[], list: ShoppingLis
   return suggestions.sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }
 
+/** Verringert den Bestand um genau 1 in derselben Einheit; Minimum ist 0. */
+export function decrementPantryAmount(amount: string | undefined): string | null {
+  const parsed = parseAmount(amount || '')
+  if (!parsed || parsed.value <= 0) return null
+  const next = Math.max(0, parsed.value - 1)
+  return joinAmount(formatNumber(next), parsed.unit)
+}
+
+export function canDecrementPantryAmount(amount: string | undefined): boolean {
+  const parsed = parseAmount(amount || '')
+  return parsed !== null && parsed.value > 0
+}
+
+/** Legt einen unter-Mindestbestand-Artikel auf die Liste – null wenn nicht nötig oder schon drauf. */
+export function prepareLowStockListAddition(
+  item: PantryItem,
+  list: ShoppingList
+): { name: string; category: string; amount: string } | null {
+  if (!isLowStock(item)) return null
+  const alreadyOnList = list.items.some((open) => !open.done && matchesPantryName(open.name, item.name))
+  if (alreadyOnList) return null
+  return {
+    name: item.name,
+    category: item.category,
+    amount: suggestedRestockAmount(item),
+  }
+}
+
 export function replenishPantryItem(pantry: PantryItem[], shoppingItem: ShoppingItem): PantryItem[] {
   const index = pantry.findIndex((item) => matchesPantryName(shoppingItem.name, item.name))
   if (index < 0 || !shoppingItem.amount.trim()) return pantry

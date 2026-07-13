@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildLowStockSuggestions,
+  canDecrementPantryAmount,
+  decrementPantryAmount,
   isLowStock,
   matchesPantryName,
+  prepareLowStockListAddition,
   replenishAmount,
   replenishPantryItem,
   suggestedRestockAmount,
@@ -82,5 +85,58 @@ describe('replenishPantryItem', () => {
       addedAt: 1,
     })
     expect(updated[0]?.amount).toBe('2,5 l')
+  })
+})
+
+describe('decrementPantryAmount', () => {
+  it('reduces stock by 1 in the same unit', () => {
+    expect(decrementPantryAmount('3 Stück')).toBe('2 Stück')
+    expect(decrementPantryAmount('1.5 l')).toBe('0,5 l')
+  })
+
+  it('does not go below zero', () => {
+    expect(decrementPantryAmount('1 Stück')).toBe('0 Stück')
+    expect(decrementPantryAmount('0 Stück')).toBeNull()
+    expect(decrementPantryAmount(undefined)).toBeNull()
+  })
+})
+
+describe('canDecrementPantryAmount', () => {
+  it('allows decrement only when stock is above zero', () => {
+    expect(canDecrementPantryAmount('2 l')).toBe(true)
+    expect(canDecrementPantryAmount('0 l')).toBe(false)
+    expect(canDecrementPantryAmount('')).toBe(false)
+  })
+})
+
+describe('prepareLowStockListAddition', () => {
+  it('returns list payload for low-stock items not already on the list', () => {
+    const item: PantryItem = {
+      id: '1',
+      name: 'Milch',
+      category: 'Milch & Käse',
+      amount: '0 l',
+      minAmount: '1 l',
+    }
+    expect(prepareLowStockListAddition(item, list)).toEqual({
+      name: 'Milch',
+      category: 'Milch & Käse',
+      amount: '1 l',
+    })
+  })
+
+  it('returns null when item is already on the list', () => {
+    const item: PantryItem = {
+      id: '1',
+      name: 'Milch',
+      category: 'Milch & Käse',
+      amount: '0 l',
+      minAmount: '1 l',
+    }
+    const busyList: ShoppingList = {
+      ...list,
+      items: [{ id: 'x', name: 'Milch', amount: '1 l', category: 'Milch & Käse', done: false, addedAt: 1 }],
+    }
+    expect(prepareLowStockListAddition(item, busyList)).toBeNull()
   })
 })

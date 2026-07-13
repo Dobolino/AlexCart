@@ -112,7 +112,7 @@ interface ProductVariant {
 | Vorrat mit Mindestbestand | ✅ |
 | Low-Stock Vorschläge | ✅ |
 | Auto-Nachfüllen beim Abhaken | ✅ |
-| Manuell „-1 verbraucht“ | ❌ geplant |
+| Manuell „-1 verbraucht“ | ✅ (`decrementPantryItem`, `PantryItemRow`) |
 | Ablauf/Resttage-Prognose | ❌ geplant |
 
 ## 5. Analytics & Insights

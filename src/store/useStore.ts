@@ -5,7 +5,7 @@ import { importFromJSON } from '@/utils/import'
 import { applyImportMode } from '@/utils/mergeList'
 import { buildRepeatCandidates, candidatesToItems } from '@/utils/repeatWeek'
 import { parseRecipeText } from '@/utils/recipe'
-import { replenishPantryItem } from '@/utils/pantry'
+import { replenishPantryItem, decrementPantryAmount, prepareLowStockListAddition } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
@@ -207,6 +207,7 @@ interface AppState {
 
   addPantryItem: (name: string, category: string, amount?: string, minAmount?: string) => void
   updatePantryItem: (id: string, patch: Partial<Pick<PantryItem, 'name' | 'category' | 'amount' | 'minAmount'>>) => void
+  decrementPantryItem: (id: string) => boolean
   removePantryItem: (id: string) => void
 
   addCustomProduct: (input: { name: string; category: string; amount: string; note?: string }) => CustomProduct
@@ -621,6 +622,43 @@ export const useStore = create<AppState>()(
                 }
           ),
         })),
+      decrementPantryItem: (id) => {
+        const state = get()
+        const index = state.pantry.findIndex((p) => p.id === id)
+        if (index < 0) return false
+
+        const item = state.pantry[index]!
+        const nextAmount = decrementPantryAmount(item.amount)
+        if (nextAmount === null) return false
+
+        const updatedItem: PantryItem = { ...item, amount: nextAmount }
+        const pantry = state.pantry.map((p, i) => (i === index ? updatedItem : p))
+
+        let lists = state.lists
+        let addedToList = false
+        const list = lists.find((l) => l.id === state.activeListId)
+        if (list) {
+          const addition = prepareLowStockListAddition(updatedItem, list)
+          if (addition) {
+            const newItem: ShoppingItem = {
+              id: uid(),
+              name: addition.name,
+              amount: addition.amount,
+              category: normalizeCategory(addition.category),
+              done: false,
+              favorite: false,
+              addedAt: Date.now(),
+            }
+            lists = lists.map((l) =>
+              l.id !== list.id ? l : { ...l, items: [...l.items, newItem] }
+            )
+            addedToList = true
+          }
+        }
+
+        set({ pantry, lists })
+        return addedToList
+      },
       removePantryItem: (id) => set((state) => ({ pantry: state.pantry.filter((p) => p.id !== id) })),
 
       addCustomProduct: (input) => {
