@@ -10,6 +10,8 @@ interface MoneyNumpadProps {
   /** Noch kompakter für Preis-Sheet ohne Scrollen. */
   dense?: boolean
   label?: string
+  /** Zusatz neben dem Betrag (z. B. Preis-Delta-Badge). */
+  trailing?: React.ReactNode
   /** Wie die orangene Summen-Karte: Label links, Betrag rechts */
   display?: 'card' | 'summary'
 }
@@ -21,6 +23,7 @@ export function MoneyNumpad({
   compact = false,
   dense = false,
   label = 'Eingabe',
+  trailing,
   display = 'card',
 }: MoneyNumpadProps) {
   const amount = centsToAmount(cents) ?? 0
@@ -67,10 +70,11 @@ export function MoneyNumpad({
             </div>
           )}
           <div
-            className={`card-surface ${displayMb} flex items-center justify-end gap-2 px-4 font-bold tabular-nums`}
+            className={`card-surface ${displayMb} flex items-center justify-between gap-2 px-4 font-bold tabular-nums`}
             style={{ color: 'var(--text)', minHeight: displayMinH, fontSize: displaySize }}
           >
-            <span>{formatMoney(amount, currency)}</span>
+            <span className="min-w-0 truncate">{formatMoney(amount, currency)}</span>
+            {trailing}
           </div>
         </>
       )}

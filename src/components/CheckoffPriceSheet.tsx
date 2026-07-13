@@ -3,6 +3,7 @@ import { Sheet } from './Sheet'
 import { MoneyNumpad } from './MoneyNumpad'
 import { ItemAmountColumn } from './ItemAmountColumn'
 import { ProduceWeightInput } from './ProduceWeightInput'
+import { PriceDeltaBadge } from './PriceDeltaBadge'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
@@ -11,7 +12,9 @@ import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/pric
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
 import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput } from '@/utils/producePrice'
+import { computePriceDelta } from '@/utils/priceDelta'
 import { formatMoney } from '@/utils/currency'
+import { useStore } from '@/store/useStore'
 import type { CheckoffPriceData, Currency, GlobalBrand, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
 
 const NEW_VARIANT = '__new__'
@@ -47,6 +50,7 @@ export function CheckoffPriceSheet({
   onAmountChange,
   highlightOptions = false,
 }: CheckoffPriceSheetProps) {
+  const purchaseLog = useStore((s) => s.purchaseLog)
   const variants = profile?.variants ?? []
   const hasVariants = variants.length > 0
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
@@ -109,6 +113,34 @@ export function CheckoffPriceSheet({
     if (isProduce && weightGrams) return resolveProduceCheckoffPrice(enteredAmount, weightGrams)
     return resolveCheckoffTotalPrice(enteredAmount, item.amount, priceMode)
   }, [enteredAmount, item.amount, priceMode, isProduce, weightGrams])
+
+  const priceDelta = useMemo(() => {
+    if (!highlightOptions || enteredAmount <= 0) return null
+    return computePriceDelta({
+      item,
+      enteredAmount,
+      isProduce,
+      wasSale,
+      priceMode,
+      quantity,
+      weightGrams,
+      selectedVariant,
+      purchaseLog,
+      currency,
+    })
+  }, [
+    highlightOptions,
+    enteredAmount,
+    item,
+    isProduce,
+    wasSale,
+    priceMode,
+    quantity,
+    weightGrams,
+    selectedVariant,
+    purchaseLog,
+    currency,
+  ])
 
   function handleAdjustAmount(direction: 1 | -1) {
     if (!onAmountChange || isProduce) return
@@ -393,6 +425,11 @@ export function CheckoffPriceSheet({
             currency={currency}
             dense
             label={isProduce ? 'Preis am Kassenbon' : quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
+            trailing={
+              priceDelta && priceDelta.direction !== 'same' ? (
+                <PriceDeltaBadge label={priceDelta.label} direction={priceDelta.direction} />
+              ) : undefined
+            }
           />
           {isProduce && enteredAmount > 0 && weightGrams && (
             <div
