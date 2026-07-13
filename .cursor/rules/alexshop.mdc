@@ -69,7 +69,7 @@ Before generating or modifying code on a fresh session:
 | Kilopreis aus exaktem Gewicht | ✅ |
 | Live-Budget / Trip-Total + Schätzung | ✅ |
 | Last Price + Delta-Badge (🔺/🔻) | ✅ (`priceDelta.ts`, `PriceDeltaBadge`) |
-| Pause/Resume Session | ❌ geplant |
+| Erledigte Kategorien einklappen, nächste öffnen | ✅ (`ShoppingCategoryBlock`) |
 | Completed Trip mit Quittung | ✅ (`completedTrips[]`, `ReceiptSheet`) |
 | Filiale pro Trip (optional) | ✅ |
 | Schnell-Hinzufügen (+), Löschen, Preis-Sheet | ✅ |

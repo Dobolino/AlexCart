@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
@@ -9,14 +9,15 @@ import { useWakeLock } from '@/hooks/useWakeLock'
 import { receiptItemsForList, todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
 import { isProduceCategory } from '@/utils/producePrice'
+import { nextOpenCategory } from '@/utils/shoppingProgress'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
-import { ItemAmountColumn } from '@/components/ItemAmountColumn'
-import { AmountBadge } from '@/components/AmountBadge'
+import { ShoppingCategoryBlock } from '@/components/ShoppingCategoryBlock'
+import { ShoppingProgressBar } from '@/components/ShoppingProgressBar'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
@@ -42,8 +43,11 @@ export function ShoppingModePage() {
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [deletedItem, setDeletedItem] = useState<ShoppingItem | null>(null)
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollTargetRef = useRef<HTMLDivElement | null>(null)
+  const prevCategoryOrderRef = useRef<string[]>([])
 
   const wakeLockActive = useWakeLock(true)
 
@@ -64,11 +68,41 @@ export function ShoppingModePage() {
     [tripTotal, openEstimate.total]
   )
 
-  if (!list) return null
-
-  const doneCount = list.items.filter((i) => i.done).length
+  const doneCount = useMemo(() => list?.items.filter((i) => i.done).length ?? 0, [list])
   const totalCount = openItems.length + doneCount
-  const groups = groupByCategory(openItems)
+  const groups = useMemo(() => groupByCategory(openItems), [openItems])
+  const categoryNames = useMemo(() => groups.map((g) => g.category), [groups])
+
+  useEffect(() => {
+    if (!categoryNames.length) {
+      setExpandedCategory(null)
+      prevCategoryOrderRef.current = categoryNames
+      return
+    }
+
+    setExpandedCategory((current) => {
+      if (current && categoryNames.includes(current)) return current
+
+      if (current) {
+        const next = nextOpenCategory(prevCategoryOrderRef.current, current)
+        if (next && categoryNames.includes(next)) return next
+      }
+
+      return categoryNames[0]!
+    })
+
+    prevCategoryOrderRef.current = categoryNames
+  }, [categoryNames])
+
+  useEffect(() => {
+    if (!expandedCategory || !scrollTargetRef.current) return
+    const el = scrollTargetRef.current
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [expandedCategory, categoryNames])
+
+  if (!list) return null
 
   const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
   const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog), calculatorTotal)
@@ -80,6 +114,10 @@ export function ShoppingModePage() {
     setLastChecked(next)
     if (undoTimer.current) clearTimeout(undoTimer.current)
     undoTimer.current = setTimeout(() => setLastChecked(null), 4000)
+  }
+
+  function handleToggleCategory(category: string) {
+    setExpandedCategory(category)
   }
 
   function handleCheck(item: ShoppingItem) {
@@ -234,18 +272,13 @@ export function ShoppingModePage() {
         </div>
       )}
 
-      {budget && (
-        <div className="px-4 py-2">
-          <div className="progress-track h-2 overflow-hidden rounded-full">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.min(100, budget.percent)}%`,
-                background: budget.status === 'over' ? 'var(--danger)' : budget.status === 'warn' ? '#e8a317' : 'var(--accent)',
-              }}
-            />
-          </div>
-        </div>
+      {totalCount > 0 && (
+        <ShoppingProgressBar
+          doneCount={doneCount}
+          totalCount={totalCount}
+          budget={budget}
+          currency={currency}
+        />
       )}
 
       <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-8">
@@ -285,60 +318,17 @@ export function ShoppingModePage() {
           </div>
         ) : (
           groups.map((group) => (
-            <div key={group.category} className="mb-5">
-              <div className="category-heading mb-2 px-1.5 text-[14px] font-bold" style={{ color: 'var(--text)' }}>
-                {group.category}
-              </div>
-              <div className="flex flex-col gap-2">
-                {group.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex min-h-[72px] items-center gap-2 rounded-2xl px-3 py-3 shadow-sm"
-                    style={{ background: 'var(--surface)' }}
-                  >
-                    <button
-                      type="button"
-                      className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full border-2"
-                      style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                      onClick={() => handleCheck(item)}
-                      aria-label={`${item.name} abhaken`}
-                    >
-                      <Icon path={ICON_PATHS.check} size={22} />
-                    </button>
-                    <button
-                      type="button"
-                      className="tap-scale min-w-0 flex-1 text-left"
-                      onClick={() => handleCheck(item)}
-                    >
-                      <span className="block truncate text-[18px] font-bold leading-tight">{item.name}</span>
-                      {item.note && (
-                        <span className="mt-0.5 block truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
-                          {item.note}
-                        </span>
-                      )}
-                    </button>
-                    {isProduceCategory(item.category) ? (
-                      item.amount ? <AmountBadge amount={item.amount} prominent /> : null
-                    ) : (
-                      <ItemAmountColumn
-                        item={item}
-                        showStepper
-                        onAdjustAmount={handleAdjustAmount}
-                      />
-                    )}
-                    <button
-                      type="button"
-                      className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                      style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
-                      onClick={() => handleDelete(item)}
-                      aria-label={`${item.name} löschen`}
-                    >
-                      <Icon path={ICON_PATHS.trash} size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ShoppingCategoryBlock
+              key={group.category}
+              ref={expandedCategory === group.category ? scrollTargetRef : undefined}
+              category={group.category}
+              items={group.items}
+              expanded={expandedCategory === group.category}
+              onToggle={() => handleToggleCategory(group.category)}
+              onCheck={handleCheck}
+              onDelete={handleDelete}
+              onAdjustAmount={handleAdjustAmount}
+            />
           ))
         )}
       </main>
