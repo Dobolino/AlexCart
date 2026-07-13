@@ -10,6 +10,12 @@ const SKIP_LINE =
 const UNITS =
   'g|kg|ml|l|cl|dl|EL|TL|Stück|Stk|Dose|Packung|Bund|Becher|Glas|Flasche|Prise|Tasse|Zehe|Scheibe|x|×'
 
+/** z. B. „1-2 Bund Petersilie“ → Menge auf den höheren Wert (2 Bund). */
+const SPAN_AMOUNT = new RegExp(
+  `^(\\d+)\\s*[-–]\\s*(\\d+)\\s*(?:(${UNITS})\\s+)?(.+)$`,
+  'iu'
+)
+
 export function parseRecipeLine(line: string): ImportItemPayload | null {
   const text = line
     .replace(/^\s*[-*•·]\s*/, '')
@@ -19,6 +25,19 @@ export function parseRecipeLine(line: string): ImportItemPayload | null {
   if (!text || text.length < 2) return null
   if (SKIP_LINE.test(text)) return null
   if (/^#{1,6}\s/.test(text)) return null
+
+  const spanMatch = text.match(SPAN_AMOUNT)
+  if (spanMatch) {
+    const low = Number(spanMatch[1])
+    const high = Number(spanMatch[2])
+    const unit = spanMatch[3] || ''
+    const name = spanMatch[4]!.trim()
+    const value = String(Math.max(low, high))
+    return {
+      name,
+      amount: unit ? joinAmount(value, unit) : value,
+    }
+  }
 
   const amountFirst = text.match(
     new RegExp(`^(\\d+(?:[.,]\\d+)?)(?:\\s*(?:${UNITS}))?\\s+(.+)$`, 'iu')
