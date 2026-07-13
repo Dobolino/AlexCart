@@ -462,7 +462,7 @@ export function ShoppingModePage() {
         />
       )}
 
-      {isPaused && <ShoppingPausedOverlay onResume={resumeShopping} />}
+      {isPaused && <ShoppingPausedOverlay onResume={resumeShopping} onExit={handleExitShopping} />}
     </div>
   )
 }

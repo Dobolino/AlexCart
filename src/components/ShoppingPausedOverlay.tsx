@@ -1,8 +1,9 @@
 interface ShoppingPausedOverlayProps {
   onResume: () => void
+  onExit: () => void
 }
 
-export function ShoppingPausedOverlay({ onResume }: ShoppingPausedOverlayProps) {
+export function ShoppingPausedOverlay({ onResume, onExit }: ShoppingPausedOverlayProps) {
   return (
     <div
       className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6"
@@ -20,6 +21,13 @@ export function ShoppingPausedOverlay({ onResume }: ShoppingPausedOverlayProps) 
       >
         <span aria-hidden>▶️</span>
         Fortsetzen
+      </button>
+      <button
+        type="button"
+        className="tap-scale mt-4 min-h-[44px] px-6 text-[14px] font-bold text-white/80"
+        onClick={onExit}
+      >
+        Einkauf beenden
       </button>
     </div>
   )
