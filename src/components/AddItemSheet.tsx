@@ -14,6 +14,8 @@ import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
 import { parseRecipeText } from '@/utils/recipe'
+import { RecipeReviewSheet, type RecipeReviewItem } from '@/components/RecipeReviewSheet'
+import { uid } from '@/utils/id'
 import type { ImportMode } from '@/types'
 
 interface AddItemSheetProps {
@@ -33,7 +35,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importIntoActiveList = useStore((s) => s.importIntoActiveList)
   const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
-  const importRecipeToActiveList = useStore((s) => s.importRecipeToActiveList)
+  const importRecipeItemsToActiveList = useStore((s) => s.importRecipeItemsToActiveList)
   const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
   const brands = useStore((s) => s.brands)
   const completedTrips = useStore((s) => s.completedTrips)
@@ -54,10 +56,8 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const [recipeText, setRecipeText] = useState('')
   const [recipeError, setRecipeError] = useState('')
   const [recipeMode, setRecipeMode] = useState<ImportMode>('append')
-  const recipePreview = useMemo(
-    () => (recipeText.trim() ? parseRecipeText(recipeText, customProducts) : []),
-    [recipeText, customProducts]
-  )
+  const [recipeReviewOpen, setRecipeReviewOpen] = useState(false)
+  const [recipeReviewItems, setRecipeReviewItems] = useState<RecipeReviewItem[]>([])
 
   const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
@@ -143,15 +143,34 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
     onImported(`${result.addedCount} Artikel von letzter Woche hinzugefügt`)
   }
 
-  function handleRecipeImport() {
+  function handleRecipeAnalyze() {
     setRecipeError('')
-    const result = importRecipeToActiveList(recipeText.trim(), recipeMode)
-    if (!result.ok) {
-      setRecipeError(result.error || 'Rezept konnte nicht importiert werden.')
+    const parsed = parseRecipeText(recipeText.trim(), customProducts)
+    if (!parsed.length) {
+      setRecipeError('Keine Zutaten im Text erkannt.')
       return
     }
+    setRecipeReviewItems(
+      parsed.map((item) => ({
+        id: uid(),
+        name: item.name,
+        amount: item.amount ?? '',
+        category: item.category ?? 'Sonstiges',
+      }))
+    )
+    setRecipeReviewOpen(true)
+  }
+
+  function handleRecipeReviewConfirm(items: { name: string; amount?: string; category?: string }[]) {
+    const result = importRecipeItemsToActiveList(items, recipeMode)
+    if (!result.ok) {
+      setRecipeError(result.error || 'Rezept konnte nicht importiert werden.')
+      setRecipeReviewOpen(false)
+      return
+    }
+    setRecipeReviewOpen(false)
     onClose()
-    onImported(`${result.addedCount ?? result.keptCount ?? 0} Zutaten hinzugefügt`)
+    onImported(`${result.addedCount ?? result.keptCount ?? items.length} Zutaten hinzugefügt`)
   }
 
   return (
@@ -359,27 +378,6 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
               setRecipeError('')
             }}
           />
-          {recipePreview.length > 0 && (
-            <div className="mt-3">
-              <div className="mb-2 text-[13px] font-bold">
-                Vorschau ({recipePreview.length} Zutaten)
-              </div>
-              <div className="card-surface max-h-40 overflow-y-auto">
-                {recipePreview.map((item) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5 text-[13px] last:border-b-0"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <span className="min-w-0 truncate font-semibold">{item.name}</span>
-                    <span className="flex-none text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                      {item.amount || '–'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           {openCount > 0 && (
             <div className="mt-3">
               <div className="mb-2 text-[13px] font-bold">Mit bestehender Liste</div>
@@ -411,14 +409,21 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
           </div>
           <button
             className="btn-primary mt-3 w-full py-3.5 text-[15px]"
-            onClick={handleRecipeImport}
-            disabled={!recipePreview.length}
+            onClick={handleRecipeAnalyze}
+            disabled={!recipeText.trim()}
           >
-            {recipePreview.length
-              ? `${recipePreview.length} Zutaten zur Liste hinzufügen`
-              : 'Zutaten zur Liste hinzufügen'}
+            Rezept analysieren
           </button>
         </div>
+      )}
+
+      {recipeReviewOpen && (
+        <RecipeReviewSheet
+          originalText={recipeText.trim()}
+          initialItems={recipeReviewItems}
+          onClose={() => setRecipeReviewOpen(false)}
+          onConfirm={handleRecipeReviewConfirm}
+        />
       )}
     </Sheet>
   )
