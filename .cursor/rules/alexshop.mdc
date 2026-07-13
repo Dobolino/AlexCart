@@ -122,7 +122,7 @@ interface ProductVariant {
 | Top-Artikel, Kategorien, Wochen-Charts | ✅ (`StatsPage`) |
 | Completed-Trip-Statistik (Monatsliste) | ✅ |
 | Quittung nachträglich bearbeiten | ✅ (`ReceiptSheet`) |
-| Filial-Vergleich, Promo-Ersparnis-Tracker | ❌ geplant |
+| Filial-Vergleich, Promo-Ersparnis-Tracker | ✅ (`storeStats.ts`) |
 | Preis-Trends pro Produkt (Charts) | ⚠️ Basis in `priceHistory.ts` |
 
 ## 6. PWA, Settings & QoL

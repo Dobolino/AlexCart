@@ -18,10 +18,13 @@ import {
   isoWeekNumber,
 } from '@/utils/stats'
 import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
+import { avgBasketByStore, promoSavingsInYear } from '@/utils/storeStats'
 import { formatMoney } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { ReceiptSheet } from '@/components/ReceiptSheet'
+import { PromoSavingsHighlight } from '@/components/PromoSavingsHighlight'
+import { StoreComparisonSection } from '@/components/StoreComparisonSection'
 import { ICON_PATHS } from '@/constants/icons'
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -38,6 +41,7 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
 export function StatsPage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
   const completedTrips = useStore((s) => s.completedTrips)
+  const priceProfiles = useStore((s) => s.priceProfiles)
   const stats = useStore((s) => s.stats)
   const lists = useStore((s) => s.lists)
   const currency = useStore((s) => s.settings.currency)
@@ -62,11 +66,15 @@ export function StatsPage() {
   const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
   const tripMonths = tripsByMonth(completedTrips)
   const selectedTrip = completedTrips.find((t) => t.id === selectedTripId) ?? null
+  const storeStats = avgBasketByStore(completedTrips)
+  const promoSavings = promoSavingsInYear(purchaseLog, priceProfiles)
 
   return (
     <>
       <PageHeader title="Statistik" subtitle="Deine Einkaufsgewohnheiten" />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+        <PromoSavingsHighlight amount={promoSavings} currency={currency} />
+        <StoreComparisonSection stores={storeStats} currency={currency} />
         <div className="mb-2.5 grid grid-cols-3 gap-2.5">
           <StatTile value={lists.length} label="Einkaufslisten" />
           <StatTile value={purchaseLog.length} label="Produkte gekauft" />
