@@ -9,6 +9,7 @@ import { getIconKey } from '@/utils/icon'
 import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
+import { buildLastPurchaseIndex, lastPurchasedHintForName } from '@/utils/purchaseFrequency'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
@@ -35,6 +36,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const importRecipeToActiveList = useStore((s) => s.importRecipeToActiveList)
   const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
   const brands = useStore((s) => s.brands)
+  const completedTrips = useStore((s) => s.completedTrips)
   const activeList = useStore((s) => s.activeList())
 
   const [mode, setMode] = useState<Mode>('search')
@@ -59,7 +61,11 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
 
   const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
-  const results = searchProducts(query, customProducts)
+  const results = useMemo(() => searchProducts(query, customProducts), [query, customProducts])
+  const lastPurchaseIndex = useMemo(
+    () => buildLastPurchaseIndex(completedTrips),
+    [completedTrips]
+  )
 
   function openConfirmFor(result: (typeof results)[number]) {
     const parsed = parseAmount(result.amount)
@@ -189,6 +195,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             {results.map((r) => {
               const iconKey = getIconKey(r.name, r.category)
               const color = getCategoryColor(r.category)
+              const frequencyHint = lastPurchasedHintForName(r.name, lastPurchaseIndex)
               return (
                 <button
                   key={r.customId || r.name}
@@ -204,6 +211,11 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{r.name}</span>
+                    {frequencyHint && (
+                      <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        {frequencyHint}
+                      </span>
+                    )}
                     <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
                       {r.category}
                     </span>

@@ -6,6 +6,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
+import { buildLastPurchaseIndex, lastPurchasedHintForName } from '@/utils/purchaseFrequency'
 import { buildQuickPicks } from '@/utils/quickAdd'
 import { useStore } from '@/store/useStore'
 
@@ -18,11 +19,16 @@ export function ShoppingQuickAddSheet({ onClose, onAdded }: ShoppingQuickAddShee
   const list = useStore((s) => s.activeList())
   const lists = useStore((s) => s.lists)
   const customProducts = useStore((s) => s.customProducts)
+  const completedTrips = useStore((s) => s.completedTrips)
   const addItemToActiveList = useStore((s) => s.addItemToActiveList)
   const [query, setQuery] = useState('')
 
   const trimmed = query.trim()
   const results = useMemo(() => searchProducts(query, customProducts, 8), [query, customProducts])
+  const lastPurchaseIndex = useMemo(
+    () => buildLastPurchaseIndex(completedTrips),
+    [completedTrips]
+  )
   const quickPicks = useMemo(
     () => (list ? buildQuickPicks(list, lists, customProducts, 6) : []),
     [list, lists, customProducts]
@@ -106,6 +112,7 @@ export function ShoppingQuickAddSheet({ onClose, onAdded }: ShoppingQuickAddShee
           {results.map((r) => {
             const iconKey = getIconKey(r.name, r.category)
             const color = getCategoryColor(r.category)
+            const frequencyHint = lastPurchasedHintForName(r.name, lastPurchaseIndex)
             return (
               <button
                 key={r.customId || r.name}
@@ -122,6 +129,11 @@ export function ShoppingQuickAddSheet({ onClose, onAdded }: ShoppingQuickAddShee
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{r.name}</span>
+                  {frequencyHint && (
+                    <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      {frequencyHint}
+                    </span>
+                  )}
                   <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     {r.category}
                     {r.amount ? ` · ${r.amount}` : ''}
