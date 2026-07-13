@@ -31,11 +31,12 @@ import type {
   PurchaseLogEntry,
   ShoppingItem,
   ShoppingList,
+  ShoppingSession,
   Theme,
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 14
+const STORE_VERSION = 15
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -165,6 +166,8 @@ interface AppState {
   brands: GlobalBrand[]
   /** Ein Eintrag pro vollständig abgeschlossener Einkaufsliste (Statistik pro Liste, nicht pro Artikel). */
   completedTrips: CompletedTrip[]
+  /** Aktive Einkaufssession (Timer/Pause) – nur im Einkaufsmodus relevant. */
+  shoppingSession: ShoppingSession | null
   stats: AppStats
   filtered: FilteredEntry[]
   settings: AppSettings
@@ -246,11 +249,21 @@ interface AppState {
   resetStats: () => void
 
   /** Loggt einen vollständig abgeschlossenen Einkauf – siehe ShoppingModePage.handleFinishShopping. */
-  logCompletedTrip: (entry: { listId: string; listName: string; items: CompletedTripItem[] }) => void
+  logCompletedTrip: (entry: {
+    listId: string
+    listName: string
+    items: CompletedTripItem[]
+    durationMs?: number
+  }) => void
   /** Nachträgliche Preiskorrektur auf der Quittung eines abgeschlossenen Einkaufs. */
   updateCompletedTripItemPrice: (tripId: string, itemId: string, price: number | undefined) => void
   /** Einkaufszentrum/Filiale nachträglich auf der Quittung erfassen. */
   updateCompletedTripStore: (tripId: string, store: string | undefined) => void
+
+  startShoppingSession: (listId: string) => void
+  pauseShopping: () => void
+  resumeShopping: () => void
+  clearShoppingSession: () => void
 }
 
 export const useStore = create<AppState>()(
@@ -264,6 +277,7 @@ export const useStore = create<AppState>()(
       priceProfiles: [],
       brands: [],
       completedTrips: [],
+      shoppingSession: null,
       stats: defaultStats(),
       filtered: [],
       settings: defaultSettings(),
@@ -771,6 +785,7 @@ export const useStore = create<AppState>()(
             calculatorEntries: [],
             calculatorDate: todayKey(),
             calculatorExcludedPurchaseIds: [],
+            shoppingSession: null,
           }
         }),
 
@@ -841,10 +856,49 @@ export const useStore = create<AppState>()(
               listName: entry.listName,
               completedAt: Date.now(),
               items: entry.items,
+              ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
             },
           ],
         }))
       },
+
+      startShoppingSession: (listId) => {
+        const existing = get().shoppingSession
+        if (existing?.listId === listId) return
+        set({
+          shoppingSession: {
+            listId,
+            startedAt: Date.now(),
+            totalPausedMs: 0,
+          },
+        })
+      },
+
+      pauseShopping: () => {
+        const session = get().shoppingSession
+        if (!session || session.pausedAt != null) return
+        set({
+          shoppingSession: {
+            ...session,
+            pausedAt: Date.now(),
+          },
+        })
+      },
+
+      resumeShopping: () => {
+        const session = get().shoppingSession
+        if (!session?.pausedAt) return
+        const pausedMs = Math.max(0, Date.now() - session.pausedAt)
+        set({
+          shoppingSession: {
+            listId: session.listId,
+            startedAt: session.startedAt,
+            totalPausedMs: session.totalPausedMs + pausedMs,
+          },
+        })
+      },
+
+      clearShoppingSession: () => set({ shoppingSession: null }),
 
       updateCompletedTripItemPrice: (tripId, itemId, price) =>
         set((state) => ({
@@ -956,6 +1010,9 @@ export const useStore = create<AppState>()(
               }
             })
           }
+          if (version < 15) {
+            state.shoppingSession = state.shoppingSession ?? null
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)
@@ -971,6 +1028,7 @@ export const useStore = create<AppState>()(
         priceProfiles: state.priceProfiles,
         brands: state.brands,
         completedTrips: state.completedTrips,
+        shoppingSession: state.shoppingSession,
         stats: state.stats,
         filtered: state.filtered,
         settings: state.settings,

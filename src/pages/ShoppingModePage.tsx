@@ -18,7 +18,13 @@ import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
 import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
 import { ShoppingCategoryBlock } from '@/components/ShoppingCategoryBlock'
 import { ShoppingProgressBar } from '@/components/ShoppingProgressBar'
+import { ShoppingPausedOverlay } from '@/components/ShoppingPausedOverlay'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
+import {
+  activeShoppingDurationMs,
+  formatShoppingDuration,
+  isShoppingPaused,
+} from '@/utils/shoppingDuration'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
 export function ShoppingModePage() {
@@ -36,6 +42,11 @@ export function ShoppingModePage() {
   const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
   const resetCalculatorSession = useStore((s) => s.resetCalculatorSession)
   const logCompletedTrip = useStore((s) => s.logCompletedTrip)
+  const shoppingSession = useStore((s) => s.shoppingSession)
+  const startShoppingSession = useStore((s) => s.startShoppingSession)
+  const pauseShopping = useStore((s) => s.pauseShopping)
+  const resumeShopping = useStore((s) => s.resumeShopping)
+  const clearShoppingSession = useStore((s) => s.clearShoppingSession)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const currency = useStore((s) => s.settings.currency)
@@ -48,8 +59,28 @@ export function ShoppingModePage() {
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollTargetRef = useRef<HTMLDivElement | null>(null)
   const prevCategoryOrderRef = useRef<string[]>([])
+  const [clock, setClock] = useState(() => Date.now())
 
-  const wakeLockActive = useWakeLock(true)
+  const sessionForList =
+    list && shoppingSession?.listId === list.id ? shoppingSession : null
+  const isPaused = isShoppingPaused(sessionForList)
+
+  const wakeLockActive = useWakeLock(!isPaused)
+
+  useEffect(() => {
+    if (!list) return
+    startShoppingSession(list.id)
+  }, [list?.id, startShoppingSession])
+
+  useEffect(() => {
+    if (!sessionForList || isPaused) return
+    const id = window.setInterval(() => setClock(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [sessionForList, isPaused])
+
+  const activeDurationMs = sessionForList
+    ? activeShoppingDurationMs(sessionForList, clock)
+    : 0
 
   const tripTotal = useMemo(() => {
     if (!list) return 0
@@ -157,14 +188,24 @@ export function ShoppingModePage() {
     clearTodayCheckoffsForActiveList()
   }
 
+  function handleExitShopping() {
+    clearShoppingSession()
+    navigate('/')
+  }
+
   function handleFinishShopping() {
     if (list && doneCount > 0) {
+      const durationMs = sessionForList
+        ? activeShoppingDurationMs(sessionForList)
+        : undefined
       logCompletedTrip({
         listId: list.id,
         listName: list.name,
         items: receiptItemsForList(purchaseLog, list.items),
+        durationMs,
       })
     }
+    clearShoppingSession()
     if (tripTotal > 0 || calculatorEntries.length > 0) {
       resetCalculatorSession()
     }
@@ -195,7 +236,7 @@ export function ShoppingModePage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" style={{ background: 'var(--bg)' }}>
+    <div className="relative flex min-h-0 flex-1 flex-col" style={{ background: 'var(--bg)' }}>
       <header
         className="glass flex flex-none items-center justify-between border-b px-4"
         style={{
@@ -208,7 +249,7 @@ export function ShoppingModePage() {
         <button
           className="tap-scale flex h-10 w-10 items-center justify-center rounded-full"
           style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
-          onClick={() => navigate('/')}
+          onClick={handleExitShopping}
           aria-label="Einkaufsmodus beenden"
         >
           <Icon path={ICON_PATHS.close} size={20} />
@@ -217,38 +258,52 @@ export function ShoppingModePage() {
           <div className="truncate text-[17px] font-extrabold">{list.name}</div>
           <div className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {doneCount} von {totalCount || doneCount} erledigt
+            {sessionForList ? ` · ${formatShoppingDuration(activeDurationMs)}` : ''}
             {showProjectedTotal
               ? ` · ${tripTotal > 0 ? formatMoney(tripTotal, currency) + ' / ' : ''}${formatMoney(projectedTotal, currency)} geschätzt`
               : ''}
             {budget ? ` · Budget ${formatMoney(budgetSpend, currency)}` : ''}
           </div>
         </div>
-        {lastChecked ? (
-          <button
-            className="tap-scale flex h-10 items-center justify-center rounded-full px-3 text-[12px] font-bold"
-            style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-            onClick={handleUndo}
-          >
-            <Icon path={ICON_PATHS.undo} size={14} />
-          </button>
-        ) : showTripTotal ? (
-          <button
-            className="tap-scale flex h-10 items-center justify-center rounded-full px-2.5 text-[11px] font-bold"
-            style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-            onClick={handleResetTrip}
-            aria-label="Einkaufssumme zurücksetzen"
-          >
-            Leeren
-          </button>
-        ) : (
-          <div className="flex w-10 items-center justify-center" title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}>
-            {wakeLockActive && (
-              <span style={{ color: 'var(--text-muted)' }} aria-label="Bildschirm bleibt an">
-                <Icon path={ICON_PATHS.sun} size={16} />
-              </span>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {!isPaused && (
+            <button
+              type="button"
+              className="tap-scale flex h-10 w-10 items-center justify-center rounded-full text-[18px]"
+              style={{ background: 'var(--chip-bg)' }}
+              onClick={pauseShopping}
+              aria-label="Einkauf pausieren"
+            >
+              <span aria-hidden>⏸️</span>
+            </button>
+          )}
+          {lastChecked ? (
+            <button
+              className="tap-scale flex h-10 items-center justify-center rounded-full px-3 text-[12px] font-bold"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+              onClick={handleUndo}
+            >
+              <Icon path={ICON_PATHS.undo} size={14} />
+            </button>
+          ) : showTripTotal ? (
+            <button
+              className="tap-scale flex h-10 items-center justify-center rounded-full px-2.5 text-[11px] font-bold"
+              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              onClick={handleResetTrip}
+              aria-label="Einkaufssumme zurücksetzen"
+            >
+              Leeren
+            </button>
+          ) : (
+            <div className="flex w-10 items-center justify-center" title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}>
+              {wakeLockActive && (
+                <span style={{ color: 'var(--text-muted)' }} aria-label="Bildschirm bleibt an">
+                  <Icon path={ICON_PATHS.sun} size={16} />
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       {(showTripTotal || showProjectedTotal) && (
@@ -404,6 +459,8 @@ export function ShoppingModePage() {
           highlightOptions
         />
       )}
+
+      {isPaused && <ShoppingPausedOverlay onResume={resumeShopping} />}
     </div>
   )
 }
