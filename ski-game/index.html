@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Peak Dual — Alpine Ski</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+
+      <div id="hud" class="hidden">
+        <div class="hud-top">
+          <div class="stat">
+            <span class="label">Score</span>
+            <span id="score">0</span>
+          </div>
+          <div class="stat center">
+            <span class="label">Speed</span>
+            <span id="speed">0</span>
+            <span class="unit">km/h</span>
+          </div>
+          <div class="stat right">
+            <span class="label">Combo</span>
+            <span id="combo">×1</span>
+          </div>
+        </div>
+        <div id="trick-banner" class="trick-banner"></div>
+        <div class="hud-bottom">
+          <div id="left-pad" class="thumb-pad">
+            <div class="thumb-ring"></div>
+            <span>A / LMB</span>
+          </div>
+          <div class="hint" id="air-hint"></div>
+          <div id="right-pad" class="thumb-pad">
+            <div class="thumb-ring"></div>
+            <span>D / RMB</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="menu" class="overlay">
+        <div class="menu-bg"></div>
+        <div class="menu-content">
+          <p class="eyebrow">PC Alpine</p>
+          <h1>Peak Dual</h1>
+          <p class="tagline">
+            Zwei Daumen. Keine Knöpfe. Nur Ski, Stöcke und Berg.
+          </p>
+          <button id="btn-start" type="button">Abfahrt starten</button>
+          <div class="controls-card">
+            <h2>Steuerung (PC)</h2>
+            <ul>
+              <li><kbd>A</kbd> / Linke Maustaste — linker Ski &amp; Stock</li>
+              <li><kbd>D</kbd> / Rechte Maustaste — rechter Ski &amp; Stock</li>
+              <li>Beide tippen — abstoßen &amp; beschleunigen</li>
+              <li>Nur rechts halten — Kurve nach links</li>
+              <li>Nur links halten — Kurve nach rechts</li>
+              <li><kbd>Shift</kbd> + beide — scharf bremsen (Ski quer)</li>
+              <li><kbd>Ctrl</kbd> + beide — Switch (180°)</li>
+            </ul>
+            <h2>In der Luft</h2>
+            <ul>
+              <li><kbd>W</kbd> — Frontflip · <kbd>S</kbd> — Backflip</li>
+              <li><kbd>A</kbd> / <kbd>D</kbd> halten — Spin</li>
+              <li><kbd>Q</kbd> / <kbd>E</kbd> — Grab links / rechts</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div id="gameover" class="overlay hidden">
+        <div class="menu-bg"></div>
+        <div class="menu-content compact">
+          <p class="eyebrow">Run beendet</p>
+          <h1 id="go-title">Abfahrt</h1>
+          <p class="final-score">Score <span id="final-score">0</span></p>
+          <p class="final-meta" id="final-meta"></p>
+          <button id="btn-retry" type="button">Nochmal fahren</button>
+          <button id="btn-menu" type="button" class="ghost">Menü</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
