@@ -12,6 +12,8 @@ export interface AppSettings {
   weeklyBudget: number
   /** Anzeige- und Eingabewährung für Preise und Budget. */
   currency: Currency
+  /** Einkaufsmodus: nur eine Kategorie offen (true) oder alle gleichzeitig sichtbar (false). */
+  shoppingAutoCollapse: boolean
 }
 
 export interface ShoppingItem {

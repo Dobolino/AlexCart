@@ -10,7 +10,8 @@ interface ShoppingCategoryBlockProps {
   category: string
   items: ShoppingItem[]
   expanded: boolean
-  onToggle: () => void
+  /** Fehlt, wenn alle Kategorien dauerhaft offen sind (kein Ein-/Ausklappen). */
+  onToggle?: () => void
   onCheck: (item: ShoppingItem) => void
   onDelete: (item: ShoppingItem) => void
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
@@ -29,23 +30,27 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
           type="button"
           className="tap-scale mb-2 flex min-h-[44px] w-full items-center gap-2 rounded-xl px-2 py-2 text-left"
           style={{
-            background: expanded ? 'var(--accent-soft)' : 'transparent',
+            background: expanded && onToggle ? 'var(--accent-soft)' : 'transparent',
+            cursor: onToggle ? 'pointer' : 'default',
           }}
           onClick={onToggle}
-          aria-expanded={expanded}
+          disabled={!onToggle}
+          aria-expanded={onToggle ? expanded : undefined}
         >
-          <span
-            className="flex h-7 w-7 flex-none items-center justify-center transition-transform duration-200"
-            style={{
-              color: expanded ? 'var(--accent)' : 'var(--text-muted)',
-              transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-            }}
-          >
-            <Icon path={ICON_PATHS.chevron} size={18} />
-          </span>
+          {onToggle && (
+            <span
+              className="flex h-7 w-7 flex-none items-center justify-center transition-transform duration-200"
+              style={{
+                color: expanded ? 'var(--accent)' : 'var(--text-muted)',
+                transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
+            >
+              <Icon path={ICON_PATHS.chevron} size={18} />
+            </span>
+          )}
           <span
             className="min-w-0 flex-1 truncate text-[14px] font-bold"
-            style={{ color: expanded ? 'var(--accent)' : 'var(--text)' }}
+            style={{ color: expanded && onToggle ? 'var(--accent)' : 'var(--text)' }}
           >
             {category}
           </span>

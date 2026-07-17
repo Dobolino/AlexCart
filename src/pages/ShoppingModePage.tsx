@@ -52,6 +52,8 @@ export function ShoppingModePage() {
   const clearShoppingSession = useStore((s) => s.clearShoppingSession)
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
+  const autoCollapse = useStore((s) => s.settings.shoppingAutoCollapse)
+  const setShoppingAutoCollapse = useStore((s) => s.setShoppingAutoCollapse)
   const currency = useStore((s) => s.settings.currency)
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
@@ -127,12 +129,12 @@ export function ShoppingModePage() {
   }
 
   useEffect(() => {
-    if (!expandedCategory || !scrollTargetRef.current) return
+    if (!autoCollapse || !expandedCategory || !scrollTargetRef.current) return
     const el = scrollTargetRef.current
     requestAnimationFrame(() => {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
-  }, [expandedCategory, categoryNames])
+  }, [autoCollapse, expandedCategory, categoryNames])
 
   if (!list) return null
 
@@ -374,19 +376,54 @@ export function ShoppingModePage() {
             </div>
           </div>
         ) : (
-          groups.map((group) => (
-            <ShoppingCategoryBlock
-              key={group.category}
-              ref={expandedCategory === group.category ? scrollTargetRef : undefined}
-              category={group.category}
-              items={group.items}
-              expanded={expandedCategory === group.category}
-              onToggle={() => handleToggleCategory(group.category)}
-              onCheck={handleCheck}
-              onDelete={handleDelete}
-              onAdjustAmount={handleAdjustAmount}
-            />
-          ))
+          <>
+            {categoryNames.length > 1 && (
+              <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  Ansicht
+                </span>
+                <div className="inline-flex rounded-full p-0.5" style={{ background: 'var(--chip-bg)' }}>
+                  <button
+                    type="button"
+                    className="tap-scale min-h-[36px] rounded-full px-3.5 text-[12px] font-bold"
+                    style={{
+                      background: autoCollapse ? 'var(--accent)' : 'transparent',
+                      color: autoCollapse ? 'var(--accent-fg)' : 'var(--text-muted)',
+                    }}
+                    onClick={() => setShoppingAutoCollapse(true)}
+                    aria-pressed={autoCollapse}
+                  >
+                    Eine Kategorie
+                  </button>
+                  <button
+                    type="button"
+                    className="tap-scale min-h-[36px] rounded-full px-3.5 text-[12px] font-bold"
+                    style={{
+                      background: !autoCollapse ? 'var(--accent)' : 'transparent',
+                      color: !autoCollapse ? 'var(--accent-fg)' : 'var(--text-muted)',
+                    }}
+                    onClick={() => setShoppingAutoCollapse(false)}
+                    aria-pressed={!autoCollapse}
+                  >
+                    Alle
+                  </button>
+                </div>
+              </div>
+            )}
+            {groups.map((group) => (
+              <ShoppingCategoryBlock
+                key={group.category}
+                ref={autoCollapse && expandedCategory === group.category ? scrollTargetRef : undefined}
+                category={group.category}
+                items={group.items}
+                expanded={!autoCollapse || expandedCategory === group.category}
+                onToggle={autoCollapse ? () => handleToggleCategory(group.category) : undefined}
+                onCheck={handleCheck}
+                onDelete={handleDelete}
+                onAdjustAmount={handleAdjustAmount}
+              />
+            ))}
+          </>
         )}
       </main>
 

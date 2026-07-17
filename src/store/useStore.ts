@@ -37,7 +37,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 15
+const STORE_VERSION = 16
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -73,6 +73,7 @@ function defaultSettings(): AppSettings {
     askPriceOnCheckoff: false,
     weeklyBudget: 0,
     currency: 'CHF',
+    shoppingAutoCollapse: true,
   }
 }
 
@@ -238,6 +239,7 @@ interface AppState {
   setTheme: (theme: Theme) => void
   setListViewMode: (mode: ListViewMode) => void
   setAskPriceOnCheckoff: (ask: boolean) => void
+  setShoppingAutoCollapse: (autoCollapse: boolean) => void
   setWeeklyBudget: (amount: number) => void
   setCurrency: (currency: AppSettings['currency']) => void
   setHasSeenOnboarding: () => void
@@ -766,6 +768,9 @@ export const useStore = create<AppState>()(
       setListViewMode: (listViewMode) => set((state) => ({ settings: { ...state.settings, listViewMode } })),
       setAskPriceOnCheckoff: (askPriceOnCheckoff) =>
         set((state) => ({ settings: { ...state.settings, askPriceOnCheckoff } })),
+
+      setShoppingAutoCollapse: (shoppingAutoCollapse) =>
+        set((state) => ({ settings: { ...state.settings, shoppingAutoCollapse } })),
       setWeeklyBudget: (weeklyBudget) =>
         set((state) => ({
           settings: {
@@ -1022,6 +1027,13 @@ export const useStore = create<AppState>()(
           }
           if (version < 15) {
             state.shoppingSession = state.shoppingSession ?? null
+          }
+          if (version < 16) {
+            state.settings = {
+              ...defaultSettings(),
+              ...(state.settings as Partial<AppSettings>),
+              shoppingAutoCollapse: true,
+            }
           }
           return state as AppState
         } catch (err) {
