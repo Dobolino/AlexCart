@@ -11,7 +11,7 @@ import { adjustAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice, type 
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
-import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput } from '@/utils/producePrice'
+import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput, explicitWeightGrams, pricePer100gFromKg } from '@/utils/producePrice'
 import { computePriceDelta } from '@/utils/priceDelta'
 import { productPriceHistory } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
@@ -57,7 +57,12 @@ export function CheckoffPriceSheet({
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
   const quantity = priceQuantityFromAmount(item.amount)
   const isProduce = isProduceCategory(item.category)
-  const weightGrams = weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
+  // Gewichts-Preisführung: Obst/Gemüse (frei abwiegbar) ODER jeder Artikel mit g/kg-Menge
+  // (z. B. „800 g Hähnchen“) – Gesamtpreis wird auf Kilo-/100-g-Preis umgerechnet.
+  const weightGrams = isProduce
+    ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
+    : explicitWeightGrams(item.amount)
+  const priceByWeight = isProduce || (weightGrams !== null && weightGrams > 0)
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
@@ -91,7 +96,7 @@ export function CheckoffPriceSheet({
         setCents(amountToCents(selectedVariant.lastSalePrice))
       }
     } else {
-      const prefilled = isProduce
+      const prefilled = priceByWeight
         ? selectedVariant.pricePerKg ?? selectedVariant.lastPrice
         : selectedVariant.lastPrice
       if (prefilled && prefilled > 0) {
@@ -105,15 +110,15 @@ export function CheckoffPriceSheet({
   const [syncedQuantity, setSyncedQuantity] = useState(quantity)
   if (quantity !== syncedQuantity) {
     setSyncedQuantity(quantity)
-    if (!isProduce && quantity > 1) setPriceMode('unit')
+    if (!priceByWeight && quantity > 1) setPriceMode('unit')
   }
 
   const enteredAmount = centsToAmount(cents) ?? 0
   const resolved = useMemo(() => {
     if (enteredAmount <= 0) return null
-    if (isProduce && weightGrams) return resolveProduceCheckoffPrice(enteredAmount, weightGrams)
+    if (priceByWeight && weightGrams) return resolveProduceCheckoffPrice(enteredAmount, weightGrams)
     return resolveCheckoffTotalPrice(enteredAmount, item.amount, priceMode)
-  }, [enteredAmount, item.amount, priceMode, isProduce, weightGrams])
+  }, [enteredAmount, item.amount, priceMode, priceByWeight, weightGrams])
 
   // Kaufhistorie nur bei Log-Änderung aufbauen, nicht bei jedem Numpad-Tastendruck.
   const priceHistory = useMemo(() => productPriceHistory(purchaseLog), [purchaseLog])
@@ -123,7 +128,7 @@ export function CheckoffPriceSheet({
     return computePriceDelta({
       item,
       enteredAmount,
-      isProduce,
+      isProduce: priceByWeight,
       wasSale,
       priceMode,
       quantity,
@@ -137,7 +142,7 @@ export function CheckoffPriceSheet({
     highlightOptions,
     enteredAmount,
     item,
-    isProduce,
+    priceByWeight,
     wasSale,
     priceMode,
     quantity,
@@ -177,8 +182,8 @@ export function CheckoffPriceSheet({
     }
 
     let payload: CheckoffPriceData
-    if (isProduce) {
-      const grams = weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount) ?? 0
+    if (priceByWeight) {
+      const grams = weightGrams ?? 0
       if (grams <= 0) {
         setError('Bitte das abgewogene Gewicht in Gramm eingeben.')
         return
@@ -256,13 +261,13 @@ export function CheckoffPriceSheet({
             </p>
           )}
 
-          {isProduce && weightGrams && weightGrams > 0 && (
+          {priceByWeight && weightGrams && weightGrams > 0 && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Gesamtpreis eingeben – wird in {formatWeightGrams(weightGrams)} auf Kilopreis umgerechnet
+              Gesamtpreis eingeben – wird bei {formatWeightGrams(weightGrams)} auf den 100-g-Preis umgerechnet
             </p>
           )}
 
-          {!isProduce && quantity > 1 && (
+          {!priceByWeight && quantity > 1 && (
             <OptionSegment
               highlight={highlightOptions}
               options={[
@@ -274,7 +279,7 @@ export function CheckoffPriceSheet({
             />
           )}
 
-          {!isProduce && quantity > 1 && (
+          {!priceByWeight && quantity > 1 && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
               {priceMode === 'unit'
                 ? `Stückpreis eingeben – wird mit ${quantity} multipliziert`
@@ -394,14 +399,12 @@ export function CheckoffPriceSheet({
               style={{ background: 'var(--chip-bg)' }}
             >
               <div>
-                <div style={{ color: 'var(--text-muted)' }}>{isProduce ? 'CHF/kg' : 'Zuletzt'}</div>
+                <div style={{ color: 'var(--text-muted)' }}>{priceByWeight ? 'Pro 100 g' : 'Zuletzt'}</div>
                 <div className="font-bold tabular-nums">
-                  {isProduce
+                  {priceByWeight
                     ? selectedVariant.pricePerKg
-                      ? formatMoney(selectedVariant.pricePerKg, currency)
-                      : selectedVariant.lastPrice
-                        ? formatMoney(selectedVariant.lastPrice, currency)
-                        : '–'
+                      ? formatMoney(pricePer100gFromKg(selectedVariant.pricePerKg), currency)
+                      : '–'
                     : selectedVariant.lastPrice
                       ? formatMoney(selectedVariant.lastPrice, currency)
                       : '–'}
@@ -430,24 +433,24 @@ export function CheckoffPriceSheet({
             }}
             currency={currency}
             dense
-            label={isProduce ? 'Preis am Kassenbon' : quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
+            label={priceByWeight ? 'Preis am Kassenbon' : quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
             trailing={
               priceDelta && priceDelta.direction !== 'same' ? (
                 <PriceDeltaBadge label={priceDelta.label} direction={priceDelta.direction} />
               ) : undefined
             }
           />
-          {isProduce && enteredAmount > 0 && weightGrams && (
+          {priceByWeight && enteredAmount > 0 && weightGrams && (
             <div
               className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
               style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
             >
-              {formatMoney(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg, currency)}/kg
+              {formatMoney(pricePer100gFromKg(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg), currency)}/100 g
               {' · '}
               {formatWeightGrams(weightGrams)}
             </div>
           )}
-          {resolved && resolved.total > 0 && !isProduce && quantity > 1 && (
+          {resolved && resolved.total > 0 && !priceByWeight && quantity > 1 && (
             <div
               className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
               style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}

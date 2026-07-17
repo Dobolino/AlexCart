@@ -88,6 +88,68 @@ describe('priceProfiles', () => {
     expect(est.openItemCount).toBe(2)
   })
 
+  it('skaliert g/kg-Artikel mit erfasstem Kilopreis nach Gewicht', () => {
+    const profiles: ProductPriceProfile[] = [
+      {
+        id: 'p1',
+        itemName: 'Hähnchenbrust',
+        category: 'Fleisch & Fisch',
+        baseKey: profileBaseKey('Hähnchenbrust', 'Fleisch & Fisch'),
+        preferredVariantId: 'v1',
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [
+          {
+            id: 'v1',
+            name: 'Standard',
+            lastPrice: 12,
+            avgPrice: 12,
+            pricePerKg: 12, // CHF 12/kg = CHF 1.20/100 g
+            purchaseCount: 1,
+            lastPurchaseDate: '2026-07-08',
+            lastPurchaseWasSale: false,
+            salePurchaseCount: 0,
+          },
+        ],
+      },
+    ]
+    const chicken = (amount: string) =>
+      item({ name: 'Hähnchenbrust', category: 'Fleisch & Fisch', amount })
+    expect(estimateItemPrice(profiles, chicken('800 g'))).toBe(9.6)
+    expect(estimateItemPrice(profiles, chicken('400 g'))).toBe(4.8)
+    expect(estimateItemPrice(profiles, chicken('1 kg'))).toBe(12)
+  })
+
+  it('lässt g/kg-Artikel ohne erfassten Kilopreis unverändert (fester Preis)', () => {
+    const profiles: ProductPriceProfile[] = [
+      {
+        id: 'p1',
+        itemName: 'Hähnchenbrust',
+        category: 'Fleisch & Fisch',
+        baseKey: profileBaseKey('Hähnchenbrust', 'Fleisch & Fisch'),
+        preferredVariantId: 'v1',
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [
+          {
+            id: 'v1',
+            name: 'Standard',
+            lastPrice: 8.5, // nur Gesamtpreis, kein pricePerKg
+            avgPrice: 8.5,
+            purchaseCount: 1,
+            lastPurchaseDate: '2026-07-08',
+            lastPurchaseWasSale: false,
+            salePurchaseCount: 0,
+          },
+        ],
+      },
+    ]
+    const chicken = (amount: string) =>
+      item({ name: 'Hähnchenbrust', category: 'Fleisch & Fisch', amount })
+    expect(estimateItemPrice(profiles, chicken('800 g'))).toBe(8.5)
+    expect(estimateItemPrice(profiles, chicken('400 g'))).toBe(8.5)
+  })
+
   it('nutzt Durchschnitt wenn kein letzter Normalpreis', () => {
     const variant = {
       id: 'v1',

@@ -1,5 +1,5 @@
 import { priceQuantityFromAmount } from './amount'
-import { isProduceCategory, weightGramsFromAmount } from './producePrice'
+import { isProduceCategory, weightGramsFromAmount, explicitWeightGrams } from './producePrice'
 import { normalize } from '@/utils/text'
 import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
 
@@ -278,6 +278,13 @@ export function estimateItemPrice(
     if (grams && perKg) return roundMoney(perKg * (grams / 1000))
     if (perKg) return perKg
     return null
+  }
+
+  // Nicht-Obst/Gemüse mit g/kg-Menge: nur skalieren, wenn ein echter Kilopreis erfasst wurde
+  // (sonst würde ein alter Gesamtpreis fälschlich als Kilopreis interpretiert).
+  const grams = explicitWeightGrams(item.amount)
+  if (grams && grams > 0 && variant.pricePerKg && variant.pricePerKg > 0) {
+    return roundMoney(variant.pricePerKg * (grams / 1000))
   }
 
   const unit = estimateVariantPrice(variant)

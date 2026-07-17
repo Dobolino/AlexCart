@@ -45,6 +45,28 @@ export function shouldUseExactProduceWeight(category: string, amount: string): b
   return parseGramsInput(amount) !== null
 }
 
+/** Nur explizite Gewichtsmengen (g/kg) – blanke Zahlen und Stück ergeben null, damit „2“ nicht
+ *  als „2 g“ missgedeutet wird. Basis für die Gewichts-Preisführung ausserhalb von Obst/Gemüse. */
+export function explicitWeightGrams(amount: string): number | null {
+  const parsed = parseAmount(amount)
+  if (!parsed || parsed.value <= 0) return null
+  const unit = normalizeUnit(parsed.unit)
+  if (unit === 'g' || unit === 'gramm' || unit === 'gr') return parsed.value
+  if (unit === 'kg') return parsed.value * 1000
+  return null
+}
+
+/** Gramm für die Preisführung: Obst/Gemüse frei abwiegbar, sonst nur explizite g/kg-Menge. */
+export function pricingWeightGrams(category: string, amount: string): number | null {
+  if (isProduceCategory(category)) return weightGramsFromAmount(amount) ?? parseGramsInput(amount)
+  return explicitWeightGrams(amount)
+}
+
+/** 100-g-Preis aus dem intern gespeicherten Kilopreis. */
+export function pricePer100gFromKg(pricePerKg: number): number {
+  return Math.round((pricePerKg / 10) * 100) / 100
+}
+
 /** Gramm aus Mengenangabe – z. B. „750 g“, „1.2 kg“, „347g“. */
 export function weightGramsFromAmount(amount: string): number | null {
   const parsed = parseAmount(amount)
