@@ -120,6 +120,33 @@ describe('priceProfiles', () => {
     expect(estimateItemPrice(profiles, chicken('1 kg'))).toBe(12)
   })
 
+  it('schätzt Stück-Obst mit Stückpreis × Anzahl, nicht als Gewicht', () => {
+    const profiles: ProductPriceProfile[] = [
+      {
+        id: 'p1',
+        itemName: 'Kiwi',
+        category: 'Früchte & Gemüse',
+        baseKey: profileBaseKey('Kiwi', 'Früchte & Gemüse'),
+        preferredVariantId: 'v1',
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [
+          {
+            id: 'v1',
+            name: 'Standard',
+            lastPrice: 0.8,
+            avgPrice: 0.8,
+            purchaseCount: 2,
+            lastPurchaseDate: '2026-07-08',
+            lastPurchaseWasSale: false,
+            salePurchaseCount: 0,
+          },
+        ],
+      },
+    ]
+    expect(estimateItemPrice(profiles, item({ name: 'Kiwi', category: 'Früchte & Gemüse', amount: '2 Stück' }))).toBe(1.6)
+  })
+
   it('lässt g/kg-Artikel ohne erfassten Kilopreis unverändert (fester Preis)', () => {
     const profiles: ProductPriceProfile[] = [
       {

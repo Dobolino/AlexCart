@@ -1,5 +1,10 @@
 import { priceQuantityFromAmount } from './amount'
-import { isProduceCategory, weightGramsFromAmount, explicitWeightGrams } from './producePrice'
+import {
+  isProduceCategory,
+  weightGramsFromAmount,
+  explicitWeightGrams,
+  shouldUseExactProduceWeight,
+} from './producePrice'
 import { normalize } from '@/utils/text'
 import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
 
@@ -272,7 +277,7 @@ export function estimateItemPrice(
   const variant = pickVariantForEstimate(profile, item)
   if (!variant) return null
 
-  if (isProduceCategory(item.category)) {
+  if (isProduceCategory(item.category) && shouldUseExactProduceWeight(item.category, item.amount)) {
     const grams = weightGramsFromAmount(item.amount)
     const perKg = variant.pricePerKg ?? variant.lastPrice ?? variant.avgPrice
     if (grams && perKg) return roundMoney(perKg * (grams / 1000))

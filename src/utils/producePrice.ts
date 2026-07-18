@@ -58,9 +58,13 @@ export function explicitWeightGrams(amount: string): number | null {
   return null
 }
 
-/** Gramm für die Preisführung: Obst/Gemüse frei abwiegbar, sonst nur explizite g/kg-Menge. */
+/** Gramm für die Preisführung: Obst/Gemüse nur bei Gewichtsangabe (nicht bei „2 Stück“),
+ *  sonst nur explizite g/kg-Menge. */
 export function pricingWeightGrams(category: string, amount: string): number | null {
-  if (isProduceCategory(category)) return weightGramsFromAmount(amount) ?? parseGramsInput(amount)
+  if (isProduceCategory(category)) {
+    if (!shouldUseExactProduceWeight(category, amount)) return null
+    return weightGramsFromAmount(amount) ?? parseGramsInput(amount)
+  }
   return explicitWeightGrams(amount)
 }
 

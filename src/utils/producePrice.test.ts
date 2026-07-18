@@ -57,6 +57,9 @@ describe('producePrice', () => {
   it('pricingWeightGrams: Obst/Gemüse frei, sonst nur explizites Gewicht', () => {
     // Obst/Gemüse akzeptiert blanke Zahl als Gramm
     expect(pricingWeightGrams('Früchte & Gemüse', '347')).toBe(347)
+    expect(pricingWeightGrams('Früchte & Gemüse', '347 g')).toBe(347)
+    // Stück-Obst: kein Waagenpreis
+    expect(pricingWeightGrams('Früchte & Gemüse', '2 Stück')).toBeNull()
     // Fleisch nur mit expliziter Einheit
     expect(pricingWeightGrams('Fleisch & Fisch', '800 g')).toBe(800)
     expect(pricingWeightGrams('Fleisch & Fisch', '2 Stück')).toBeNull()

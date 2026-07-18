@@ -19,7 +19,15 @@ import {
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
-import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput, explicitWeightGrams, pricePer100gFromKg } from '@/utils/producePrice'
+import {
+  resolveProduceCheckoffPrice,
+  weightGramsFromAmount,
+  formatWeightGrams,
+  parseGramsInput,
+  explicitWeightGrams,
+  pricePer100gFromKg,
+  shouldUseExactProduceWeight,
+} from '@/utils/producePrice'
 import { computePriceDelta } from '@/utils/priceDelta'
 import { productPriceHistory } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
@@ -65,16 +73,16 @@ export function CheckoffPriceSheet({
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
   const quantity = priceQuantityFromAmount(item.amount)
   const packAmount = parsePackAmount(item.amount)
-  const isProduce = isProduceCategory(item.category)
-  // Gewichts-Preisführung: Obst/Gemüse (frei abwiegbar) ODER jeder Artikel mit g/kg-Menge
-  // (z. B. „800 g Hähnchen“) – Gesamtpreis wird auf Kilo-/100-g-Preis umgerechnet.
-  // Pack-Mengen („2 × 400 g“) sind Stückzahl × Packung → Preis multiplizieren, kein Waagenpreis.
+  // Obst/Gemüse nach Gewicht (g/kg) → Waagenpreis; bei „2 Stück Kiwi“ → Stückpreis × Anzahl.
+  // Pack-Mengen („2 × 400 g“) und sonstige g/kg-Artikel analog.
+  const useProduceWeight = !packAmount && shouldUseExactProduceWeight(item.category, item.amount)
   const weightGrams = packAmount
     ? null
-    : isProduce
+    : useProduceWeight
       ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
       : explicitWeightGrams(item.amount)
-  const priceByWeight = !packAmount && (isProduce || (weightGrams !== null && weightGrams > 0))
+  const priceByWeight =
+    !packAmount && (useProduceWeight || (weightGrams !== null && weightGrams > 0))
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
@@ -166,7 +174,7 @@ export function CheckoffPriceSheet({
   ])
 
   function handleAdjustAmount(direction: 1 | -1) {
-    if (!onAmountChange || isProduce) return
+    if (!onAmountChange || useProduceWeight) return
     if (!item.amount.trim() && direction > 0) {
       onAmountChange('1 Stk')
       return
@@ -184,7 +192,7 @@ export function CheckoffPriceSheet({
       setVariantName(preset)
     }
     // „800 g“ + Chip „400 g“ → „2 × 400 g“, damit der Preis einer Dose × Anzahl gilt.
-    if (onAmountChange && !isProduce) {
+    if (onAmountChange && !useProduceWeight) {
       const count = inferPackCount(item.amount, preset)
       const next = formatPackAmountFromPreset(count, preset)
       if (next) onAmountChange(next)
@@ -251,7 +259,7 @@ export function CheckoffPriceSheet({
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
           </p>
 
-          {onAmountChange && isProduce && (
+          {onAmountChange && useProduceWeight && (
             <div className="mb-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
               <div className="mb-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
                 Abgewogenes Gewicht
@@ -263,7 +271,7 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {onAmountChange && !isProduce && (
+          {onAmountChange && !useProduceWeight && (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
               <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
                 Menge
@@ -276,7 +284,7 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {isProduce && (
+          {useProduceWeight && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Exaktes Gewicht vom Kassenbon eingeben – z. B. 347 g
             </p>

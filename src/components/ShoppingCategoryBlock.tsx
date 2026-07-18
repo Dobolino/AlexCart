@@ -3,7 +3,7 @@ import { Icon } from './Icon'
 import { ItemAmountColumn } from './ItemAmountColumn'
 import { AmountBadge } from './AmountBadge'
 import { ICON_PATHS } from '@/constants/icons'
-import { isProduceCategory } from '@/utils/producePrice'
+import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import type { ShoppingItem } from '@/types'
 
 interface ShoppingCategoryBlockProps {
@@ -95,7 +95,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                       </span>
                     )}
                   </button>
-                  {isProduceCategory(item.category) ? (
+                  {shouldUseExactProduceWeight(item.category, item.amount) ? (
                     item.amount ? <AmountBadge amount={item.amount} prominent /> : null
                   ) : (
                     <ItemAmountColumn item={item} showStepper onAdjustAmount={onAdjustAmount} />

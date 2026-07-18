@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
-import { isProduceCategory } from '@/utils/producePrice'
+import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { buildShareText } from '@/utils/shareText'
 import { CategorySection } from '@/components/CategorySection'
 import { ProductIconSlot } from '@/components/ProductIconSlot'
@@ -175,7 +175,7 @@ export function ListPage() {
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
-    if (isProduceCategory(item.category)) return
+    if (shouldUseExactProduceWeight(item.category, item.amount)) return
     updateItemInActiveList(item.id, { amount: adjustAmount(item.amount, direction) })
   }
 
