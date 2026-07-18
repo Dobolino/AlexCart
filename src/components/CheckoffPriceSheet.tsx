@@ -224,7 +224,11 @@ export function CheckoffPriceSheet({
   return (
     <Sheet onClose={onClose} tall>
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <div className="shrink-0">
+        {/* Formular scrollt – Numpad + Speichern bleiben unten erreichbar */}
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
           <p className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
@@ -422,9 +426,7 @@ export function CheckoffPriceSheet({
               </div>
             </div>
           )}
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
           <MoneyNumpad
             cents={cents}
             onChange={(value) => {
