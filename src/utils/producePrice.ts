@@ -1,4 +1,4 @@
-import { formatNumber, joinAmount, parseAmount } from '@/utils/amount'
+import { formatNumber, joinAmount, parseAmount, parsePackAmount } from '@/utils/amount'
 import { normalizeCategory } from '@/utils/icon'
 
 export const PRODUCE_CATEGORY = 'Früchte & Gemüse'
@@ -46,8 +46,10 @@ export function shouldUseExactProduceWeight(category: string, amount: string): b
 }
 
 /** Nur explizite Gewichtsmengen (g/kg) – blanke Zahlen und Stück ergeben null, damit „2“ nicht
- *  als „2 g“ missgedeutet wird. Basis für die Gewichts-Preisführung ausserhalb von Obst/Gemüse. */
+ *  als „2 g“ missgedeutet wird. Basis für die Gewichts-Preisführung ausserhalb von Obst/Gemüse.
+ *  Pack-Mengen („2 × 400 g“) sind Stückzahl × Packung, kein Waagengewicht. */
 export function explicitWeightGrams(amount: string): number | null {
+  if (parsePackAmount(amount)) return null
   const parsed = parseAmount(amount)
   if (!parsed || parsed.value <= 0) return null
   const unit = normalizeUnit(parsed.unit)
@@ -69,6 +71,7 @@ export function pricePer100gFromKg(pricePerKg: number): number {
 
 /** Gramm aus Mengenangabe – z. B. „750 g“, „1.2 kg“, „347g“. */
 export function weightGramsFromAmount(amount: string): number | null {
+  if (parsePackAmount(amount)) return null
   const parsed = parseAmount(amount)
   if (parsed) {
     const unit = normalizeUnit(parsed.unit)

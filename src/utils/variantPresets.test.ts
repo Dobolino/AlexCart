@@ -8,8 +8,13 @@ describe('variantPresets', () => {
     expect(isCanProduct('Bohnen', 'Konserven & Saucen', '2 Dosen')).toBe(true)
   })
 
-  it('liefert 400 ml und 800 ml für Dosen', () => {
-    expect(getVariantSizePresets('Ketchup', 'Konserven & Saucen')).toEqual(['400 ml', '800 ml'])
+  it('liefert g- und ml-Dosengrössen', () => {
+    expect(getVariantSizePresets('Ketchup', 'Konserven & Saucen')).toEqual([
+      '400 g',
+      '800 g',
+      '400 ml',
+      '800 ml',
+    ])
     expect(getVariantSizePresets('Milch', 'Milch & Käse')).toEqual([])
   })
 

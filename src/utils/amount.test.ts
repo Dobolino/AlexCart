@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, combineAmounts, mergeItems, adjustAmount, stepForUnit, joinAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice } from './amount'
+import {
+  parseAmount,
+  parsePackAmount,
+  formatPackAmountFromPreset,
+  inferPackCount,
+  combineAmounts,
+  mergeItems,
+  adjustAmount,
+  stepForUnit,
+  joinAmount,
+  priceQuantityFromAmount,
+  resolveCheckoffTotalPrice,
+} from './amount'
 
 describe('parseAmount', () => {
   it('splits value and unit', () => {
@@ -26,11 +38,35 @@ describe('joinAmount', () => {
   })
 })
 
+describe('parsePackAmount', () => {
+  it('erkennt 2 × 400 g und Varianten', () => {
+    expect(parsePackAmount('2 × 400 g')).toEqual({ count: 2, packValue: 400, packUnit: 'g' })
+    expect(parsePackAmount('2x400g')).toEqual({ count: 2, packValue: 400, packUnit: 'g' })
+    expect(parsePackAmount('3 x 400 ml')).toEqual({ count: 3, packValue: 400, packUnit: 'ml' })
+  })
+  it('lehnt normale Mengen ab', () => {
+    expect(parsePackAmount('800 g')).toBeNull()
+    expect(parsePackAmount('2 Stk')).toBeNull()
+  })
+})
+
+describe('inferPackCount / formatPackAmountFromPreset', () => {
+  it('leitet Anzahl aus Gesamtgewicht und Packungsgrösse ab', () => {
+    expect(inferPackCount('800 g', '400 g')).toBe(2)
+    expect(inferPackCount('800 g', '400 ml')).toBe(2)
+    expect(formatPackAmountFromPreset(2, '400 g')).toBe('2 × 400 g')
+  })
+})
+
 describe('priceQuantityFromAmount', () => {
   it('nutzt Stückzahlen als Multiplikator', () => {
     expect(priceQuantityFromAmount('2 Stk')).toBe(2)
     expect(priceQuantityFromAmount('3')).toBe(3)
     expect(priceQuantityFromAmount('2 Packungen')).toBe(2)
+  })
+  it('nutzt Pack-Anzahl bei 2 × 400 g', () => {
+    expect(priceQuantityFromAmount('2 × 400 g')).toBe(2)
+    expect(priceQuantityFromAmount('1 × 400 g')).toBe(1)
   })
   it('behandelt Gewicht/Volumen als eine Packung', () => {
     expect(priceQuantityFromAmount('500 g')).toBe(1)
@@ -43,6 +79,13 @@ describe('resolveCheckoffTotalPrice', () => {
     expect(resolveCheckoffTotalPrice(2.5, '2 Stk', 'unit')).toEqual({
       total: 5,
       unitPrice: 2.5,
+      quantity: 2,
+    })
+  })
+  it('multipliziert Packungspreis bei 2 × 400 g', () => {
+    expect(resolveCheckoffTotalPrice(0.65, '2 × 400 g', 'unit')).toEqual({
+      total: 1.3,
+      unitPrice: 0.65,
       quantity: 2,
     })
   })
@@ -86,6 +129,11 @@ describe('adjustAmount', () => {
   it('increments by the unit step', () => {
     expect(adjustAmount('500 g', 1)).toBe('550 g')
     expect(adjustAmount('2 Stück', 1)).toBe('3 Stück')
+  })
+  it('ändert bei Pack-Mengen nur die Anzahl', () => {
+    expect(adjustAmount('2 × 400 g', 1)).toBe('3 × 400 g')
+    expect(adjustAmount('2 × 400 g', -1)).toBe('1 × 400 g')
+    expect(adjustAmount('1 × 400 g', -1)).toBe('1 × 400 g')
   })
   it('decrements by the unit step, preserving casing', () => {
     expect(adjustAmount('500 g', -1)).toBe('450 g')

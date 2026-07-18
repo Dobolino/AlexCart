@@ -8,6 +8,68 @@ export interface ParsedAmount {
   unit: string
 }
 
+/** Mehrere gleich grosse Packungen, z. B. „2 × 400 g“ (2 Dosen à 400 g). */
+export interface PackAmount {
+  count: number
+  packValue: number
+  packUnit: string
+}
+
+const PACK_AMOUNT_RE = /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*([a-zA-ZäöüÄÖÜµμ%]+)\s*$/iu
+
+export function parsePackAmount(str: string | undefined | null): PackAmount | null {
+  if (!str) return null
+  const m = String(str).trim().match(PACK_AMOUNT_RE)
+  if (!m) return null
+  const count = Number(m[1])
+  const packValue = parseFloat(m[2]!.replace(',', '.'))
+  const packUnit = m[3]!.trim()
+  if (!Number.isFinite(count) || count < 1 || !Number.isFinite(packValue) || packValue <= 0 || !packUnit) {
+    return null
+  }
+  return { count: Math.round(count), packValue, packUnit }
+}
+
+export function formatPackAmount(count: number, packValue: number, packUnit: string): string {
+  const n = Math.max(1, Math.round(count))
+  return `${n} × ${joinAmount(formatNumber(packValue), packUnit.trim())}`
+}
+
+/** Baut „N × 400 g“ aus Anzahl und Grössen-Preset („400 g“ / „400 ml“). */
+export function formatPackAmountFromPreset(count: number, preset: string): string | null {
+  const parsed = parseAmount(preset)
+  if (!parsed || !parsed.unit) return null
+  return formatPackAmount(count, parsed.value, parsed.unit)
+}
+
+/**
+ * Leitet die Packungsanzahl ab, wenn die aktuelle Menge ein Vielfaches der Packungsgrösse ist
+ * (z. B. „800 g“ + Preset „400 g“ → 2). Sonst bestehende Pack-Anzahl oder 1.
+ */
+export function inferPackCount(amount: string, preset: string): number {
+  const existing = parsePackAmount(amount)
+  if (existing) return existing.count
+
+  const presetParsed = parseAmount(preset)
+  if (!presetParsed || presetParsed.value <= 0) return 1
+
+  const amountParsed = parseAmount(amount)
+  if (!amountParsed || amountParsed.value <= 0) return 1
+
+  const presetUnit = normalizeUnit(presetParsed.unit)
+  const amountUnit = normalizeUnit(amountParsed.unit)
+  const compatible =
+    presetUnit === amountUnit ||
+    ((presetUnit === 'g' || presetUnit === 'ml') && (amountUnit === 'g' || amountUnit === 'ml'))
+  if (!compatible) return 1
+
+  const ratio = amountParsed.value / presetParsed.value
+  if (ratio >= 1 && Math.abs(ratio - Math.round(ratio)) < 0.001) {
+    return Math.max(1, Math.round(ratio))
+  }
+  return 1
+}
+
 export function parseAmount(str: string | undefined | null): ParsedAmount | null {
   if (!str) return null
   const m = String(str).trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/)
@@ -40,8 +102,14 @@ export function stepForUnit(unit: string): number {
 
 /** Erhöht/verringert eine Mengenangabe um einen sinnvollen Schritt; nicht unter
  *  einen Schritt sinken (0 oder negative Mengen ergeben keinen Sinn - dafür löscht
- *  man den Artikel). Nicht parsebare Mengen bleiben unverändert. */
+ *  man den Artikel). Nicht parsebare Mengen bleiben unverändert.
+ *  Bei Pack-Mengen („2 × 400 g“) ändert nur die Anzahl, die Packungsgrösse bleibt. */
 export function adjustAmount(amount: string, direction: 1 | -1): string {
+  const pack = parsePackAmount(amount)
+  if (pack) {
+    const next = direction > 0 ? pack.count + 1 : Math.max(1, pack.count - 1)
+    return formatPackAmount(next, pack.packValue, pack.packUnit)
+  }
   const parsed = parseAmount(amount)
   if (!parsed) return amount
   const step = stepForUnit(parsed.unit)
@@ -78,8 +146,11 @@ function normalizeUnit(unit: string): string {
     .replace(/\p{M}/gu, '')
 }
 
-/** Anzahl für Preisberechnung – z. B. „2 Stk“ → 2, „500 g“ → 1 (Packungspreis). */
+/** Anzahl für Preisberechnung – z. B. „2 Stk“ → 2, „2 × 400 g“ → 2, „500 g“ → 1. */
 export function priceQuantityFromAmount(amount: string): number {
+  const pack = parsePackAmount(amount)
+  if (pack) return pack.count
+
   const parsed = parseAmount(amount)
   if (!parsed) {
     const bare = String(amount).trim().match(/^(\d+)$/)
@@ -111,9 +182,20 @@ export function resolveCheckoffTotalPrice(
 }
 
 export function combineAmounts(a: string, b: string): string {
+  const packA = parsePackAmount(a)
+  const packB = parsePackAmount(b)
+  if (
+    packA &&
+    packB &&
+    packA.packUnit.toLowerCase() === packB.packUnit.toLowerCase() &&
+    packA.packValue === packB.packValue
+  ) {
+    return formatPackAmount(packA.count + packB.count, packA.packValue, packA.packUnit)
+  }
+
   const pa = parseAmount(a)
   const pb = parseAmount(b)
-  if (pa && pb && pa.unit.toLowerCase() === pb.unit.toLowerCase()) {
+  if (pa && pb && !packA && !packB && pa.unit.toLowerCase() === pb.unit.toLowerCase()) {
     const sum = formatNumber(pa.value + pb.value)
     return pa.unit ? `${sum} ${pa.unit}` : sum
   }
