@@ -8,7 +8,7 @@ import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { receiptItemsForList, todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
-import { isProduceCategory } from '@/utils/producePrice'
+import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { nextOpenCategory } from '@/utils/shoppingProgress'
 import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
@@ -216,7 +216,8 @@ export function ShoppingModePage() {
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
-    if (isProduceCategory(item.category)) return
+    // Gewichts-Obst bleibt fix; Stück-Obst (z. B. „2 Stück Kiwi“) darf per Stepper geändert werden.
+    if (shouldUseExactProduceWeight(item.category, item.amount)) return
     if (!item.amount.trim() && direction > 0) {
       updateItemInActiveList(item.id, { amount: '1 Stk' })
       return

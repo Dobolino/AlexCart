@@ -19,7 +19,18 @@ import {
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
-import { isProduceCategory, resolveProduceCheckoffPrice, weightGramsFromAmount, formatWeightGrams, parseGramsInput, explicitWeightGrams, pricePer100gFromKg } from '@/utils/producePrice'
+import {
+  resolveProduceCheckoffPrice,
+  weightGramsFromAmount,
+  formatWeightGrams,
+  parseGramsInput,
+  explicitWeightGrams,
+  pricePer100gFromKg,
+  isProduceCategory,
+  canChooseProducePricingMode,
+  defaultProducePricingMode,
+  type ProducePricingMode,
+} from '@/utils/producePrice'
 import { computePriceDelta } from '@/utils/priceDelta'
 import { productPriceHistory } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
@@ -66,15 +77,8 @@ export function CheckoffPriceSheet({
   const quantity = priceQuantityFromAmount(item.amount)
   const packAmount = parsePackAmount(item.amount)
   const isProduce = isProduceCategory(item.category)
-  // Gewichts-Preisführung: Obst/Gemüse (frei abwiegbar) ODER jeder Artikel mit g/kg-Menge
-  // (z. B. „800 g Hähnchen“) – Gesamtpreis wird auf Kilo-/100-g-Preis umgerechnet.
-  // Pack-Mengen („2 × 400 g“) sind Stückzahl × Packung → Preis multiplizieren, kein Waagenpreis.
-  const weightGrams = packAmount
-    ? null
-    : isProduce
-      ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
-      : explicitWeightGrams(item.amount)
-  const priceByWeight = !packAmount && (isProduce || (weightGrams !== null && weightGrams > 0))
+  const canChooseProduceMode = canChooseProducePricingMode(item.category, item.amount)
+  const forcedWeightGrams = packAmount ? null : explicitWeightGrams(item.amount)
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
@@ -85,11 +89,33 @@ export function CheckoffPriceSheet({
   const [wasSale, setWasSale] = useState(false)
   const [priceMode, setPriceMode] = useState<CheckoffPriceMode>(quantity > 1 ? 'unit' : 'total')
   const [error, setError] = useState('')
+  const [produceMode, setProduceMode] = useState<ProducePricingMode>(() =>
+    defaultProducePricingMode(item.name, item.category, item.amount, initialVariant)
+  )
+  const [produceModeTouched, setProduceModeTouched] = useState(false)
 
   const selectedVariant = useMemo(() => {
     if (selection === NEW_VARIANT) return undefined
     return profile ? findVariant(profile, selection) : undefined
   }, [profile, selection])
+
+  // Vorauswahl anpassen, wenn Variante wechselt – nur wenn Nutzer den Modus noch nicht manuell gesetzt hat.
+  const produceDefaultKey = `${selectedVariant?.id ?? ''}|${item.amount}`
+  const [appliedProduceDefaultKey, setAppliedProduceDefaultKey] = useState(produceDefaultKey)
+  if (!produceModeTouched && produceDefaultKey !== appliedProduceDefaultKey) {
+    setAppliedProduceDefaultKey(produceDefaultKey)
+    setProduceMode(defaultProducePricingMode(item.name, item.category, item.amount, selectedVariant ?? initialVariant))
+  }
+
+  // Obst: wählbarer Modus (Banane kg / Kiwi Stück). Sonst: explizite g/kg → Waagenpreis.
+  const priceByWeight =
+    !packAmount && (forcedWeightGrams !== null || (isProduce && produceMode === 'weight'))
+  const showProduceWeightInput = Boolean(isProduce && priceByWeight)
+  const weightGrams = packAmount
+    ? null
+    : priceByWeight
+      ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount) ?? forcedWeightGrams
+      : null
 
   const showNewVariantName = selection === NEW_VARIANT
   const sizePresets = getVariantSizePresets(item.name, item.category, item.amount)
@@ -166,7 +192,7 @@ export function CheckoffPriceSheet({
   ])
 
   function handleAdjustAmount(direction: 1 | -1) {
-    if (!onAmountChange || isProduce) return
+    if (!onAmountChange || showProduceWeightInput) return
     if (!item.amount.trim() && direction > 0) {
       onAmountChange('1 Stk')
       return
@@ -184,7 +210,7 @@ export function CheckoffPriceSheet({
       setVariantName(preset)
     }
     // „800 g“ + Chip „400 g“ → „2 × 400 g“, damit der Preis einer Dose × Anzahl gilt.
-    if (onAmountChange && !isProduce) {
+    if (onAmountChange && !showProduceWeightInput) {
       const count = inferPackCount(item.amount, preset)
       const next = formatPackAmountFromPreset(count, preset)
       if (next) onAmountChange(next)
@@ -251,7 +277,30 @@ export function CheckoffPriceSheet({
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
           </p>
 
-          {onAmountChange && isProduce && (
+          {canChooseProduceMode && (
+            <>
+              <OptionSegment
+                highlight={highlightOptions}
+                options={[
+                  { value: 'weight', label: 'Nach Gewicht' },
+                  { value: 'piece', label: 'Pro Stück' },
+                ]}
+                value={produceMode}
+                onChange={(v) => {
+                  setProduceModeTouched(true)
+                  setProduceMode(v as ProducePricingMode)
+                  setError('')
+                }}
+              />
+              <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                {produceMode === 'weight'
+                  ? 'Für Ware mit Kilopreis (z. B. Bananen) – Gewicht vom Bon eingeben'
+                  : 'Für Stückpreise (z. B. Kiwi) – Preis pro Stück eingeben'}
+              </p>
+            </>
+          )}
+
+          {onAmountChange && showProduceWeightInput && (
             <div className="mb-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
               <div className="mb-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
                 Abgewogenes Gewicht
@@ -263,7 +312,7 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {onAmountChange && !isProduce && (
+          {onAmountChange && !showProduceWeightInput && (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
               <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
                 Menge
@@ -276,7 +325,7 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {isProduce && (
+          {showProduceWeightInput && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Exaktes Gewicht vom Kassenbon eingeben – z. B. 347 g
             </p>

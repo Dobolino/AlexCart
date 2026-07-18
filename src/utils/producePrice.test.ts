@@ -10,6 +10,8 @@ import {
   explicitWeightGrams,
   pricingWeightGrams,
   pricePer100gFromKg,
+  defaultProducePricingMode,
+  canChooseProducePricingMode,
 } from './producePrice'
 
 describe('producePrice', () => {
@@ -56,10 +58,30 @@ describe('producePrice', () => {
 
   it('pricingWeightGrams: Obst/Gemüse frei, sonst nur explizites Gewicht', () => {
     // Obst/Gemüse akzeptiert blanke Zahl als Gramm
-    expect(pricingWeightGrams('Früchte & Gemüse', '347')).toBe(347)
+    expect(pricingWeightGrams('Früchte & Gemüse', '347', 'Äpfel')).toBe(347)
+    expect(pricingWeightGrams('Früchte & Gemüse', '347 g', 'Äpfel')).toBe(347)
+    // Stück-Kiwi: kein Waagenpreis
+    expect(pricingWeightGrams('Früchte & Gemüse', '2 Stück', 'Kiwi')).toBeNull()
+    // Banane mit Stück + Kilohistorie → Gewicht-Modus, aber ohne Gramm → null
+    expect(
+      pricingWeightGrams('Früchte & Gemüse', '3 Stück', 'Banane', { pricePerKg: 2.5 })
+    ).toBeNull()
     // Fleisch nur mit expliziter Einheit
     expect(pricingWeightGrams('Fleisch & Fisch', '800 g')).toBe(800)
     expect(pricingWeightGrams('Fleisch & Fisch', '2 Stück')).toBeNull()
+  })
+
+  it('wählt Banane→Gewicht und Kiwi→Stück als Default', () => {
+    expect(defaultProducePricingMode('Banane', 'Früchte & Gemüse', '3 Stück')).toBe('weight')
+    expect(defaultProducePricingMode('Kiwi', 'Früchte & Gemüse', '2 Stück')).toBe('piece')
+    expect(
+      defaultProducePricingMode('Banane', 'Früchte & Gemüse', '3 Stück', { pricePerKg: 2.4 })
+    ).toBe('weight')
+    expect(
+      defaultProducePricingMode('Kiwi', 'Früchte & Gemüse', '2 Stück', { lastPrice: 0.8 })
+    ).toBe('piece')
+    expect(canChooseProducePricingMode('Früchte & Gemüse', '2 Stück')).toBe(true)
+    expect(canChooseProducePricingMode('Früchte & Gemüse', '500 g')).toBe(false)
   })
 
   it('pricePer100gFromKg rechnet Kilopreis auf 100 g', () => {

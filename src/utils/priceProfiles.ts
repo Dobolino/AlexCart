@@ -1,5 +1,10 @@
 import { priceQuantityFromAmount } from './amount'
-import { isProduceCategory, weightGramsFromAmount, explicitWeightGrams } from './producePrice'
+import {
+  isProduceCategory,
+  weightGramsFromAmount,
+  explicitWeightGrams,
+  defaultProducePricingMode,
+} from './producePrice'
 import { normalize } from '@/utils/text'
 import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
 
@@ -273,11 +278,19 @@ export function estimateItemPrice(
   if (!variant) return null
 
   if (isProduceCategory(item.category)) {
-    const grams = weightGramsFromAmount(item.amount)
-    const perKg = variant.pricePerKg ?? variant.lastPrice ?? variant.avgPrice
-    if (grams && perKg) return roundMoney(perKg * (grams / 1000))
-    if (perKg) return perKg
-    return null
+    const mode = defaultProducePricingMode(item.name, item.category, item.amount, variant)
+    if (mode === 'weight') {
+      const grams = weightGramsFromAmount(item.amount)
+      const perKg = variant.pricePerKg ?? variant.lastPrice ?? variant.avgPrice
+      if (grams && perKg) return roundMoney(perKg * (grams / 1000))
+      // Stück auf der Liste, aber Kilopreis-Historie: kein Gramm → nur Richtwert pro kg
+      if (perKg) return perKg
+      return null
+    }
+    // Stückpreis-Obst (Kiwi etc.)
+    const unit = estimateVariantPrice(variant)
+    if (unit === null) return null
+    return roundMoney(unit * priceQuantityFromAmount(item.amount))
   }
 
   // Nicht-Obst/Gemüse mit g/kg-Menge: nur skalieren, wenn ein echter Kilopreis erfasst wurde

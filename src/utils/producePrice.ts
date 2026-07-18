@@ -1,7 +1,10 @@
 import { formatNumber, joinAmount, parseAmount, parsePackAmount } from '@/utils/amount'
-import { normalizeCategory } from '@/utils/icon'
+import { getIconKey, normalizeCategory } from '@/utils/icon'
 
 export const PRODUCE_CATEGORY = 'Früchte & Gemüse'
+
+/** Obst/Gemüse: Waagen-/Kilopreis oder Stückpreis (Banane vs. Kiwi). */
+export type ProducePricingMode = 'weight' | 'piece'
 
 function normalizeUnit(unit: string): string {
   return unit
@@ -29,6 +32,108 @@ const PRODUCE_PIECE_UNITS = new Set([
   'becher',
   'prise',
 ])
+
+/** Typisch nach Gewicht verkauft – auch wenn die Liste „3 Stück“ sagt (z. B. Bananen). */
+const WEIGHED_PRODUCE_ICONS = new Set([
+  'banane',
+  'apfel',
+  'birne',
+  'traube',
+  'kartoffel',
+  'zwiebel',
+  'karotte',
+  'tomate',
+  'erdbeere',
+  'blaubeere',
+  'himbeere',
+  'kirsche',
+  'pflaume',
+  'pfirsich',
+  'aprikose',
+  'mandarine',
+  'clementine',
+  'orange',
+  'zitrone',
+  'limette',
+  'ingwer',
+  'knoblauch',
+  'pilz',
+  'spinat',
+  'salat',
+])
+
+/** Typisch mit Stückpreis – Kiwi, Avocado, … */
+const PIECE_PRODUCE_ICONS = new Set([
+  'kiwi',
+  'avocado',
+  'mango',
+  'ananas',
+  'melone',
+  'wassermelone',
+  'kokosnuss',
+  'granatapfel',
+  'paprika',
+  'gurke',
+  'zucchini',
+  'aubergine',
+  'mais',
+  'fenchel',
+  'lauch',
+  'sellerie',
+  'brokkoli',
+  'blumenkohl',
+  'kuerbis',
+])
+
+/** Obst/Gemüse-Menge in Stück/Bund/… (nicht g/kg). */
+export function isProducePieceUnitAmount(amount: string): boolean {
+  if (parsePackAmount(amount)) return false
+  const parsed = parseAmount(amount)
+  if (!parsed) return false
+  return PRODUCE_PIECE_UNITS.has(normalizeUnit(parsed.unit))
+}
+
+/** Menge erzwingt Waagenpreis (explizite g/kg auf der Liste). */
+export function isForcedWeightAmount(amount: string): boolean {
+  return explicitWeightGrams(amount) !== null
+}
+
+/**
+ * Ob der Nutzer zwischen Kilopreis und Stückpreis wählen kann.
+ * Bei fester g/kg-Menge auf der Liste nicht – sonst ja (Stück, leer, …).
+ */
+export function canChooseProducePricingMode(category: string, amount: string): boolean {
+  if (!isProduceCategory(category)) return false
+  if (parsePackAmount(amount)) return false
+  if (isForcedWeightAmount(amount)) return false
+  return true
+}
+
+/**
+ * Vorauswahl: Historie (pricePerKg) > Icon-Heuristik > Stück→Stück / sonst Gewicht.
+ * Beispiel: Banane „3 Stück“ + Kilohistorie → weight; Kiwi „2 Stück“ → piece.
+ */
+export function defaultProducePricingMode(
+  name: string,
+  category: string,
+  amount: string,
+  variant?: { pricePerKg?: number; lastPrice?: number } | null
+): ProducePricingMode {
+  if (!isProduceCategory(category)) return 'piece'
+  if (isForcedWeightAmount(amount)) return 'weight'
+
+  if (variant?.pricePerKg && variant.pricePerKg > 0) return 'weight'
+  if (isProducePieceUnitAmount(amount) && variant?.lastPrice && !(variant.pricePerKg && variant.pricePerKg > 0)) {
+    return 'piece'
+  }
+
+  const icon = getIconKey(name, category)
+  if (WEIGHED_PRODUCE_ICONS.has(icon)) return 'weight'
+  if (PIECE_PRODUCE_ICONS.has(icon)) return 'piece'
+
+  if (isProducePieceUnitAmount(amount)) return 'piece'
+  return 'weight'
+}
 
 /** Obst/Gemüse nach Gewicht: freie Gramm-Eingabe statt +/- in 50-g-Schritten. */
 export function shouldUseExactProduceWeight(category: string, amount: string): boolean {
@@ -58,9 +163,18 @@ export function explicitWeightGrams(amount: string): number | null {
   return null
 }
 
-/** Gramm für die Preisführung: Obst/Gemüse frei abwiegbar, sonst nur explizite g/kg-Menge. */
-export function pricingWeightGrams(category: string, amount: string): number | null {
-  if (isProduceCategory(category)) return weightGramsFromAmount(amount) ?? parseGramsInput(amount)
+/** Gramm für die Preisführung ohne Varianten-Kontext (Schätzung). */
+export function pricingWeightGrams(
+  category: string,
+  amount: string,
+  name = '',
+  variant?: { pricePerKg?: number; lastPrice?: number } | null
+): number | null {
+  if (isProduceCategory(category)) {
+    const mode = defaultProducePricingMode(name || 'x', category, amount, variant)
+    if (mode !== 'weight') return null
+    return weightGramsFromAmount(amount) ?? parseGramsInput(amount)
+  }
   return explicitWeightGrams(amount)
 }
 
