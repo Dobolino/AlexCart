@@ -7,7 +7,7 @@ import { useVisualViewportInset } from '@/hooks/useVisualViewportInset'
 interface SheetProps {
   onClose: () => void
   children: ReactNode
-  /** Volle Sheet-Höhe für kompakte, nicht scrollbare Inhalte (z. B. Preis-Sheet). */
+  /** Volle Sheet-Höhe für dichte Inhalte, die intern scrollen (z. B. Preis-Sheet). */
   tall?: boolean
 }
 
@@ -23,7 +23,7 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
     }
   }, [])
 
-  // Eingabefeld oben im Sheet fixieren – nicht mit dem Panel wegscrollen.
+  // Fokussiertes Feld im scrollbaren Bereich sichtbar halten (z. B. Preis-Sheet).
   useEffect(() => {
     const panel = panelRef.current
     if (!panel) return
@@ -31,7 +31,9 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
     function onFocusIn(e: FocusEvent) {
       const target = e.target as HTMLElement
       if (!target.matches('input, textarea, select')) return
-      panel!.scrollTop = 0
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      })
     }
 
     panel.addEventListener('focusin', onFocusIn)
@@ -63,6 +65,7 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
           paddingBottom: 'calc(20px + var(--safe-bottom))',
           paddingLeft: 'calc(18px + var(--safe-left))',
           paddingRight: 'calc(18px + var(--safe-right))',
+          touchAction: 'pan-y',
         }}
         onClick={(e) => e.stopPropagation()}
       >

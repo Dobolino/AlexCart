@@ -19,6 +19,17 @@ describe('parseRecipeLine', () => {
     expect(parseRecipeLine('1–2 EL Olivenöl')).toEqual({ name: 'Olivenöl', amount: '2 EL' })
     expect(parseRecipeLine('2 - 4 Eier')).toEqual({ name: 'Eier', amount: '4' })
   })
+
+  it('erkennt Packungsanzahl × Grösse', () => {
+    expect(parseRecipeLine('2x 400g Dosentomaten')).toEqual({
+      name: 'Dosentomaten',
+      amount: '2 × 400 g',
+    })
+    expect(parseRecipeLine('- 2 × 400 g gehackte Tomaten')).toEqual({
+      name: 'gehackte Tomaten',
+      amount: '2 × 400 g',
+    })
+  })
 })
 
 describe('parseRecipeText', () => {

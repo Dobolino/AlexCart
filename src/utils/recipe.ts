@@ -1,5 +1,5 @@
 import { normalize } from './text'
-import { parseAmount, joinAmount, formatNumber } from './amount'
+import { parseAmount, joinAmount, formatNumber, formatPackAmount } from './amount'
 import { searchProducts } from './search'
 import { normalizeCategory } from './icon'
 import type { CustomProduct, ImportItemPayload } from '@/types'
@@ -27,6 +27,21 @@ export function parseRecipeLine(line: string): ImportItemPayload | null {
   if (!text || text.length < 2) return null
   if (SKIP_LINE.test(text)) return null
   if (/^#{1,6}\s/.test(text)) return null
+
+  // „2x 400g Dosentomaten“ / „2 × 400 g Tomaten“ → Packungsanzahl × Grösse
+  const packMatch = text.match(
+    new RegExp(`^(\\d+)\\s*[x×]\\s*(\\d+(?:[.,]\\d+)?)\\s*(${UNITS})\\s+(.+)$`, 'iu')
+  )
+  if (packMatch) {
+    return {
+      name: packMatch[4]!.trim(),
+      amount: formatPackAmount(
+        Number(packMatch[1]),
+        parseFloat(packMatch[2]!.replace(',', '.')),
+        packMatch[3]!
+      ),
+    }
+  }
 
   const amountFirst = text.match(
     new RegExp(`^(\\d+(?:[.,]\\d+)?)(?:\\s*(?:${UNITS}))?\\s+(.+)$`, 'iu')

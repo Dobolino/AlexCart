@@ -51,6 +51,7 @@ describe('producePrice', () => {
     expect(explicitWeightGrams('2 Stück')).toBeNull()
     expect(explicitWeightGrams('2')).toBeNull()
     expect(explicitWeightGrams('')).toBeNull()
+    expect(explicitWeightGrams('2 × 400 g')).toBeNull()
   })
 
   it('pricingWeightGrams: Obst/Gemüse frei, sonst nur explizites Gewicht', () => {

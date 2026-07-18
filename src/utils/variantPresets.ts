@@ -1,8 +1,8 @@
 import { getIconKey } from '@/utils/icon'
 import { normalize } from '@/utils/text'
 
-/** Typische Dosengrössen – Schnellwahl beim Preis erfassen. */
-export const CAN_SIZE_PRESETS = ['400 ml', '800 ml'] as const
+/** Typische Dosengrössen – Schnellwahl beim Preis erfassen (g und ml). */
+export const CAN_SIZE_PRESETS = ['400 g', '800 g', '400 ml', '800 ml'] as const
 
 const DOSE_AMOUNT_PATTERN = /\b(dose|dosen)\b/i
 

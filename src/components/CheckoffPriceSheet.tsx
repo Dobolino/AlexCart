@@ -7,7 +7,15 @@ import { PriceDeltaBadge } from './PriceDeltaBadge'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
-import { adjustAmount, priceQuantityFromAmount, resolveCheckoffTotalPrice, type CheckoffPriceMode } from '@/utils/amount'
+import {
+  adjustAmount,
+  formatPackAmountFromPreset,
+  inferPackCount,
+  parsePackAmount,
+  priceQuantityFromAmount,
+  resolveCheckoffTotalPrice,
+  type CheckoffPriceMode,
+} from '@/utils/amount'
 import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
@@ -56,13 +64,17 @@ export function CheckoffPriceSheet({
   const hasVariants = variants.length > 0
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
   const quantity = priceQuantityFromAmount(item.amount)
+  const packAmount = parsePackAmount(item.amount)
   const isProduce = isProduceCategory(item.category)
   // Gewichts-Preisführung: Obst/Gemüse (frei abwiegbar) ODER jeder Artikel mit g/kg-Menge
   // (z. B. „800 g Hähnchen“) – Gesamtpreis wird auf Kilo-/100-g-Preis umgerechnet.
-  const weightGrams = isProduce
-    ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
-    : explicitWeightGrams(item.amount)
-  const priceByWeight = isProduce || (weightGrams !== null && weightGrams > 0)
+  // Pack-Mengen („2 × 400 g“) sind Stückzahl × Packung → Preis multiplizieren, kein Waagenpreis.
+  const weightGrams = packAmount
+    ? null
+    : isProduce
+      ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount)
+      : explicitWeightGrams(item.amount)
+  const priceByWeight = !packAmount && (isProduce || (weightGrams !== null && weightGrams > 0))
 
   const [selection, setSelection] = useState<string>(
     hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
@@ -171,6 +183,12 @@ export function CheckoffPriceSheet({
       setSelection(NEW_VARIANT)
       setVariantName(preset)
     }
+    // „800 g“ + Chip „400 g“ → „2 × 400 g“, damit der Preis einer Dose × Anzahl gilt.
+    if (onAmountChange && !isProduce) {
+      const count = inferPackCount(item.amount, preset)
+      const next = formatPackAmountFromPreset(count, preset)
+      if (next) onAmountChange(next)
+    }
     setError('')
   }
 
@@ -224,7 +242,10 @@ export function CheckoffPriceSheet({
   return (
     <Sheet onClose={onClose} tall>
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <div className="shrink-0">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
           <p className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
@@ -267,11 +288,19 @@ export function CheckoffPriceSheet({
             </p>
           )}
 
+          {packAmount && (
+            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {quantity > 1
+                ? `Preis einer Packung (${packAmount.packValue} ${packAmount.packUnit}) eingeben – wird mit ${quantity} multipliziert`
+                : `Eine Packung à ${packAmount.packValue} ${packAmount.packUnit}`}
+            </p>
+          )}
+
           {!priceByWeight && quantity > 1 && (
             <OptionSegment
               highlight={highlightOptions}
               options={[
-                { value: 'unit', label: 'Pro Stück' },
+                { value: 'unit', label: packAmount ? 'Pro Packung' : 'Pro Stück' },
                 { value: 'total', label: 'Gesamt' },
               ]}
               value={priceMode}
@@ -279,7 +308,7 @@ export function CheckoffPriceSheet({
             />
           )}
 
-          {!priceByWeight && quantity > 1 && (
+          {!priceByWeight && !packAmount && quantity > 1 && (
             <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
               {priceMode === 'unit'
                 ? `Stückpreis eingeben – wird mit ${quantity} multipliziert`
@@ -422,9 +451,7 @@ export function CheckoffPriceSheet({
               </div>
             </div>
           )}
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
           <MoneyNumpad
             cents={cents}
             onChange={(value) => {
@@ -433,7 +460,15 @@ export function CheckoffPriceSheet({
             }}
             currency={currency}
             dense
-            label={priceByWeight ? 'Preis am Kassenbon' : quantity > 1 && priceMode === 'unit' ? 'Preis pro Stück' : 'Preis'}
+            label={
+              priceByWeight
+                ? 'Preis am Kassenbon'
+                : quantity > 1 && priceMode === 'unit'
+                  ? packAmount
+                    ? 'Preis pro Packung'
+                    : 'Preis pro Stück'
+                  : 'Preis'
+            }
             trailing={
               priceDelta && priceDelta.direction !== 'same' ? (
                 <PriceDeltaBadge label={priceDelta.label} direction={priceDelta.direction} />
