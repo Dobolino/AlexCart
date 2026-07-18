@@ -120,8 +120,8 @@ describe('priceProfiles', () => {
     expect(estimateItemPrice(profiles, chicken('1 kg'))).toBe(12)
   })
 
-  it('schätzt Stück-Obst mit Stückpreis × Anzahl, nicht als Gewicht', () => {
-    const profiles: ProductPriceProfile[] = [
+  it('schätzt Stück-Obst mit Stückpreis × Anzahl; Banane bleibt Kilopreis-Logik', () => {
+    const kiwiProfiles: ProductPriceProfile[] = [
       {
         id: 'p1',
         itemName: 'Kiwi',
@@ -144,7 +144,38 @@ describe('priceProfiles', () => {
         ],
       },
     ]
-    expect(estimateItemPrice(profiles, item({ name: 'Kiwi', category: 'Früchte & Gemüse', amount: '2 Stück' }))).toBe(1.6)
+    expect(
+      estimateItemPrice(kiwiProfiles, item({ name: 'Kiwi', category: 'Früchte & Gemüse', amount: '2 Stück' }))
+    ).toBe(1.6)
+
+    const bananaProfiles: ProductPriceProfile[] = [
+      {
+        id: 'p2',
+        itemName: 'Banane',
+        category: 'Früchte & Gemüse',
+        baseKey: profileBaseKey('Banane', 'Früchte & Gemüse'),
+        preferredVariantId: 'v1',
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [
+          {
+            id: 'v1',
+            name: 'Standard',
+            lastPrice: 2.4,
+            avgPrice: 2.4,
+            pricePerKg: 2.4,
+            purchaseCount: 2,
+            lastPurchaseDate: '2026-07-08',
+            lastPurchaseWasSale: false,
+            salePurchaseCount: 0,
+          },
+        ],
+      },
+    ]
+    // 3 Stück auf der Liste, aber Kilopreis → Richtwert pro kg (kein Gramm bekannt)
+    expect(
+      estimateItemPrice(bananaProfiles, item({ name: 'Banane', category: 'Früchte & Gemüse', amount: '3 Stück' }))
+    ).toBe(2.4)
   })
 
   it('lässt g/kg-Artikel ohne erfassten Kilopreis unverändert (fester Preis)', () => {
