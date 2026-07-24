@@ -269,6 +269,21 @@ export function pickVariantForEstimate(
   return profile.variants[0]
 }
 
+/** Zuletzt erfasster Kilopreis eines Produkts (falls es je nach Gewicht abgehakt wurde) -
+ *  für die 100-g-Anzeige im Preisverlauf. Nimmt die jüngste Variante mit pricePerKg. */
+export function productPricePerKg(
+  profiles: ProductPriceProfile[],
+  name: string,
+  category: string
+): number | null {
+  const profile = findPriceProfile(profiles, name, category)
+  if (!profile) return null
+  const withPerKg = profile.variants
+    .filter((v) => v.pricePerKg !== undefined && v.pricePerKg > 0)
+    .sort((a, b) => (b.lastPurchaseDate || '').localeCompare(a.lastPurchaseDate || ''))
+  return withPerKg[0]?.pricePerKg ?? null
+}
+
 export function estimateItemPrice(
   profiles: ProductPriceProfile[],
   item: ShoppingItem

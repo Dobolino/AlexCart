@@ -19,6 +19,8 @@ import {
 } from '@/utils/stats'
 import { productPriceHistory, spendPerWeek } from '@/utils/priceHistory'
 import { avgBasketByStore, promoSavingsInYear } from '@/utils/storeStats'
+import { productPricePerKg } from '@/utils/priceProfiles'
+import { pricePer100gFromKg } from '@/utils/producePrice'
 import { formatMoney } from '@/utils/currency'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -233,14 +235,24 @@ export function StatsPage() {
                   Preisverlauf
                 </div>
                 <div className="card-surface mb-4.5 px-4 py-3.5">
-                  {priceHistory.slice(0, 8).map((entry) => (
-                    <div key={entry.name} className="mb-3 border-b pb-3 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
-                      <div className="mb-0.5 text-[14px] font-bold">{entry.name}</div>
-                      <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        Zuletzt {formatMoney(entry.lastPrice, currency)} · Ø {formatMoney(entry.avgPrice, currency)} · {entry.count}× erfasst
+                  {priceHistory.slice(0, 8).map((entry) => {
+                    const perKg = productPricePerKg(priceProfiles, entry.name, entry.category)
+                    return (
+                      <div key={entry.name} className="mb-3 border-b pb-3 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
+                        <div className="mb-0.5 flex items-baseline justify-between gap-2">
+                          <span className="text-[14px] font-bold">{entry.name}</span>
+                          {perKg !== null && (
+                            <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: 'var(--accent)' }}>
+                              {formatMoney(pricePer100gFromKg(perKg), currency)}/100 g
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          Zuletzt {formatMoney(entry.lastPrice, currency)} · Ø {formatMoney(entry.avgPrice, currency)} · {entry.count}× erfasst
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             )}

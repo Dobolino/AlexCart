@@ -8,6 +8,7 @@ import {
   estimateVariantPrice,
   findPriceProfile,
   profileBaseKey,
+  productPricePerKg,
   recordVariantPurchase,
 } from './priceProfiles'
 import type { ProductPriceProfile, ShoppingItem } from '@/types'
@@ -206,6 +207,25 @@ describe('priceProfiles', () => {
       item({ name: 'Hähnchenbrust', category: 'Fleisch & Fisch', amount })
     expect(estimateItemPrice(profiles, chicken('800 g'))).toBe(8.5)
     expect(estimateItemPrice(profiles, chicken('400 g'))).toBe(8.5)
+  })
+
+  it('productPricePerKg liefert den jüngsten erfassten Kilopreis, sonst null', () => {
+    const profiles: ProductPriceProfile[] = [
+      {
+        id: 'p1',
+        itemName: 'Hähnchenbrust',
+        category: 'Fleisch & Fisch',
+        baseKey: profileBaseKey('Hähnchenbrust', 'Fleisch & Fisch'),
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [
+          { id: 'v1', name: 'alt', pricePerKg: 9, purchaseCount: 1, lastPurchaseDate: '2026-07-01', lastPurchaseWasSale: false, salePurchaseCount: 0 },
+          { id: 'v2', name: 'neu', pricePerKg: 12, purchaseCount: 1, lastPurchaseDate: '2026-07-08', lastPurchaseWasSale: false, salePurchaseCount: 0 },
+        ],
+      },
+    ]
+    expect(productPricePerKg(profiles, 'Hähnchenbrust', 'Fleisch & Fisch')).toBe(12)
+    expect(productPricePerKg(profiles, 'Milch', 'Milch & Käse')).toBeNull()
   })
 
   it('nutzt Durchschnitt wenn kein letzter Normalpreis', () => {
