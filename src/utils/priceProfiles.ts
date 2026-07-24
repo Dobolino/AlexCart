@@ -4,6 +4,7 @@ import {
   weightGramsFromAmount,
   explicitWeightGrams,
   defaultProducePricingMode,
+  estimatedPieceGrams,
 } from './producePrice'
 import { normalize } from '@/utils/text'
 import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
@@ -295,10 +296,11 @@ export function estimateItemPrice(
   if (isProduceCategory(item.category)) {
     const mode = defaultProducePricingMode(item.name, item.category, item.amount, variant)
     if (mode === 'weight') {
-      const grams = weightGramsFromAmount(item.amount)
       const perKg = variant.pricePerKg ?? variant.lastPrice ?? variant.avgPrice
+      // Echtes Gewicht (g/kg), sonst aus der Stückzahl geschätzt (z. B. 5 Bananen ≈ 600 g).
+      const grams = weightGramsFromAmount(item.amount) ?? estimatedPieceGrams(item.name, item.category, item.amount)
       if (grams && perKg) return roundMoney(perKg * (grams / 1000))
-      // Stück auf der Liste, aber Kilopreis-Historie: kein Gramm → nur Richtwert pro kg
+      // Kein Gewicht ableitbar (z. B. leere Menge): nur Richtwert pro kg
       if (perKg) return perKg
       return null
     }

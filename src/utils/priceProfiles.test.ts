@@ -173,9 +173,14 @@ describe('priceProfiles', () => {
         ],
       },
     ]
-    // 3 Stück auf der Liste, aber Kilopreis → Richtwert pro kg (kein Gramm bekannt)
+    // 3 Stück auf der Liste + Kilopreis: Gewicht aus Ø-Stückgewicht schätzen
+    // (Banane ≈ 120 g → 3 × 120 g = 360 g → 2.4 CHF/kg × 0,36 kg = 0,86)
     expect(
       estimateItemPrice(bananaProfiles, item({ name: 'Banane', category: 'Früchte & Gemüse', amount: '3 Stück' }))
+    ).toBe(0.86)
+    // Ohne Mengenangabe kein Gewicht ableitbar → Richtwert pro kg
+    expect(
+      estimateItemPrice(bananaProfiles, item({ name: 'Banane', category: 'Früchte & Gemüse', amount: '' }))
     ).toBe(2.4)
   })
 

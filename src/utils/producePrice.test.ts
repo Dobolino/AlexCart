@@ -12,6 +12,8 @@ import {
   pricePer100gFromKg,
   defaultProducePricingMode,
   canChooseProducePricingMode,
+  averageGramsPerPiece,
+  estimatedPieceGrams,
 } from './producePrice'
 
 describe('producePrice', () => {
@@ -87,5 +89,21 @@ describe('producePrice', () => {
   it('pricePer100gFromKg rechnet Kilopreis auf 100 g', () => {
     expect(pricePer100gFromKg(12)).toBe(1.2)
     expect(pricePer100gFromKg(10.63)).toBe(1.06)
+  })
+
+  it('averageGramsPerPiece nutzt Tabelle, sonst Standardwert', () => {
+    expect(averageGramsPerPiece('Banane', 'Früchte & Gemüse')).toBe(120)
+    expect(averageGramsPerPiece('Apfel', 'Früchte & Gemüse')).toBe(180)
+    // unbekanntes Produkt → Standard 150 g
+    expect(averageGramsPerPiece('Sternfrucht', 'Früchte & Gemüse')).toBe(150)
+  })
+
+  it('estimatedPieceGrams schätzt Gewicht aus Stückzahl, sonst null', () => {
+    expect(estimatedPieceGrams('Banane', 'Früchte & Gemüse', '5 Stück')).toBe(600)
+    expect(estimatedPieceGrams('Apfel', 'Früchte & Gemüse', '3')).toBe(540)
+    // g/kg-Menge, Bund/Packung oder Nicht-Obst → null (kein Schätzwert nötig/sinnvoll)
+    expect(estimatedPieceGrams('Banane', 'Früchte & Gemüse', '500 g')).toBeNull()
+    expect(estimatedPieceGrams('Petersilie', 'Früchte & Gemüse', '1 Bund')).toBeNull()
+    expect(estimatedPieceGrams('Milch', 'Milch & Käse', '2 Stück')).toBeNull()
   })
 })

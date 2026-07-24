@@ -1,5 +1,6 @@
 import { formatNumber, joinAmount, parseAmount, parsePackAmount } from '@/utils/amount'
 import { getIconKey, normalizeCategory } from '@/utils/icon'
+import { PRODUCE_PIECE_GRAMS, DEFAULT_PIECE_GRAMS } from '@/constants/produceWeights'
 
 export const PRODUCE_CATEGORY = 'Früchte & Gemüse'
 
@@ -181,6 +182,27 @@ export function pricingWeightGrams(
 /** 100-g-Preis aus dem intern gespeicherten Kilopreis. */
 export function pricePer100gFromKg(pricePerKg: number): number {
   return Math.round((pricePerKg / 10) * 100) / 100
+}
+
+/** Typisches Gewicht eines einzelnen Stücks (Icon-Tabelle, sonst Standardwert). */
+export function averageGramsPerPiece(name: string, category: string): number {
+  return PRODUCE_PIECE_GRAMS[getIconKey(name, category)] ?? DEFAULT_PIECE_GRAMS
+}
+
+/**
+ * Geschätztes Gesamtgewicht für eine Stück-Menge Obst/Gemüse (z. B. „5 Stück Bananen“ →
+ * 5 × Ø-Stückgewicht). Nur für die Kostenschätzung, wenn kein echtes Gewicht vorliegt.
+ * Gibt null zurück, wenn die Menge kein zählbares Stück ist (Bund, Packung, g/kg …).
+ */
+export function estimatedPieceGrams(name: string, category: string, amount: string): number | null {
+  if (!isProduceCategory(category)) return null
+  if (parsePackAmount(amount)) return null
+  const parsed = parseAmount(amount)
+  if (!parsed || parsed.value <= 0) return null
+  const unit = normalizeUnit(parsed.unit)
+  // Nur echte Einzelstücke (Stück/Stk oder blanke Zahl) – Bund/Packung sind gewichtsmässig unklar.
+  if (unit !== 'stuck' && unit !== 'stk' && unit !== 'stck' && unit !== '') return null
+  return Math.round(parsed.value) * averageGramsPerPiece(name, category)
 }
 
 /** Gramm aus Mengenangabe – z. B. „750 g“, „1.2 kg“, „347g“. */
