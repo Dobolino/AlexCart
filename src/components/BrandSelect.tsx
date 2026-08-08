@@ -30,8 +30,6 @@ export function BrandSelect({ brands, value, onChange, onCreateBrand, label = 'M
     [brands, q]
   )
 
-  const showSearch = brands.length > 6
-
   function handleCreate() {
     if (!q || exactExists) return
     const id = onCreateBrand(q)
@@ -45,26 +43,24 @@ export function BrandSelect({ brands, value, onChange, onCreateBrand, label = 'M
         {label}
       </div>
 
-      {(showSearch || brands.length > 0) && (
-        <div className="relative mb-2">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
-            <Icon path={ICON_PATHS.search} size={15} />
-          </span>
-          <input
-            type="text"
-            className="input w-full py-2 pl-9 text-[14px]"
-            placeholder="Marke suchen oder neu eingeben"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                handleCreate()
-              }
-            }}
-          />
-        </div>
-      )}
+      <div className="relative mb-2">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+          <Icon path={ICON_PATHS.search} size={15} />
+        </span>
+        <input
+          type="text"
+          className="input w-full py-2 pl-9 text-[14px]"
+          placeholder="Marke suchen oder neu eingeben"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleCreate()
+            }
+          }}
+        />
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {q && !exactExists && (
