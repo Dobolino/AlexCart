@@ -191,4 +191,7 @@ export interface ShoppingSession {
   startedAt: number
   pausedAt?: number
   totalPausedMs: number
+  /** In dieser Sitzung abgehakte Artikel-IDs – bestimmt, was in die Quittung des Einkaufs kommt
+   *  (nicht alle „done"-Artikel, sonst landen Reste früherer Einkäufe in der Quittung). */
+  checkedItemIds: string[]
 }

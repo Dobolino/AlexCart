@@ -86,20 +86,28 @@ export function matchesListItem(
   return entry.name === item.name && entry.category === item.category
 }
 
-/** Quittungs-Zeilen für die abgehakten Artikel einer Liste - für CompletedTrip beim Abschluss
- *  des Einkaufsmodus. Preis fehlt, wenn beim Abhaken keiner erfasst wurde. */
-export function receiptItemsForList(
+/** Quittungs-Zeilen für die in DIESER Einkaufssitzung abgehakten Artikel (nach IDs), für
+ *  CompletedTrip beim Abschluss. Dedupliziert, ignoriert gelöschte Artikel, Preis optional.
+ *  So landen keine Reste früherer Einkäufe (alte „done"-Artikel) in der Quittung. */
+export function receiptItemsForSession(
   purchaseLog: PurchaseLogEntry[],
   listItems: ShoppingItem[],
+  checkedItemIds: string[],
   today: string = todayKey()
 ): { id: string; name: string; amount: string; price?: number }[] {
-  return listItems
-    .filter((item) => item.done)
-    .map((item) => {
-      const entry = purchaseLog.find((e) => e.date === today && matchesListItem(e, item))
-      const price = entry?.price && entry.price > 0 ? entry.price : undefined
-      return { id: item.id, name: item.name, amount: item.amount, price }
-    })
+  const byId = new Map(listItems.map((i) => [i.id, i]))
+  const seen = new Set<string>()
+  const out: { id: string; name: string; amount: string; price?: number }[] = []
+  for (const id of checkedItemIds) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    const item = byId.get(id)
+    if (!item) continue
+    const entry = purchaseLog.find((e) => e.date === today && matchesListItem(e, item))
+    const price = entry?.price && entry.price > 0 ? entry.price : undefined
+    out.push({ id: item.id, name: item.name, amount: item.amount, price })
+  }
+  return out
 }
 
 /** Entfernt den heutigen Kauf-Eintrag für name/category (z. B. beim Abhaken rückgängig). */

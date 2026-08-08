@@ -6,7 +6,7 @@ import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
 import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
-import { receiptItemsForList, todayPricedTotalForList } from '@/utils/purchaseLog'
+import { receiptItemsForSession, todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { nextOpenCategory } from '@/utils/shoppingProgress'
@@ -210,7 +210,7 @@ export function ShoppingModePage() {
       logCompletedTrip({
         listId: list.id,
         listName: list.name,
-        items: receiptItemsForList(purchaseLog, list.items),
+        items: receiptItemsForSession(purchaseLog, list.items, sessionForList?.checkedItemIds ?? []),
         durationMs,
       })
     }

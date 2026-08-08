@@ -37,7 +37,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 16
+const STORE_VERSION = 17
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -458,30 +458,42 @@ export const useStore = create<AppState>()(
         const checkoff = parseCheckoffInput(priceOrData)
 
         set((state) => {
+          let base: Partial<AppState>
           if (nowDone) {
             if (checkoff) {
-              return commitItemPurchase(state, item, checkoff, {
+              base = commitItemPurchase(state, item, checkoff, {
                 listId: list.id,
                 itemId,
                 markDone: true,
                 wasDone: item.done,
               })
+            } else {
+              base = {
+                lists: state.lists.map((l) =>
+                  l.id !== list.id
+                    ? l
+                    : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: true } : i)) }
+                ),
+                purchaseLog: [
+                  ...state.purchaseLog,
+                  { id: uid(), itemId, name: item.name, category: item.category, date: todayKey() },
+                ],
+                pantry: replenishPantryItem(state.pantry, item),
+              }
             }
-            return {
-              lists: state.lists.map((l) =>
-                l.id !== list.id
-                  ? l
-                  : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: true } : i)) }
-              ),
-              purchaseLog: [
-                ...state.purchaseLog,
-                { id: uid(), itemId, name: item.name, category: item.category, date: todayKey() },
-              ],
-              pantry: replenishPantryItem(state.pantry, item),
-            }
+          } else {
+            base = undoTodayCheckoff(state, item, list.id, itemId)
           }
 
-          return undoTodayCheckoff(state, item, list.id, itemId)
+          // Nur in dieser Sitzung abgehakte Artikel merken – bestimmt später die Quittung.
+          const session = state.shoppingSession
+          if (session && session.listId === list.id) {
+            const checked = new Set(session.checkedItemIds ?? [])
+            if (nowDone) checked.add(itemId)
+            else checked.delete(itemId)
+            base = { ...base, shoppingSession: { ...session, checkedItemIds: [...checked] } }
+          }
+          return base
         })
       },
 
@@ -896,6 +908,7 @@ export const useStore = create<AppState>()(
             listId,
             startedAt: Date.now(),
             totalPausedMs: 0,
+            checkedItemIds: [],
           },
         })
       },
@@ -920,6 +933,7 @@ export const useStore = create<AppState>()(
             listId: session.listId,
             startedAt: session.startedAt,
             totalPausedMs: session.totalPausedMs + pausedMs,
+            checkedItemIds: session.checkedItemIds ?? [],
           },
         })
       },
@@ -1044,6 +1058,15 @@ export const useStore = create<AppState>()(
               ...defaultSettings(),
               ...(state.settings as Partial<AppSettings>),
               shoppingAutoCollapse: true,
+            }
+          }
+          if (version < 17 && state.shoppingSession) {
+            // Laufende Sitzung: bereits abgehakte Artikel der Liste übernehmen, damit ihr
+            // Fortschritt beim Update nicht aus der Quittung fällt.
+            const s = state.shoppingSession as ShoppingSession
+            if (!Array.isArray(s.checkedItemIds)) {
+              const sessionList = (state.lists ?? []).find((l) => l.id === s.listId)
+              s.checkedItemIds = (sessionList?.items ?? []).filter((i) => i.done).map((i) => i.id)
             }
           }
           return state as AppState

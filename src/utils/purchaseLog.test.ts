@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   idsToExcludeTodayPricedCheckoffs,
-  receiptItemsForList,
+  receiptItemsForSession,
   removeTodayPurchaseLogEntriesForItems,
   removeTodayPurchaseLogEntry,
   syncPurchaseLogForItemRename,
@@ -95,17 +95,19 @@ describe('purchaseLog', () => {
     expect(next[0]?.itemId).toBe('item-a')
   })
 
-  it('receiptItemsForList baut Quittungszeilen nur für abgehakte Artikel, Preis optional', () => {
+  it('receiptItemsForSession nimmt nur Session-Artikel, dedupliziert, Preis optional', () => {
     const listItems = [
       { id: 'item-1', name: 'Milch', amount: '1 l', category: 'Milch & Käse', done: true, favorite: false, addedAt: 0 },
       { id: 'item-2', name: 'Brot', amount: '1 Stk', category: 'Brot & Backwaren', done: true, favorite: false, addedAt: 0 },
-      { id: 'item-3', name: 'Eier', amount: '6 Stk', category: 'Sonstiges', done: false, favorite: false, addedAt: 0 },
+      // item-3 ist zwar "done", aber NICHT in dieser Session abgehakt (Rest von früher) → nicht in der Quittung
+      { id: 'item-3', name: 'Eier', amount: '6 Stk', category: 'Sonstiges', done: true, favorite: false, addedAt: 0 },
     ]
-    const withItemIds = [
+    const log = [
       { id: 'x', itemId: 'item-1', name: 'Milch', category: 'Milch & Käse', date: today, price: 2.5 },
       { id: 'y', itemId: 'item-2', name: 'Brot', category: 'Brot & Backwaren', date: today },
     ]
-    const receipt = receiptItemsForList(withItemIds, listItems, today)
+    // Session hat item-1 und item-2 abgehakt (item-2 doppelt in der Liste → nur einmal)
+    const receipt = receiptItemsForSession(log, listItems, ['item-1', 'item-2', 'item-2', 'ghost'], today)
     expect(receipt).toEqual([
       { id: 'item-1', name: 'Milch', amount: '1 l', price: 2.5 },
       { id: 'item-2', name: 'Brot', amount: '1 Stk', price: undefined },

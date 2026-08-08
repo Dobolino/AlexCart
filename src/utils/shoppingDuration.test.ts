@@ -7,6 +7,7 @@ describe('shoppingDuration', () => {
     listId: 'l1',
     startedAt: 1_000_000,
     totalPausedMs: 0,
+    checkedItemIds: [],
   }
 
   it('misst aktive Zeit ohne Pause', () => {
