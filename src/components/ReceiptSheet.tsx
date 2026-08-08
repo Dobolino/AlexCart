@@ -4,6 +4,7 @@ import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
 import { tripTotalSpent } from '@/utils/stats'
+import { shareReceiptImage } from '@/utils/receiptExport'
 import type { CompletedTrip, Currency } from '@/types'
 
 interface ReceiptSheetProps {
@@ -72,10 +73,20 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
         </div>
 
         <div className="shrink-0 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <span className="text-[14px] font-bold">Summe</span>
             <span className="text-[20px] font-extrabold tabular-nums">{formatMoney(total, currency)}</span>
           </div>
+          <button
+            type="button"
+            className="btn-soft flex w-full items-center justify-center gap-2 py-3 text-[14px] font-bold"
+            onClick={() => {
+              void shareReceiptImage(trip, currency)
+            }}
+          >
+            <Icon path={ICON_PATHS.share} size={16} />
+            Als Kassenbon teilen
+          </button>
         </div>
       </div>
 
