@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { ProductForm, type ProductFormValues } from './ProductForm'
-import { BrandPicker } from './BrandPicker'
+import { BrandSelect } from './BrandSelect'
 import { getDefaultUnit } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
 import { findPriceProfile } from '@/utils/priceProfiles'
@@ -18,6 +18,7 @@ interface EditItemSheetProps {
 export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
   const updateItemInActiveList = useStore((s) => s.updateItemInActiveList)
   const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
+  const ensureBrand = useStore((s) => s.ensureBrand)
   const priceProfiles = useStore((s) => s.priceProfiles)
   const brands = useStore((s) => s.brands)
   const parsed = parseAmount(item.amount)
@@ -57,11 +58,9 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
       <h2 className="mb-3 text-lg font-bold">Artikel bearbeiten</h2>
       <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
 
-      {brands.length > 0 && (
-        <div className="mt-3">
-          <BrandPicker brands={brands} value={selectedBrandId} onChange={handleBrandChange} />
-        </div>
-      )}
+      <div className="mt-3">
+        <BrandSelect brands={brands} value={selectedBrandId} onChange={handleBrandChange} onCreateBrand={ensureBrand} />
+      </div>
 
       {profile && profile.variants.length > 0 && (
         <div className="mt-3">

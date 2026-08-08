@@ -23,7 +23,11 @@ describe('productPriceHistory', () => {
 
 describe('spendPerWeek', () => {
   it('returns weekly spend buckets', () => {
-    const weeks = spendPerWeek(log, 4)
+    // Datum relativ zu heute, damit der Test nicht mit fortschreitender Zeit aus dem
+    // 4-Wochen-Fenster fällt (fixe Kalenderdaten liefen sonst irgendwann ins Leere).
+    const today = new Date().toLocaleDateString('sv-SE')
+    const recentLog = [{ name: 'Milch', category: 'Milch & Käse', date: today, price: 2.5 }]
+    const weeks = spendPerWeek(recentLog, 4)
     expect(weeks).toHaveLength(4)
     expect(weeks.some((w) => w.amount > 0)).toBe(true)
   })

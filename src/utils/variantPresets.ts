@@ -1,5 +1,13 @@
-import { getIconKey } from '@/utils/icon'
+import { getIconKey, normalizeCategory } from '@/utils/icon'
 import { normalize } from '@/utils/text'
+
+/** Einheiten für die Klein/Gross-Auswahl bei Dosen (qualitativ, ohne feste Grammzahl). */
+export const CAN_SIZE_UNITS = { klein: 'kleine Dose', gross: 'grosse Dose' } as const
+
+/** Ob für dieses Produkt eine Klein/Gross-Dosenwahl angeboten wird (Dosen + Konserven-Kategorie). */
+export function offersCanSize(name: string, category: string, amount = ''): boolean {
+  return isCanProduct(name, category, amount) || normalizeCategory(category) === 'Konserven & Saucen'
+}
 
 /** Typische Dosengrössen – Schnellwahl beim Preis erfassen (g und ml). */
 export const CAN_SIZE_PRESETS = ['400 g', '800 g', '400 ml', '800 ml'] as const

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
-import { BrandPicker } from './BrandPicker'
+import { BrandSelect } from './BrandSelect'
 import { ICON_PATHS } from '@/constants/icons'
 import { DEFAULT_UNIT, getDefaultUnit } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
@@ -37,6 +37,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
   const importRecipeItemsToActiveList = useStore((s) => s.importRecipeItemsToActiveList)
   const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
+  const ensureBrand = useStore((s) => s.ensureBrand)
   const brands = useStore((s) => s.brands)
   const completedTrips = useStore((s) => s.completedTrips)
   const activeList = useStore((s) => s.activeList())
@@ -273,11 +274,9 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
           <h2 className="mb-3 text-lg font-bold">{formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}</h2>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
-            {brands.length > 0 && (
-              <div className="mt-3">
-                <BrandPicker brands={brands} value={selectedBrandId} onChange={setSelectedBrandId} />
-              </div>
-            )}
+            <div className="mt-3">
+              <BrandSelect brands={brands} value={selectedBrandId} onChange={setSelectedBrandId} onCreateBrand={ensureBrand} />
+            </div>
           </div>
           <div className="mt-4 flex shrink-0 gap-2.5">
             <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setMode('search')}>

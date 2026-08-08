@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getVariantSizePresets, isCanProduct, findVariantIdByName } from './variantPresets'
+import { getVariantSizePresets, isCanProduct, findVariantIdByName, offersCanSize, CAN_SIZE_UNITS } from './variantPresets'
 
 describe('variantPresets', () => {
   it('erkennt Dosen-Produkte', () => {
@@ -16,6 +16,14 @@ describe('variantPresets', () => {
       '800 ml',
     ])
     expect(getVariantSizePresets('Milch', 'Milch & Käse')).toEqual([])
+  })
+
+  it('bietet Klein/Gross für Dosen und Konserven-Kategorie', () => {
+    expect(offersCanSize('Tomatenmark', 'Konserven & Saucen')).toBe(true)
+    expect(offersCanSize('Kidneybohnen', 'Konserven & Saucen')).toBe(true)
+    expect(offersCanSize('Milch', 'Milch & Käse')).toBe(false)
+    expect(CAN_SIZE_UNITS.klein).toBe('kleine Dose')
+    expect(CAN_SIZE_UNITS.gross).toBe('grosse Dose')
   })
 
   it('findet bestehende Variante per Name', () => {

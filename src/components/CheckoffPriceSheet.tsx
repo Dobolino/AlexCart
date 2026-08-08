@@ -4,6 +4,7 @@ import { MoneyNumpad } from './MoneyNumpad'
 import { ItemAmountColumn } from './ItemAmountColumn'
 import { ProduceWeightInput } from './ProduceWeightInput'
 import { PriceDeltaBadge } from './PriceDeltaBadge'
+import { BrandSelect } from './BrandSelect'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
@@ -71,6 +72,7 @@ export function CheckoffPriceSheet({
   highlightOptions = false,
 }: CheckoffPriceSheetProps) {
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const ensureBrand = useStore((s) => s.ensureBrand)
   const variants = profile?.variants ?? []
   const hasVariants = variants.length > 0
   const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
@@ -365,25 +367,9 @@ export function CheckoffPriceSheet({
             </p>
           )}
 
-          {brands.length > 0 && (
-            <div className="mb-2">
-              <label className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-                Marke
-              </label>
-              <select
-                className="input w-full py-2.5 text-[14px]"
-                value={brandId}
-                onChange={(e) => setBrandId(e.target.value)}
-              >
-                <option value="">Keine Marke</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="mb-2">
+            <BrandSelect brands={brands} value={brandId} onChange={setBrandId} onCreateBrand={ensureBrand} label="Marke" />
+          </div>
 
           {sizePresets.length > 0 && (
             <div className="mb-2">

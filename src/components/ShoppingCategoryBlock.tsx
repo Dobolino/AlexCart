@@ -13,13 +13,13 @@ interface ShoppingCategoryBlockProps {
   /** Fehlt, wenn alle Kategorien dauerhaft offen sind (kein Ein-/Ausklappen). */
   onToggle?: () => void
   onCheck: (item: ShoppingItem) => void
-  onDelete: (item: ShoppingItem) => void
+  onOpenMenu: (item: ShoppingItem) => void
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
 }
 
 export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategoryBlockProps>(
   function ShoppingCategoryBlock(
-    { category, items, expanded, onToggle, onCheck, onDelete, onAdjustAmount },
+    { category, items, expanded, onToggle, onCheck, onOpenMenu, onAdjustAmount },
     ref
   ) {
     const openLabel = items.length === 1 ? '1 offen' : `${items.length} offen`
@@ -104,10 +104,10 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                     type="button"
                     className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
                     style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
-                    onClick={() => onDelete(item)}
-                    aria-label={`${item.name} löschen`}
+                    onClick={() => onOpenMenu(item)}
+                    aria-label={`${item.name}: Optionen`}
                   >
-                    <Icon path={ICON_PATHS.trash} size={16} />
+                    <Icon path={ICON_PATHS.more} size={18} />
                   </button>
                 </div>
               ))}

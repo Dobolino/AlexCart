@@ -224,6 +224,8 @@ interface AppState {
   removeCustomProduct: (id: string) => void
 
   addBrand: (name: string) => void
+  /** Legt eine Marke bei Bedarf an und gibt ihre ID zurück – für Inline-Anlegen im Marken-Wähler. */
+  ensureBrand: (name: string) => string
   addHouseBrandPresets: (names?: string[]) => void
   /** Findet/legt eine markengebundene Variante für ein Produkt an (ohne Kaufhistorie) - für
    *  die Markenauswahl beim Anlegen/Bearbeiten eines Artikels. Gibt die variantId zurück. */
@@ -716,6 +718,15 @@ export const useStore = create<AppState>()(
           if (state.brands.some((b) => normalize(b.name) === normalize(trimmed))) return state
           return { brands: [...state.brands, { id: uid(), name: trimmed, createdAt: Date.now() }] }
         })
+      },
+      ensureBrand: (name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return ''
+        const existing = get().brands.find((b) => normalize(b.name) === normalize(trimmed))
+        if (existing) return existing.id
+        const brand = { id: uid(), name: trimmed, createdAt: Date.now() }
+        set((state) => ({ brands: [...state.brands, brand] }))
+        return brand.id
       },
       addHouseBrandPresets: (names) =>
         set((state) => ({

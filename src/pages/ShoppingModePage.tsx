@@ -15,7 +15,9 @@ import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
-import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
+import { AddItemSheet } from '@/components/AddItemSheet'
+import { EditItemSheet } from '@/components/EditItemSheet'
+import { ItemActionSheet } from '@/components/ItemActionSheet'
 import { ShoppingCategoryBlock } from '@/components/ShoppingCategoryBlock'
 import { ShoppingProgressBar } from '@/components/ShoppingProgressBar'
 import { ShoppingPausedOverlay } from '@/components/ShoppingPausedOverlay'
@@ -54,10 +56,14 @@ export function ShoppingModePage() {
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const autoCollapse = useStore((s) => s.settings.shoppingAutoCollapse)
   const setShoppingAutoCollapse = useStore((s) => s.setShoppingAutoCollapse)
+  const toggleItemFavorite = useStore((s) => s.toggleItemFavorite)
+  const addPantryItem = useStore((s) => s.addPantryItem)
   const currency = useStore((s) => s.settings.currency)
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null)
+  const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null)
   const [deletedItem, setDeletedItem] = useState<ShoppingItem | null>(null)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -420,7 +426,7 @@ export function ShoppingModePage() {
                 expanded={!autoCollapse || expandedCategory === group.category}
                 onToggle={autoCollapse ? () => handleToggleCategory(group.category) : undefined}
                 onCheck={handleCheck}
-                onDelete={handleDelete}
+                onOpenMenu={setMenuItem}
                 onAdjustAmount={handleAdjustAmount}
               />
             ))}
@@ -477,11 +483,33 @@ export function ShoppingModePage() {
       )}
 
       {addOpen && (
-        <ShoppingQuickAddSheet
-          onClose={() => setAddOpen(false)}
-          onAdded={() => hapticSuccess()}
+        <AddItemSheet onClose={() => setAddOpen(false)} onImported={() => hapticSuccess()} />
+      )}
+
+      {menuItem && (
+        <ItemActionSheet
+          item={menuItem}
+          onClose={() => setMenuItem(null)}
+          onEdit={() => {
+            setEditingItem(menuItem)
+            setMenuItem(null)
+          }}
+          onAddToPantry={() => {
+            addPantryItem(menuItem.name, menuItem.category, menuItem.amount)
+            setMenuItem(null)
+          }}
+          onToggleFavorite={() => {
+            toggleItemFavorite(menuItem.id)
+            setMenuItem(null)
+          }}
+          onDelete={() => {
+            handleDelete(menuItem)
+            setMenuItem(null)
+          }}
         />
       )}
+
+      {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
 
       {priceSheetItem && (
         <CheckoffPriceSheet
