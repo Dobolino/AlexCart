@@ -13,6 +13,8 @@ interface ReceiptSheetProps {
   onClose: () => void
   onUpdatePrice: (itemId: string, price: number | undefined) => void
   onUpdateStore: (store: string | undefined) => void
+  onRemoveItem: (itemId: string) => void
+  onDeleteTrip: () => void
 }
 
 function formatTripDate(completedAt: number): string {
@@ -25,7 +27,7 @@ function formatTripDate(completedAt: number): string {
 
 /** Quittung eines abgeschlossenen Einkaufs - Preise pro Artikel und das Einkaufszentrum lassen
  *  sich hier nachträglich korrigieren, z. B. wenn beim Abhaken etwas falsch eingegeben wurde. */
-export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore }: ReceiptSheetProps) {
+export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore, onRemoveItem, onDeleteTrip }: ReceiptSheetProps) {
   const total = tripTotalSpent(trip)
   const [editingStore, setEditingStore] = useState(false)
   const [storeDraft, setStoreDraft] = useState('')
@@ -68,8 +70,19 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {trip.items.map((item) => (
-            <ReceiptRow key={item.id} item={item} currency={currency} onUpdatePrice={onUpdatePrice} />
+            <ReceiptRow
+              key={item.id}
+              item={item}
+              currency={currency}
+              onUpdatePrice={onUpdatePrice}
+              onRemove={() => onRemoveItem(item.id)}
+            />
           ))}
+          {trip.items.length === 0 && (
+            <p className="py-6 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              Keine Artikel mehr in dieser Quittung.
+            </p>
+          )}
         </div>
 
         <div className="shrink-0 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
@@ -77,16 +90,29 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
             <span className="text-[14px] font-bold">Summe</span>
             <span className="text-[20px] font-extrabold tabular-nums">{formatMoney(total, currency)}</span>
           </div>
-          <button
-            type="button"
-            className="btn-soft flex w-full items-center justify-center gap-2 py-3 text-[14px] font-bold"
-            onClick={() => {
-              void shareReceiptImage(trip, currency)
-            }}
-          >
-            <Icon path={ICON_PATHS.share} size={16} />
-            Als Kassenbon teilen
-          </button>
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              className="btn-soft flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-bold"
+              onClick={() => {
+                void shareReceiptImage(trip, currency)
+              }}
+            >
+              <Icon path={ICON_PATHS.share} size={16} />
+              Als Kassenbon teilen
+            </button>
+            <button
+              type="button"
+              className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-xl"
+              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              onClick={() => {
+                if (window.confirm('Diesen Einkauf aus dem Verlauf löschen?')) onDeleteTrip()
+              }}
+              aria-label="Einkauf löschen"
+            >
+              <Icon path={ICON_PATHS.trash} size={17} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -122,10 +148,12 @@ function ReceiptRow({
   item,
   currency,
   onUpdatePrice,
+  onRemove,
 }: {
   item: { id: string; name: string; amount: string; price?: number }
   currency: Currency
   onUpdatePrice: (itemId: string, price: number | undefined) => void
+  onRemove: () => void
 }) {
   const [priceInput, setPriceInput] = useState(item.price !== undefined ? String(item.price) : '')
 
@@ -163,6 +191,15 @@ function ReceiptRow({
         <span className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
           {currency}
         </span>
+        <button
+          type="button"
+          className="tap-scale ml-1 flex h-8 w-8 flex-none items-center justify-center rounded-full"
+          style={{ color: 'var(--text-muted)' }}
+          onClick={onRemove}
+          aria-label={`${item.name} aus Quittung entfernen`}
+        >
+          <Icon path={ICON_PATHS.trash} size={15} />
+        </button>
       </div>
     </div>
   )

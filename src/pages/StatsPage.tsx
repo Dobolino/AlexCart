@@ -50,6 +50,8 @@ export function StatsPage() {
   const resetStats = useStore((s) => s.resetStats)
   const updateCompletedTripItemPrice = useStore((s) => s.updateCompletedTripItemPrice)
   const updateCompletedTripStore = useStore((s) => s.updateCompletedTripStore)
+  const removeCompletedTrip = useStore((s) => s.removeCompletedTrip)
+  const removeCompletedTripItem = useStore((s) => s.removeCompletedTripItem)
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
 
   const top = topItems(purchaseLog)
@@ -325,6 +327,11 @@ export function StatsPage() {
           onClose={() => setSelectedTripId(null)}
           onUpdatePrice={(itemId, price) => updateCompletedTripItemPrice(selectedTrip.id, itemId, price)}
           onUpdateStore={(store) => updateCompletedTripStore(selectedTrip.id, store)}
+          onRemoveItem={(itemId) => removeCompletedTripItem(selectedTrip.id, itemId)}
+          onDeleteTrip={() => {
+            removeCompletedTrip(selectedTrip.id)
+            setSelectedTripId(null)
+          }}
         />
       )}
     </>

@@ -268,6 +268,10 @@ interface AppState {
   updateCompletedTripItemPrice: (tripId: string, itemId: string, price: number | undefined) => void
   /** Einkaufszentrum/Filiale nachträglich auf der Quittung erfassen. */
   updateCompletedTripStore: (tripId: string, store: string | undefined) => void
+  /** Ganzen abgeschlossenen Einkauf aus dem Verlauf entfernen. */
+  removeCompletedTrip: (tripId: string) => void
+  /** Einzelne Position aus der Quittung eines abgeschlossenen Einkaufs entfernen. */
+  removeCompletedTripItem: (tripId: string, itemId: string) => void
 
   startShoppingSession: (listId: string) => void
   pauseShopping: () => void
@@ -960,6 +964,20 @@ export const useStore = create<AppState>()(
         set((state) => ({
           completedTrips: state.completedTrips.map((trip) =>
             trip.id !== tripId ? trip : { ...trip, store: store?.trim() || undefined }
+          ),
+        })),
+
+      removeCompletedTrip: (tripId) =>
+        set((state) => ({
+          completedTrips: state.completedTrips.filter((trip) => trip.id !== tripId),
+        })),
+
+      removeCompletedTripItem: (tripId, itemId) =>
+        set((state) => ({
+          completedTrips: state.completedTrips.map((trip) =>
+            trip.id !== tripId
+              ? trip
+              : { ...trip, items: trip.items.filter((item) => item.id !== itemId) }
           ),
         })),
     }),
