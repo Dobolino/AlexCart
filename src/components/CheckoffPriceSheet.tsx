@@ -289,31 +289,31 @@ export function CheckoffPriceSheet({
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
           <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
-          <p className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-0.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
           </p>
+          {item.note ? (
+            <p className="mb-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              {item.note}
+            </p>
+          ) : (
+            <div className="mb-2" />
+          )}
 
           {canChooseProduceMode && (
-            <>
-              <OptionSegment
-                highlight={highlightOptions}
-                options={[
-                  { value: 'weight', label: 'Nach Gewicht' },
-                  { value: 'piece', label: 'Pro Stück' },
-                ]}
-                value={produceMode}
-                onChange={(v) => {
-                  setProduceModeTouched(true)
-                  setProduceMode(v as ProducePricingMode)
-                  setError('')
-                }}
-              />
-              <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                {produceMode === 'weight'
-                  ? 'Für Ware mit Kilopreis (z. B. Bananen) – Gewicht vom Bon eingeben'
-                  : 'Für Stückpreise (z. B. Kiwi) – Preis pro Stück eingeben'}
-              </p>
-            </>
+            <OptionSegment
+              highlight={highlightOptions}
+              options={[
+                { value: 'weight', label: 'Nach Gewicht' },
+                { value: 'piece', label: 'Pro Stück' },
+              ]}
+              value={produceMode}
+              onChange={(v) => {
+                setProduceModeTouched(true)
+                setProduceMode(v as ProducePricingMode)
+                setError('')
+              }}
+            />
           )}
 
           {onAmountChange && showProduceWeightInput && (
@@ -339,26 +339,6 @@ export function CheckoffPriceSheet({
                 onAdjustAmount={(_, direction) => handleAdjustAmount(direction)}
               />
             </div>
-          )}
-
-          {showProduceWeightInput && (
-            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Exaktes Gewicht vom Kassenbon eingeben – z. B. 347 g
-            </p>
-          )}
-
-          {priceByWeight && weightGrams && weightGrams > 0 && (
-            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Gesamtpreis eingeben – wird bei {formatWeightGrams(weightGrams)} auf den 100-g-Preis umgerechnet
-            </p>
-          )}
-
-          {packAmount && (
-            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              {quantity > 1
-                ? `Preis einer Packung (${packAmount.packValue} ${packAmount.packUnit}) eingeben – wird mit ${quantity} multipliziert`
-                : `Eine Packung à ${packAmount.packValue} ${packAmount.packUnit}`}
-            </p>
           )}
 
           {!priceByWeight && quantity > 1 && (

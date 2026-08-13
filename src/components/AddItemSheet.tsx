@@ -311,7 +311,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             </summary>
             <p className="mt-2 leading-relaxed">
               Prompt kopieren, in Claude oder ChatGPT einfügen und darunter den Wochenplan oder das Rezept schreiben.
-              Die Antwort als JSON hier einfügen.
+              Die Antwort als JSON hier einfügen. Mengen und optionale Einkaufsnotizen (`note`) kommen mit.
             </p>
             <button
               type="button"
@@ -338,7 +338,7 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
           </details>
           <textarea
             className="input min-h-[160px] font-mono text-[14px]"
-            placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Obst & Gemüse"}]}'
+            placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500g","category":"Früchte & Gemüse","note":"reif"}]}'
             value={importText}
             onChange={(e) => {
               setImportText(e.target.value)

@@ -160,4 +160,16 @@ describe('mergeItems', () => {
     const result = mergeItems([{ name: '  ', amount: '1x', category: 'Sonstiges' }])
     expect(result).toHaveLength(0)
   })
+  it('übernimmt und verbindet Einkaufsnotizen', () => {
+    const single = mergeItems([
+      { name: 'Hähnchenbrust', amount: '600 g', category: 'Fleisch & Fisch', note: 'ohne Haut' },
+    ])
+    expect(single[0].note).toBe('ohne Haut')
+
+    const merged = mergeItems([
+      { name: 'Tomaten', amount: '300 g', category: 'Früchte & Gemüse', note: 'reif' },
+      { name: 'Tomaten', amount: '200 g', category: 'Früchte & Gemüse', note: 'Bio' },
+    ])
+    expect(merged[0].note).toBe('reif; Bio')
+  })
 })

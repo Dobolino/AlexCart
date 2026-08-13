@@ -141,6 +141,8 @@ export interface ImportItemPayload {
   name: string
   amount?: string
   category?: string
+  /** Optionale Einkaufsnotiz (Marke, Zubereitung, „Bio“, …) – erscheint unter dem Namen. */
+  note?: string
 }
 
 export interface ImportPayload {

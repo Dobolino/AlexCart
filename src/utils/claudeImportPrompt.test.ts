@@ -4,10 +4,13 @@ import { CATEGORIES } from '@/data/products'
 import { UNITS } from '@/constants/units'
 
 describe('buildClaudeImportPrompt', () => {
-  it('enthält Schema, Kategorien, Einheiten und Mengenregeln', () => {
+  it('enthält Schema, Kategorien, Einheiten, Notizen und Mengenregeln', () => {
     const prompt = buildClaudeImportPrompt()
     expect(prompt).toContain('"week"')
     expect(prompt).toContain('"items"')
+    expect(prompt).toContain('"note"')
+    expect(prompt).toContain('Einkaufsnotiz')
+    expect(prompt).toContain('genau wie angegeben')
     expect(prompt).toContain('Nur JSON')
     expect(prompt).toContain('2 Becher')
     expect(prompt).toContain('FALSCH')
