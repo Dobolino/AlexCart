@@ -62,8 +62,8 @@ export function StatsPage() {
   const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
   const completionRate = stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
   const hasPriceData = pricedPurchaseCount(purchaseLog) > 0
-  const priceHistory = productPriceHistory(purchaseLog)
-  const spendWeeks = spendPerWeek(purchaseLog, 8)
+  const priceHistory = productPriceHistory(purchaseLog, currency)
+  const spendWeeks = spendPerWeek(purchaseLog, 8, currency)
   const maxSpendWeek = Math.max(0.01, ...spendWeeks.map((w) => w.amount))
   const hasCompletedTrips = completedTrips.length > 0
   const tripWeeks = completedTripsPerWeek(completedTrips, 8)
@@ -238,7 +238,7 @@ export function StatsPage() {
                 </div>
                 <div className="card-surface mb-4.5 px-4 py-3.5">
                   {priceHistory.slice(0, 8).map((entry) => {
-                    const perKg = productPricePerKg(priceProfiles, entry.name, entry.category)
+                    const perKg = productPricePerKg(priceProfiles, entry.name, entry.category, currency)
                     return (
                       <div key={entry.name} className="mb-3 border-b pb-3 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
                         <div className="mb-0.5 flex items-baseline justify-between gap-2">

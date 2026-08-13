@@ -1,5 +1,6 @@
 import type {
   CheckoffPriceData,
+  Currency,
   PantryItem,
   ProductPriceProfile,
   PurchaseLogEntry,
@@ -54,7 +55,7 @@ function revertProfilesForLogEntry(
   if (!profile) return profiles
   const variant = findVariant(profile, entry.variantId)
   if (!variant) return profiles
-  const reverted = revertLastPurchaseOnVariant(variant, !!entry.wasSale)
+  const reverted = revertLastPurchaseOnVariant(variant, !!entry.wasSale, entry.currency ?? 'CHF')
   const variants = profile.variants.map((v) => (v.id === reverted.id ? reverted : v))
   return upsertPriceProfile(profiles, { ...profile, variants, updatedAt: Date.now() })
 }
@@ -63,10 +64,19 @@ export function commitItemPurchase(
   state: PurchaseState,
   item: ShoppingItem,
   data: CheckoffPriceData,
-  opts: { listId: string; itemId: string; markDone: boolean; wasDone: boolean }
+  opts: { listId: string; itemId: string; markDone: boolean; wasDone: boolean; currency?: Currency }
 ): PurchaseState {
   const today = todayKey()
-  const purchase = recordVariantPurchase(state.priceProfiles, item.name, item.category, data, today, uid)
+  const currency = opts.currency ?? 'CHF'
+  const purchase = recordVariantPurchase(
+    state.priceProfiles,
+    item.name,
+    item.category,
+    data,
+    today,
+    uid,
+    currency
+  )
   let priceProfiles = state.priceProfiles
   priceProfiles = purchase.createdNewProfile
     ? [...priceProfiles, purchase.profile]
@@ -81,6 +91,7 @@ export function commitItemPurchase(
     category: item.category,
     date: today,
     price: data.price,
+    currency,
     variantId: purchase.variantId,
     variantName: purchase.variantName,
     wasSale: !!data.wasSale,

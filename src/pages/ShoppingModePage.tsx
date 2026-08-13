@@ -94,14 +94,14 @@ export function ShoppingModePage() {
 
   const tripTotal = useMemo(() => {
     if (!list) return 0
-    return todayPricedTotalForList(purchaseLog, list.items, todayKey(), new Set(excludedIds))
-  }, [purchaseLog, list, excludedIds])
+    return todayPricedTotalForList(purchaseLog, list.items, todayKey(), new Set(excludedIds), currency)
+  }, [purchaseLog, list, excludedIds, currency])
 
   const openItems = useMemo(() => list?.items.filter((i) => !i.done) ?? [], [list])
 
   const openEstimate = useMemo(
-    () => estimateOpenListCost(openItems, priceProfiles),
-    [openItems, priceProfiles]
+    () => estimateOpenListCost(openItems, priceProfiles, currency),
+    [openItems, priceProfiles, currency]
   )
 
   const projectedTotal = useMemo(
@@ -145,7 +145,7 @@ export function ShoppingModePage() {
   if (!list) return null
 
   const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
-  const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog), calculatorTotal)
+  const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog, undefined, currency), calculatorTotal)
   const budget = weeklyBudget > 0 ? budgetProgress(budgetSpend, weeklyBudget) : null
   const showTripTotal = tripTotal > 0
   const showProjectedTotal = projectedTotal > 0 && (tripTotal > 0 || openEstimate.pricedItemCount > 0)

@@ -16,6 +16,7 @@ import { CATEGORIES } from '@/data/products'
 import { parseRecipeText } from '@/utils/recipe'
 import { RecipeReviewSheet, type RecipeReviewItem } from '@/components/RecipeReviewSheet'
 import { uid } from '@/utils/id'
+import { buildClaudeImportPrompt } from '@/utils/claudeImportPrompt'
 import type { ImportMode } from '@/types'
 
 interface AddItemSheetProps {
@@ -54,6 +55,8 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
   const [importMode, setImportMode] = useState<ImportMode>('merge')
+  const [promptCopied, setPromptCopied] = useState(false)
+  const claudePrompt = useMemo(() => buildClaudeImportPrompt(), [])
   const [recipeText, setRecipeText] = useState('')
   const [recipeError, setRecipeError] = useState('')
   const [recipeMode, setRecipeMode] = useState<ImportMode>('append')
@@ -307,12 +310,31 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
               Claude-Prompt für den Import
             </summary>
             <p className="mt-2 leading-relaxed">
-              Erstelle eine Einkaufsliste als JSON mit diesem Format: week (ISO-Datum), items mit name, amount und
-              category. Kategorien: Früchte & Gemüse, Milch & Käse, Fleisch & Fisch, Getreide & Beilagen, Brot &
-              Backwaren, Tiefkühl, Getränke, Konserven & Saucen, Gewürze, Öl & Backen, Sonstiges, Asiatisch &
-              Indisch, Protein & Health, Süßes & Snacks, Haushalt & Reinigung, Drogerie & Kosmetik, Tierbedarf. Nur
-              JSON ausgeben, ohne Erklärung.
+              Prompt kopieren, in Claude oder ChatGPT einfügen und darunter den Wochenplan oder das Rezept schreiben.
+              Die Antwort als JSON hier einfügen.
             </p>
+            <button
+              type="button"
+              className="btn-soft tap-scale mt-2 flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-bold"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(claudePrompt)
+                  setPromptCopied(true)
+                  window.setTimeout(() => setPromptCopied(false), 2000)
+                } catch {
+                  setImportError('Kopieren nicht möglich – Prompt manuell markieren.')
+                }
+              }}
+            >
+              <Icon path={ICON_PATHS.copy} size={15} />
+              {promptCopied ? 'Kopiert' : 'Prompt kopieren'}
+            </button>
+            <pre
+              className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg px-2.5 py-2 text-[11px] leading-snug"
+              style={{ background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            >
+              {claudePrompt}
+            </pre>
           </details>
           <textarea
             className="input min-h-[160px] font-mono text-[14px]"

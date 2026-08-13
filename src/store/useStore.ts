@@ -10,7 +10,12 @@ import { normalize } from '@/utils/text'
 import { todayKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
 import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList, syncPurchaseLogForItemRename } from '@/utils/purchaseLog'
-import { buildProfilesFromPurchaseLog, ensureBrandVariant } from '@/utils/priceProfiles'
+import {
+  buildProfilesFromPurchaseLog,
+  ensureBrandVariant,
+  pricesForCurrency,
+  setPricesForCurrency,
+} from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
@@ -37,7 +42,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 17
+const STORE_VERSION = 18
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -470,6 +475,7 @@ export const useStore = create<AppState>()(
                 itemId,
                 markDone: true,
                 wasDone: item.done,
+                currency: state.settings.currency,
               })
             } else {
               base = {
@@ -480,7 +486,14 @@ export const useStore = create<AppState>()(
                 ),
                 purchaseLog: [
                   ...state.purchaseLog,
-                  { id: uid(), itemId, name: item.name, category: item.category, date: todayKey() },
+                  {
+                    id: uid(),
+                    itemId,
+                    name: item.name,
+                    category: item.category,
+                    date: todayKey(),
+                    currency: state.settings.currency,
+                  },
                 ],
                 pantry: replenishPantryItem(state.pantry, item),
               }
@@ -512,6 +525,7 @@ export const useStore = create<AppState>()(
             itemId: item.id,
             markDone: true,
             wasDone: true,
+            currency: state.settings.currency,
           })
         )
       },
@@ -771,25 +785,39 @@ export const useStore = create<AppState>()(
           })),
         })),
       updatePriceProfileVariant: (profileId, variantId, patch) =>
-        set((state) => ({
-          priceProfiles: state.priceProfiles.map((profile) => {
-            if (profile.id !== profileId) return profile
-            return {
-              ...profile,
-              updatedAt: Date.now(),
-              variants: profile.variants.map((v) => {
-                if (v.id !== variantId) return v
-                return {
-                  ...v,
-                  ...(patch.name !== undefined ? { name: patch.name.trim() || v.name } : {}),
-                  ...(patch.brandId !== undefined ? { brandId: patch.brandId || undefined } : {}),
-                  ...(patch.lastPrice !== undefined ? { lastPrice: patch.lastPrice > 0 ? patch.lastPrice : undefined } : {}),
-                  ...(patch.pricePerKg !== undefined ? { pricePerKg: patch.pricePerKg > 0 ? patch.pricePerKg : undefined } : {}),
-                }
-              }),
-            }
-          }),
-        })),
+        set((state) => {
+          const currency = state.settings.currency
+          return {
+            priceProfiles: state.priceProfiles.map((profile) => {
+              if (profile.id !== profileId) return profile
+              return {
+                ...profile,
+                updatedAt: Date.now(),
+                variants: profile.variants.map((v) => {
+                  if (v.id !== variantId) return v
+                  let next = {
+                    ...v,
+                    ...(patch.name !== undefined ? { name: patch.name.trim() || v.name } : {}),
+                    ...(patch.brandId !== undefined ? { brandId: patch.brandId || undefined } : {}),
+                  }
+                  if (patch.lastPrice !== undefined || patch.pricePerKg !== undefined) {
+                    const current = pricesForCurrency(v, currency)
+                    next = setPricesForCurrency(next, currency, {
+                      ...current,
+                      ...(patch.lastPrice !== undefined
+                        ? { lastPrice: patch.lastPrice > 0 ? patch.lastPrice : undefined }
+                        : {}),
+                      ...(patch.pricePerKg !== undefined
+                        ? { pricePerKg: patch.pricePerKg > 0 ? patch.pricePerKg : undefined }
+                        : {}),
+                    })
+                  }
+                  return next
+                }),
+              }
+            }),
+          }
+        }),
 
       setTheme: (theme) => set((state) => ({ settings: { ...state.settings, theme } })),
       setListViewMode: (listViewMode) => set((state) => ({ settings: { ...state.settings, listViewMode } })),
@@ -1085,6 +1113,45 @@ export const useStore = create<AppState>()(
             if (!Array.isArray(s.checkedItemIds)) {
               const sessionList = (state.lists ?? []).find((l) => l.id === s.listId)
               s.checkedItemIds = (sessionList?.items ?? []).filter((i) => i.done).map((i) => i.id)
+            }
+          }
+          if (version < 18) {
+            // Alte Preise ohne Währung = CHF; Varianten-Legacy in byCurrency.CHF spiegeln.
+            if (Array.isArray(state.purchaseLog)) {
+              state.purchaseLog = state.purchaseLog.map((entry) => ({
+                ...entry,
+                currency: entry.currency ?? 'CHF',
+              }))
+            }
+            if (Array.isArray(state.priceProfiles)) {
+              state.priceProfiles = state.priceProfiles.map((profile) => ({
+                ...profile,
+                variants: profile.variants.map((variant) => {
+                  if (variant.byCurrency && Object.keys(variant.byCurrency).length > 0) return variant
+                  const hasLegacy =
+                    variant.lastPrice != null ||
+                    variant.avgPrice != null ||
+                    variant.pricePerKg != null ||
+                    variant.purchaseCount > 0
+                  if (!hasLegacy) return { ...variant, byCurrency: variant.byCurrency ?? {} }
+                  return {
+                    ...variant,
+                    byCurrency: {
+                      CHF: {
+                        pricePerKg: variant.pricePerKg,
+                        lastPrice: variant.lastPrice,
+                        avgPrice: variant.avgPrice,
+                        purchaseCount: variant.purchaseCount,
+                        lastPurchaseDate: variant.lastPurchaseDate,
+                        lastSalePrice: variant.lastSalePrice,
+                        lastPurchaseWasSale: variant.lastPurchaseWasSale,
+                        avgSalePrice: variant.avgSalePrice,
+                        salePurchaseCount: variant.salePurchaseCount,
+                      },
+                    },
+                  }
+                }),
+              }))
             }
           }
           return state as AppState
