@@ -59,10 +59,14 @@ describe('storeStats', () => {
   it('berechnet Ø Warenkorb pro Filiale', () => {
     const stats = avgBasketByStore(trips)
     expect(stats).toHaveLength(2)
-    const migros = stats.find((s) => s.store === 'Migros')
-    expect(migros?.tripCount).toBe(2)
-    expect(migros?.avgSpent).toBe(79.6)
-    expect(stats.find((s) => s.store === 'Coop')?.avgSpent).toBe(91.5)
+    // Günstigste zuerst (Migros Ø 79.6 < Coop 91.5)
+    expect(stats[0]?.store).toBe('Migros')
+    expect(stats[0]?.percentAboveCheapest).toBe(0)
+    expect(stats[0]?.tripCount).toBe(2)
+    expect(stats[0]?.avgSpent).toBe(79.6)
+    const coop = stats.find((s) => s.store === 'Coop')
+    expect(coop?.avgSpent).toBe(91.5)
+    expect(coop?.percentAboveCheapest).toBe(14.9)
   })
 
   it('berechnet Ersparnis gegen Normalpreis', () => {

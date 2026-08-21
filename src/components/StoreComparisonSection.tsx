@@ -30,6 +30,9 @@ export function StoreComparisonSection({ stores, currency }: StoreComparisonSect
             </span>
             <span className="mt-0.5 text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
               {store.tripCount === 1 ? '1 Einkauf' : `${store.tripCount} Einkäufe`}
+              {store.percentAboveCheapest === 0
+                ? ' · günstigste'
+                : ` · +${store.percentAboveCheapest.toLocaleString('de-CH')} %`}
             </span>
           </div>
         ))}

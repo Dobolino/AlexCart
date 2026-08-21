@@ -12,6 +12,8 @@ export interface StoreBasketStat {
   tripCount: number
   avgSpent: number
   totalSpent: number
+  /** Prozent teurer als die Filiale mit dem günstigsten Ø-Warenkorb (0 = günstigste). */
+  percentAboveCheapest: number
 }
 
 /** Ø Warenkorb pro Filiale aus abgeschlossenen Einkäufen mit gesetzter `store`. */
@@ -32,14 +34,29 @@ export function avgBasketByStore(trips: CompletedTrip[]): StoreBasketStat[] {
     }
   }
 
-  return Array.from(byKey.values())
-    .map(({ label, total, count }) => ({
-      store: label,
-      tripCount: count,
-      totalSpent: roundMoney(total),
-      avgSpent: roundMoney(total / count),
+  const base = Array.from(byKey.values()).map(({ label, total, count }) => ({
+    store: label,
+    tripCount: count,
+    totalSpent: roundMoney(total),
+    avgSpent: roundMoney(total / count),
+  }))
+
+  const cheapestAvg = base.length ? Math.min(...base.map((s) => s.avgSpent)) : 0
+
+  return base
+    .map((stat) => ({
+      ...stat,
+      percentAboveCheapest:
+        cheapestAvg > 0
+          ? Math.round(((stat.avgSpent - cheapestAvg) / cheapestAvg) * 1000) / 10
+          : 0,
     }))
-    .sort((a, b) => b.tripCount - a.tripCount || a.store.localeCompare(b.store, 'de'))
+    .sort(
+      (a, b) =>
+        a.percentAboveCheapest - b.percentAboveCheapest ||
+        b.tripCount - a.tripCount ||
+        a.store.localeCompare(b.store, 'de')
+    )
 }
 
 /** Ersparnis eines Aktions-Einkaufs gegenüber dem letzten Normalpreis der Variante. */

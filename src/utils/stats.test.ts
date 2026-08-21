@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   topItems,
   categoryBreakdown,
+  categorySpendBreakdown,
   avgItemsPerTrip,
   distinctShoppingDays,
   productsPerWeek,
@@ -86,6 +87,14 @@ describe('spend stats', () => {
     expect(avgSpendPerTrip(pricedLog)).toBeCloseTo(6.75)
     expect(maxTripSpend(pricedLog)).toBeCloseTo(6.8)
     expect(pricedPurchaseCount(pricedLog)).toBe(3)
+  })
+
+  it('breaks down spend by category with percent share', () => {
+    const result = categorySpendBreakdown(pricedLog)
+    expect(result[0]).toMatchObject({ label: 'Milch & Käse', total: 9.3, count: 2 })
+    expect(result[0]?.percent).toBe(68.9)
+    expect(result[1]).toMatchObject({ label: 'Brot & Backwaren', total: 4.2, count: 1 })
+    expect(result[1]?.percent).toBe(31.1)
   })
 })
 
