@@ -1,4 +1,4 @@
-import { findPriceProfile, findVariant } from '@/utils/priceProfiles'
+import { findPriceProfile, findVariant, pricesForCurrency } from '@/utils/priceProfiles'
 import { tripTotalSpent } from '@/utils/stats'
 import { normalize } from '@/utils/text'
 import type { CompletedTrip, ProductPriceProfile, PurchaseLogEntry } from '@/types'
@@ -52,13 +52,18 @@ export function savingsForSaleEntry(
   const profile = findPriceProfile(profiles, entry.name, entry.category)
   if (!profile) return 0
 
+  const currency = entry.currency ?? 'CHF'
   const variant = entry.variantId
     ? findVariant(profile, entry.variantId)
-    : profile.variants.find((v) => (v.lastPrice ?? 0) > 0 || (v.avgPrice ?? 0) > 0)
+    : profile.variants.find((v) => {
+        const p = pricesForCurrency(v, currency)
+        return (p.lastPrice ?? 0) > 0 || (p.avgPrice ?? 0) > 0
+      })
 
   if (!variant) return 0
 
-  const reference = variant.lastPrice ?? variant.avgPrice
+  const prices = pricesForCurrency(variant, currency)
+  const reference = prices.lastPrice ?? prices.avgPrice
   if (!reference || reference <= entry.price) return 0
 
   return roundMoney(reference - entry.price)

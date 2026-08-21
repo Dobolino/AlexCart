@@ -57,10 +57,25 @@ export interface PurchaseLogEntry {
   date: string
   /** Optionaler Preis in der gewählten Währung beim Abhaken. */
   price?: number
+  /** Währung des erfassten Preises – Schätzung nutzt nur die aktive Währung. */
+  currency?: Currency
   variantId?: string
   variantName?: string
   /** Aktionspreis – verfälscht nicht den Normal-Durchschnitt. */
   wasSale?: boolean
+}
+
+/** Preisstatistik einer Variante in einer Währung. */
+export interface VariantCurrencyPrices {
+  pricePerKg?: number
+  lastPrice?: number
+  avgPrice?: number
+  purchaseCount: number
+  lastPurchaseDate?: string
+  lastSalePrice?: number
+  lastPurchaseWasSale: boolean
+  avgSalePrice?: number
+  salePurchaseCount: number
 }
 
 /** Einzelne Produktvariante (Marke, Bio, Grösse …). */
@@ -83,6 +98,8 @@ export interface ProductVariant {
   lastPurchaseWasSale: boolean
   avgSalePrice?: number
   salePurchaseCount: number
+  /** Preise getrennt nach Währung (CHF / EUR) – Schätzung filtert nach aktiver Währung. */
+  byCurrency?: Partial<Record<Currency, VariantCurrencyPrices>>
 }
 
 /** Preisprofil pro Listenartikel (z. B. „Milch“ mit mehreren Varianten). */
@@ -124,6 +141,8 @@ export interface ImportItemPayload {
   name: string
   amount?: string
   category?: string
+  /** Optionale Einkaufsnotiz (Marke, Zubereitung, „Bio“, …) – erscheint unter dem Namen. */
+  note?: string
 }
 
 export interface ImportPayload {

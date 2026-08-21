@@ -2,6 +2,7 @@ import type { CheckoffPriceMode } from '@/utils/amount'
 import { productPriceHistory, type ProductPriceStats } from '@/utils/priceHistory'
 import { resolveProduceCheckoffPrice } from '@/utils/producePrice'
 import { formatMoney } from '@/utils/currency'
+import { pricesForCurrency } from '@/utils/priceProfiles'
 import { normalize } from '@/utils/text'
 import type { Currency, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
 
@@ -34,24 +35,25 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-/** Letzter bekannter Preis – zuerst Variante, sonst Kaufhistorie. */
-export function resolveReferencePrice(input: Omit<PriceDeltaInput, 'enteredAmount' | 'currency'>): number | null {
-  const { selectedVariant, wasSale, isProduce, item, purchaseLog, priceHistory } = input
+/** Letzter bekannter Preis – zuerst Variante (aktive Währung), sonst Kaufhistorie. */
+export function resolveReferencePrice(input: Omit<PriceDeltaInput, 'enteredAmount'>): number | null {
+  const { selectedVariant, wasSale, isProduce, item, purchaseLog, priceHistory, currency } = input
 
   if (selectedVariant) {
-    if (wasSale && selectedVariant.lastSalePrice && selectedVariant.lastSalePrice > 0) {
-      return selectedVariant.lastSalePrice
+    const prices = pricesForCurrency(selectedVariant, currency)
+    if (wasSale && prices.lastSalePrice && prices.lastSalePrice > 0) {
+      return prices.lastSalePrice
     }
     if (isProduce) {
-      const perKg = selectedVariant.pricePerKg ?? selectedVariant.lastPrice
+      const perKg = prices.pricePerKg ?? prices.lastPrice
       return perKg && perKg > 0 ? perKg : null
     }
-    if (selectedVariant.lastPrice && selectedVariant.lastPrice > 0) {
-      return selectedVariant.lastPrice
+    if (prices.lastPrice && prices.lastPrice > 0) {
+      return prices.lastPrice
     }
   }
 
-  const history = priceHistory ?? productPriceHistory(purchaseLog)
+  const history = priceHistory ?? productPriceHistory(purchaseLog, currency)
   const entry = history.find((row) => normalize(row.name) === normalize(item.name))
   if (!entry || entry.lastPrice <= 0) return null
   return entry.lastPrice

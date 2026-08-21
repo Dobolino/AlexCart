@@ -7,7 +7,15 @@ import {
   estimatedPieceGrams,
 } from './producePrice'
 import { normalize } from '@/utils/text'
-import type { CheckoffPriceData, ProductPriceProfile, ProductVariant, PurchaseLogEntry, ShoppingItem } from '@/types'
+import type {
+  CheckoffPriceData,
+  Currency,
+  ProductPriceProfile,
+  ProductVariant,
+  PurchaseLogEntry,
+  ShoppingItem,
+  VariantCurrencyPrices,
+} from '@/types'
 
 export function profileBaseKey(itemName: string, category: string): string {
   return `${normalize(itemName)}|${normalize(category)}`
@@ -26,6 +34,75 @@ export function findVariant(profile: ProductPriceProfile, variantId: string): Pr
   return profile.variants.find((v) => v.id === variantId)
 }
 
+function emptyCurrencyPrices(): VariantCurrencyPrices {
+  return {
+    purchaseCount: 0,
+    lastPurchaseWasSale: false,
+    salePurchaseCount: 0,
+  }
+}
+
+/** Liest die Preisstatistik einer Variante für eine Währung (Legacy-Top-Level = CHF). */
+export function pricesForCurrency(variant: ProductVariant, currency: Currency): VariantCurrencyPrices {
+  const stored = variant.byCurrency?.[currency]
+  if (stored) return { ...emptyCurrencyPrices(), ...stored }
+
+  const hasByCurrency = variant.byCurrency && Object.keys(variant.byCurrency).length > 0
+  if (!hasByCurrency && currency === 'CHF') {
+    return {
+      pricePerKg: variant.pricePerKg,
+      lastPrice: variant.lastPrice,
+      avgPrice: variant.avgPrice,
+      purchaseCount: variant.purchaseCount,
+      lastPurchaseDate: variant.lastPurchaseDate,
+      lastSalePrice: variant.lastSalePrice,
+      lastPurchaseWasSale: variant.lastPurchaseWasSale,
+      avgSalePrice: variant.avgSalePrice,
+      salePurchaseCount: variant.salePurchaseCount,
+    }
+  }
+  return emptyCurrencyPrices()
+}
+
+export function hasPriceForCurrency(variant: ProductVariant, currency: Currency): boolean {
+  const p = pricesForCurrency(variant, currency)
+  return (
+    (p.lastPrice !== undefined && p.lastPrice > 0) ||
+    (p.avgPrice !== undefined && p.avgPrice > 0) ||
+    (p.pricePerKg !== undefined && p.pricePerKg > 0)
+  )
+}
+
+/**
+ * Schreibt Preise in den Währungs-Bucket.
+ * Legacy-Top-Level-Felder spiegeln nur CHF (ältere UI / Migrationen).
+ */
+export function setPricesForCurrency(
+  variant: ProductVariant,
+  currency: Currency,
+  prices: VariantCurrencyPrices
+): ProductVariant {
+  const next: ProductVariant = {
+    ...variant,
+    byCurrency: {
+      ...variant.byCurrency,
+      [currency]: prices,
+    },
+  }
+  if (currency === 'CHF') {
+    next.pricePerKg = prices.pricePerKg
+    next.lastPrice = prices.lastPrice
+    next.avgPrice = prices.avgPrice
+    next.purchaseCount = prices.purchaseCount
+    next.lastPurchaseDate = prices.lastPurchaseDate
+    next.lastSalePrice = prices.lastSalePrice
+    next.lastPurchaseWasSale = prices.lastPurchaseWasSale
+    next.avgSalePrice = prices.avgSalePrice
+    next.salePurchaseCount = prices.salePurchaseCount
+  }
+  return next
+}
+
 export function createEmptyVariant(name: string, id: string): ProductVariant {
   return {
     id,
@@ -33,6 +110,7 @@ export function createEmptyVariant(name: string, id: string): ProductVariant {
     purchaseCount: 0,
     lastPurchaseWasSale: false,
     salePurchaseCount: 0,
+    byCurrency: {},
   }
 }
 
@@ -54,67 +132,74 @@ function roundMoney(value: number): number {
 }
 
 /** Normal-Durchschnitt nur aus Nicht-Aktionskäufen. */
-function nextNormalAverage(current: ProductVariant, price: number): number {
+function nextNormalAverage(current: VariantCurrencyPrices, price: number): number {
   const normalCount = current.purchaseCount - current.salePurchaseCount
   const nextCount = normalCount + 1
   if (normalCount <= 0 || current.avgPrice === undefined) return price
   return roundMoney((current.avgPrice * normalCount + price) / nextCount)
 }
 
-function nextSaleAverage(current: ProductVariant, price: number): number {
+function nextSaleAverage(current: VariantCurrencyPrices, price: number): number {
   const nextCount = current.salePurchaseCount + 1
   if (current.salePurchaseCount <= 0 || current.avgSalePrice === undefined) return price
   return roundMoney((current.avgSalePrice * current.salePurchaseCount + price) / nextCount)
 }
 
-/** Wendet einen Kauf auf eine Variante an und gibt die aktualisierte Variante zurück. */
+/** Wendet einen Kauf auf eine Variante in der gegebenen Währung an. */
 export function applyPurchaseToVariant(
   variant: ProductVariant,
   price: number,
   date: string,
-  wasSale: boolean
+  wasSale: boolean,
+  currency: Currency = 'CHF'
 ): ProductVariant {
-  const next: ProductVariant = {
-    ...variant,
-    purchaseCount: variant.purchaseCount + 1,
+  const current = pricesForCurrency(variant, currency)
+  const next: VariantCurrencyPrices = {
+    ...current,
+    purchaseCount: current.purchaseCount + 1,
     lastPurchaseDate: date,
     lastPurchaseWasSale: wasSale,
   }
 
   if (wasSale) {
     next.lastSalePrice = price
-    next.avgSalePrice = nextSaleAverage(variant, price)
-    next.salePurchaseCount = variant.salePurchaseCount + 1
-    return next
+    next.avgSalePrice = nextSaleAverage(current, price)
+    next.salePurchaseCount = current.salePurchaseCount + 1
+    return setPricesForCurrency(variant, currency, next)
   }
 
   next.lastPrice = price
-  next.avgPrice = nextNormalAverage(variant, price)
-  return next
+  next.avgPrice = nextNormalAverage(current, price)
+  return setPricesForCurrency(variant, currency, next)
 }
 
 /** Entfernt den letzten Kauf einer Variante (beim Abhaken rückgängig) – vereinfachte Rücknahme. */
-export function revertLastPurchaseOnVariant(variant: ProductVariant, wasSale: boolean): ProductVariant {
-  const next: ProductVariant = {
-    ...variant,
-    purchaseCount: Math.max(0, variant.purchaseCount - 1),
+export function revertLastPurchaseOnVariant(
+  variant: ProductVariant,
+  wasSale: boolean,
+  currency: Currency = 'CHF'
+): ProductVariant {
+  const current = pricesForCurrency(variant, currency)
+  const next: VariantCurrencyPrices = {
+    ...current,
+    purchaseCount: Math.max(0, current.purchaseCount - 1),
     lastPurchaseWasSale: false,
   }
 
   if (wasSale) {
-    next.salePurchaseCount = Math.max(0, variant.salePurchaseCount - 1)
+    next.salePurchaseCount = Math.max(0, current.salePurchaseCount - 1)
     if (next.salePurchaseCount === 0) {
       next.lastSalePrice = undefined
       next.avgSalePrice = undefined
     }
-    return next
+    return setPricesForCurrency(variant, currency, next)
   }
 
   if (next.purchaseCount - next.salePurchaseCount <= 0) {
     next.lastPrice = undefined
     next.avgPrice = undefined
   }
-  return next
+  return setPricesForCurrency(variant, currency, next)
 }
 
 export interface ResolvedVariantPurchase {
@@ -126,10 +211,13 @@ export interface ResolvedVariantPurchase {
   createdNewProfile: boolean
 }
 
-function withVariantMeta(variant: ProductVariant, data: CheckoffPriceData): ProductVariant {
-  const next = { ...variant }
+function withVariantMeta(variant: ProductVariant, data: CheckoffPriceData, currency: Currency): ProductVariant {
+  let next = { ...variant }
   if (data.brandId) next.brandId = data.brandId
-  if (data.pricePerKg !== undefined) next.pricePerKg = data.pricePerKg
+  if (data.pricePerKg !== undefined) {
+    const prices = pricesForCurrency(next, currency)
+    next = setPricesForCurrency(next, currency, { ...prices, pricePerKg: data.pricePerKg })
+  }
   return next
 }
 
@@ -140,7 +228,8 @@ export function recordVariantPurchase(
   category: string,
   data: CheckoffPriceData,
   date: string,
-  createId: () => string
+  createId: () => string,
+  currency: Currency = 'CHF'
 ): ResolvedVariantPurchase {
   const now = Date.now()
   let profile = findPriceProfile(profiles, itemName, category)
@@ -166,8 +255,9 @@ export function recordVariantPurchase(
     const idx = profileCopy.variants.findIndex((v) => v.id === data.variantId)
     if (idx >= 0) {
       variant = withVariantMeta(
-        applyPurchaseToVariant(profileCopy.variants[idx]!, profilePrice, date, wasSale),
-        data
+        applyPurchaseToVariant(profileCopy.variants[idx]!, profilePrice, date, wasSale, currency),
+        data,
+        currency
       )
       profileCopy.variants[idx] = variant
     }
@@ -177,8 +267,9 @@ export function recordVariantPurchase(
     const name = (data.variantName || itemName).trim()
     if (!name) throw new Error('Variantenname fehlt')
     const newVariant = withVariantMeta(
-      applyPurchaseToVariant(createEmptyVariant(name, createId()), profilePrice, date, wasSale),
-      data
+      applyPurchaseToVariant(createEmptyVariant(name, createId()), profilePrice, date, wasSale, currency),
+      data,
+      currency
     )
     profileCopy.variants.push(newVariant)
     variant = newVariant
@@ -242,82 +333,88 @@ export function ensureBrandVariant(
   return { profiles: upsertPriceProfile(nextProfiles, updatedProfile), variantId: variant.id }
 }
 
-/** Schätzpreis für eine Variante: letzter Normalpreis → Durchschnitt → nichts. */
-export function estimateVariantPrice(variant: ProductVariant): number | null {
-  if (variant.lastPrice !== undefined && variant.lastPrice > 0) return variant.lastPrice
-  if (variant.avgPrice !== undefined && variant.avgPrice > 0) return variant.avgPrice
+/** Schätzpreis für eine Variante in der aktiven Währung. */
+export function estimateVariantPrice(variant: ProductVariant, currency: Currency = 'CHF'): number | null {
+  const prices = pricesForCurrency(variant, currency)
+  if (prices.lastPrice !== undefined && prices.lastPrice > 0) return prices.lastPrice
+  if (prices.avgPrice !== undefined && prices.avgPrice > 0) return prices.avgPrice
   return null
 }
 
-/** Wählt die passende Variante für Schätzung. */
+/** Wählt die passende Variante für Schätzung (bevorzugt Varianten mit Preis in der aktiven Währung). */
 export function pickVariantForEstimate(
   profile: ProductPriceProfile | undefined,
-  item: ShoppingItem
+  item: ShoppingItem,
+  currency: Currency = 'CHF'
 ): ProductVariant | undefined {
   if (!profile?.variants.length) return undefined
   if (item.variantId) {
     const chosen = findVariant(profile, item.variantId)
+    if (chosen && hasPriceForCurrency(chosen, currency)) return chosen
     if (chosen) return chosen
   }
   if (profile.preferredVariantId) {
     const preferred = findVariant(profile, profile.preferredVariantId)
-    if (preferred) return preferred
+    if (preferred && hasPriceForCurrency(preferred, currency)) return preferred
   }
   const withPrice = profile.variants
-    .filter((v) => estimateVariantPrice(v) !== null)
-    .sort((a, b) => (b.lastPurchaseDate || '').localeCompare(a.lastPurchaseDate || ''))
+    .filter((v) => hasPriceForCurrency(v, currency))
+    .sort((a, b) =>
+      (pricesForCurrency(b, currency).lastPurchaseDate || '').localeCompare(
+        pricesForCurrency(a, currency).lastPurchaseDate || ''
+      )
+    )
   if (withPrice[0]) return withPrice[0]
   return profile.variants[0]
 }
 
-/** Zuletzt erfasster Kilopreis eines Produkts (falls es je nach Gewicht abgehakt wurde) -
- *  für die 100-g-Anzeige im Preisverlauf. Nimmt die jüngste Variante mit pricePerKg. */
+/** Zuletzt erfasster Kilopreis eines Produkts in der aktiven Währung. */
 export function productPricePerKg(
   profiles: ProductPriceProfile[],
   name: string,
-  category: string
+  category: string,
+  currency: Currency = 'CHF'
 ): number | null {
   const profile = findPriceProfile(profiles, name, category)
   if (!profile) return null
   const withPerKg = profile.variants
-    .filter((v) => v.pricePerKg !== undefined && v.pricePerKg > 0)
-    .sort((a, b) => (b.lastPurchaseDate || '').localeCompare(a.lastPurchaseDate || ''))
-  return withPerKg[0]?.pricePerKg ?? null
+    .map((v) => ({ v, prices: pricesForCurrency(v, currency) }))
+    .filter(({ prices }) => prices.pricePerKg !== undefined && prices.pricePerKg > 0)
+    .sort((a, b) => (b.prices.lastPurchaseDate || '').localeCompare(a.prices.lastPurchaseDate || ''))
+  return withPerKg[0]?.prices.pricePerKg ?? null
 }
 
 export function estimateItemPrice(
   profiles: ProductPriceProfile[],
-  item: ShoppingItem
+  item: ShoppingItem,
+  currency: Currency = 'CHF'
 ): number | null {
   const profile = findPriceProfile(profiles, item.name, item.category)
-  const variant = pickVariantForEstimate(profile, item)
-  if (!variant) return null
+  const variant = pickVariantForEstimate(profile, item, currency)
+  if (!variant || !hasPriceForCurrency(variant, currency)) return null
+
+  const prices = pricesForCurrency(variant, currency)
 
   if (isProduceCategory(item.category)) {
-    const mode = defaultProducePricingMode(item.name, item.category, item.amount, variant)
+    const mode = defaultProducePricingMode(item.name, item.category, item.amount, prices)
     if (mode === 'weight') {
-      const perKg = variant.pricePerKg ?? variant.lastPrice ?? variant.avgPrice
-      // Echtes Gewicht (g/kg), sonst aus der Stückzahl geschätzt (z. B. 5 Bananen ≈ 600 g).
+      const perKg = prices.pricePerKg ?? prices.lastPrice ?? prices.avgPrice
       const grams = weightGramsFromAmount(item.amount) ?? estimatedPieceGrams(item.name, item.category, item.amount)
       if (grams && perKg) return roundMoney(perKg * (grams / 1000))
-      // Kein Gewicht ableitbar (z. B. leere Menge): nur Richtwert pro kg
       if (perKg) return perKg
       return null
     }
-    // Stückpreis-Obst (Kiwi etc.)
-    const unit = estimateVariantPrice(variant)
+    const unit = estimateVariantPrice(variant, currency)
     if (unit === null) return null
     return roundMoney(unit * priceQuantityFromAmount(item.amount))
   }
 
-  // Nicht-Obst/Gemüse mit g/kg-Menge: nur skalieren, wenn ein echter Kilopreis erfasst wurde
-  // (sonst würde ein alter Gesamtpreis fälschlich als Kilopreis interpretiert).
   const grams = explicitWeightGrams(item.amount)
-  if (grams && grams > 0 && variant.pricePerKg && variant.pricePerKg > 0) {
-    return roundMoney(variant.pricePerKg * (grams / 1000))
+  if (grams && grams > 0 && prices.pricePerKg && prices.pricePerKg > 0) {
+    return roundMoney(prices.pricePerKg * (grams / 1000))
   }
 
-  const unit = estimateVariantPrice(variant)
+  const unit = estimateVariantPrice(variant, currency)
   if (unit === null) return null
   return roundMoney(unit * priceQuantityFromAmount(item.amount))
 }
@@ -330,13 +427,14 @@ export interface ListCostEstimate {
 
 export function estimateOpenListCost(
   items: ShoppingItem[],
-  profiles: ProductPriceProfile[]
+  profiles: ProductPriceProfile[],
+  currency: Currency = 'CHF'
 ): ListCostEstimate {
   const open = items.filter((i) => !i.done)
   let total = 0
   let pricedItemCount = 0
   for (const item of open) {
-    const price = estimateItemPrice(profiles, item)
+    const price = estimateItemPrice(profiles, item, currency)
     if (price !== null) {
       total += price
       pricedItemCount += 1
@@ -375,7 +473,8 @@ export function buildProfilesFromPurchaseLog(
     }
 
     const idx = profile.variants.findIndex((v) => v.id === variant!.id)
-    profile.variants[idx] = applyPurchaseToVariant(variant, entry.price, entry.date, !!entry.wasSale)
+    const currency = entry.currency ?? 'CHF'
+    profile.variants[idx] = applyPurchaseToVariant(variant, entry.price, entry.date, !!entry.wasSale, currency)
     profile.preferredVariantId = variant.id
     profile.updatedAt = Date.now()
   }

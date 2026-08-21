@@ -17,7 +17,7 @@ describe('importFromJSON', () => {
     const payload = JSON.stringify({
       week: '2026-07-06',
       items: [
-        { name: 'Tomaten', amount: '300g', category: 'Früchte & Gemüse' },
+        { name: 'Tomaten', amount: '300g', category: 'Früchte & Gemüse', note: 'reif' },
         { name: 'Tomaten', amount: '200g', category: 'Früchte & Gemüse' },
         { name: 'Salz', amount: '1 Prise', category: 'Sonstiges' },
       ],
@@ -26,7 +26,28 @@ describe('importFromJSON', () => {
     expect(result.ok).toBe(true)
     expect(result.kept).toHaveLength(1)
     expect(result.kept?.[0].amount).toBe('500 g')
+    expect(result.kept?.[0].note).toBe('reif')
     expect(result.filtered).toHaveLength(1)
     expect(result.filtered?.[0].name).toBe('Salz')
+  })
+
+  it('übernimmt Einkaufsnotizen aus dem Import', () => {
+    const payload = JSON.stringify({
+      items: [
+        {
+          name: 'Hähnchenbrust',
+          amount: '600 g',
+          category: 'Fleisch & Fisch',
+          note: 'ohne Haut',
+        },
+      ],
+    })
+    const result = importFromJSON(payload, [])
+    expect(result.ok).toBe(true)
+    expect(result.kept?.[0]).toMatchObject({
+      name: 'Hähnchenbrust',
+      amount: '600 g',
+      note: 'ohne Haut',
+    })
   })
 })

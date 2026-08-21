@@ -17,7 +17,7 @@ import {
   resolveCheckoffTotalPrice,
   type CheckoffPriceMode,
 } from '@/utils/amount'
-import { amountToCents, findVariant, pickVariantForEstimate } from '@/utils/priceProfiles'
+import { amountToCents, findVariant, pickVariantForEstimate, pricesForCurrency } from '@/utils/priceProfiles'
 import { findVariantIdByName, getVariantSizePresets } from '@/utils/variantPresets'
 import { formatVariantLabel } from '@/utils/brands'
 import {
@@ -75,7 +75,7 @@ export function CheckoffPriceSheet({
   const ensureBrand = useStore((s) => s.ensureBrand)
   const variants = profile?.variants ?? []
   const hasVariants = variants.length > 0
-  const initialVariant = pickVariantForEstimate(profile ?? undefined, item)
+  const initialVariant = pickVariantForEstimate(profile ?? undefined, item, currency)
   const quantity = priceQuantityFromAmount(item.amount)
   const packAmount = parsePackAmount(item.amount)
   const isProduce = isProduceCategory(item.category)
@@ -92,7 +92,12 @@ export function CheckoffPriceSheet({
   const [priceMode, setPriceMode] = useState<CheckoffPriceMode>(quantity > 1 ? 'unit' : 'total')
   const [error, setError] = useState('')
   const [produceMode, setProduceMode] = useState<ProducePricingMode>(() =>
-    defaultProducePricingMode(item.name, item.category, item.amount, initialVariant)
+    defaultProducePricingMode(
+      item.name,
+      item.category,
+      item.amount,
+      initialVariant ? pricesForCurrency(initialVariant, currency) : null
+    )
   )
   const [produceModeTouched, setProduceModeTouched] = useState(false)
 
@@ -101,12 +106,21 @@ export function CheckoffPriceSheet({
     return profile ? findVariant(profile, selection) : undefined
   }, [profile, selection])
 
+  const selectedPrices = selectedVariant ? pricesForCurrency(selectedVariant, currency) : null
+
   // Vorauswahl anpassen, wenn Variante wechselt – nur wenn Nutzer den Modus noch nicht manuell gesetzt hat.
-  const produceDefaultKey = `${selectedVariant?.id ?? ''}|${item.amount}`
+  const produceDefaultKey = `${selectedVariant?.id ?? ''}|${item.amount}|${currency}`
   const [appliedProduceDefaultKey, setAppliedProduceDefaultKey] = useState(produceDefaultKey)
   if (!produceModeTouched && produceDefaultKey !== appliedProduceDefaultKey) {
     setAppliedProduceDefaultKey(produceDefaultKey)
-    setProduceMode(defaultProducePricingMode(item.name, item.category, item.amount, selectedVariant ?? initialVariant))
+    setProduceMode(
+      defaultProducePricingMode(
+        item.name,
+        item.category,
+        item.amount,
+        selectedPrices ?? (initialVariant ? pricesForCurrency(initialVariant, currency) : null)
+      )
+    )
   }
 
   // Obst: wählbarer Modus (Banane kg / Kiwi Stück). Sonst: explizite g/kg → Waagenpreis.
@@ -126,19 +140,19 @@ export function CheckoffPriceSheet({
   // während des Renderns statt in einem Effect (React-Muster "Zustand beim Ändern eines Werts
   // anpassen"). appliedPrefillKey startet bei null, damit die erste Vorbelegung auch beim
   // initialen Mount greift (bisher übernahm das der erste Effect-Lauf).
-  const prefillKey = `${selectedVariant?.id ?? ''}|${wasSale}`
+  const prefillKey = `${selectedVariant?.id ?? ''}|${wasSale}|${currency}`
   const [appliedPrefillKey, setAppliedPrefillKey] = useState<string | null>(null)
-  if (selectedVariant && prefillKey !== appliedPrefillKey) {
+  if (selectedVariant && selectedPrices && prefillKey !== appliedPrefillKey) {
     setAppliedPrefillKey(prefillKey)
     setBrandId(selectedVariant.brandId || '')
     if (wasSale) {
-      if (selectedVariant.lastSalePrice && selectedVariant.lastSalePrice > 0) {
-        setCents(amountToCents(selectedVariant.lastSalePrice))
+      if (selectedPrices.lastSalePrice && selectedPrices.lastSalePrice > 0) {
+        setCents(amountToCents(selectedPrices.lastSalePrice))
       }
     } else {
       const prefilled = priceByWeight
-        ? selectedVariant.pricePerKg ?? selectedVariant.lastPrice
-        : selectedVariant.lastPrice
+        ? selectedPrices.pricePerKg ?? selectedPrices.lastPrice
+        : selectedPrices.lastPrice
       if (prefilled && prefilled > 0) {
         setCents(amountToCents(prefilled))
       }
@@ -161,7 +175,7 @@ export function CheckoffPriceSheet({
   }, [enteredAmount, item.amount, priceMode, priceByWeight, weightGrams])
 
   // Kaufhistorie nur bei Log-Änderung aufbauen, nicht bei jedem Numpad-Tastendruck.
-  const priceHistory = useMemo(() => productPriceHistory(purchaseLog), [purchaseLog])
+  const priceHistory = useMemo(() => productPriceHistory(purchaseLog, currency), [purchaseLog, currency])
 
   const priceDelta = useMemo(() => {
     if (!highlightOptions || enteredAmount <= 0) return null
@@ -275,31 +289,31 @@ export function CheckoffPriceSheet({
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
           <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
-          <p className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mb-0.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
           </p>
+          {item.note ? (
+            <p className="mb-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              {item.note}
+            </p>
+          ) : (
+            <div className="mb-2" />
+          )}
 
           {canChooseProduceMode && (
-            <>
-              <OptionSegment
-                highlight={highlightOptions}
-                options={[
-                  { value: 'weight', label: 'Nach Gewicht' },
-                  { value: 'piece', label: 'Pro Stück' },
-                ]}
-                value={produceMode}
-                onChange={(v) => {
-                  setProduceModeTouched(true)
-                  setProduceMode(v as ProducePricingMode)
-                  setError('')
-                }}
-              />
-              <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                {produceMode === 'weight'
-                  ? 'Für Ware mit Kilopreis (z. B. Bananen) – Gewicht vom Bon eingeben'
-                  : 'Für Stückpreise (z. B. Kiwi) – Preis pro Stück eingeben'}
-              </p>
-            </>
+            <OptionSegment
+              highlight={highlightOptions}
+              options={[
+                { value: 'weight', label: 'Nach Gewicht' },
+                { value: 'piece', label: 'Pro Stück' },
+              ]}
+              value={produceMode}
+              onChange={(v) => {
+                setProduceModeTouched(true)
+                setProduceMode(v as ProducePricingMode)
+                setError('')
+              }}
+            />
           )}
 
           {onAmountChange && showProduceWeightInput && (
@@ -325,26 +339,6 @@ export function CheckoffPriceSheet({
                 onAdjustAmount={(_, direction) => handleAdjustAmount(direction)}
               />
             </div>
-          )}
-
-          {showProduceWeightInput && (
-            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Exaktes Gewicht vom Kassenbon eingeben – z. B. 347 g
-            </p>
-          )}
-
-          {priceByWeight && weightGrams && weightGrams > 0 && (
-            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Gesamtpreis eingeben – wird bei {formatWeightGrams(weightGrams)} auf den 100-g-Preis umgerechnet
-            </p>
-          )}
-
-          {packAmount && (
-            <p className="mb-2 px-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              {quantity > 1
-                ? `Preis einer Packung (${packAmount.packValue} ${packAmount.packUnit}) eingeben – wird mit ${quantity} multipliziert`
-                : `Eine Packung à ${packAmount.packValue} ${packAmount.packUnit}`}
-            </p>
           )}
 
           {!priceByWeight && quantity > 1 && (
@@ -457,7 +451,7 @@ export function CheckoffPriceSheet({
             </div>
           )}
 
-          {selectedVariant && (
+          {selectedVariant && selectedPrices && (
             <div
               className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl px-2.5 py-2 text-center text-[11px]"
               style={{ background: 'var(--chip-bg)' }}
@@ -466,23 +460,23 @@ export function CheckoffPriceSheet({
                 <div style={{ color: 'var(--text-muted)' }}>{priceByWeight ? 'Pro 100 g' : 'Zuletzt'}</div>
                 <div className="font-bold tabular-nums">
                   {priceByWeight
-                    ? selectedVariant.pricePerKg
-                      ? formatMoney(pricePer100gFromKg(selectedVariant.pricePerKg), currency)
+                    ? selectedPrices.pricePerKg
+                      ? formatMoney(pricePer100gFromKg(selectedPrices.pricePerKg), currency)
                       : '–'
-                    : selectedVariant.lastPrice
-                      ? formatMoney(selectedVariant.lastPrice, currency)
+                    : selectedPrices.lastPrice
+                      ? formatMoney(selectedPrices.lastPrice, currency)
                       : '–'}
                 </div>
               </div>
               <div>
                 <div style={{ color: 'var(--text-muted)' }}>Ø normal</div>
                 <div className="font-bold tabular-nums">
-                  {selectedVariant.avgPrice ? formatMoney(selectedVariant.avgPrice, currency) : '–'}
+                  {selectedPrices.avgPrice ? formatMoney(selectedPrices.avgPrice, currency) : '–'}
                 </div>
               </div>
               <div>
                 <div style={{ color: 'var(--text-muted)' }}>Gekauft</div>
-                <div className="font-bold">{formatShortDate(selectedVariant.lastPurchaseDate)}</div>
+                <div className="font-bold">{formatShortDate(selectedPrices.lastPurchaseDate)}</div>
               </div>
             </div>
           )}
@@ -616,9 +610,10 @@ function PriceTypePicker({
   currency: Currency
   highlight?: boolean
 }) {
+  const prices = variant ? pricesForCurrency(variant, currency) : null
   const lastSaleHint =
-    variant?.lastSalePrice && variant.lastSalePrice > 0
-      ? `Zuletzt ${formatMoney(variant.lastSalePrice, currency)}`
+    prices?.lastSalePrice && prices.lastSalePrice > 0
+      ? `Zuletzt ${formatMoney(prices.lastSalePrice, currency)}`
       : null
 
   return (

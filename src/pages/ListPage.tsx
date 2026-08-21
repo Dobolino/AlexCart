@@ -79,12 +79,12 @@ export function ListPage() {
 
   const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
   const hasCalculatorTotal = calculatorEntries.length > 0
-  const weekSpend = currentWeekSpend(purchaseLog)
+  const weekSpend = currentWeekSpend(purchaseLog, undefined, currency)
   const budgetSpend = totalBudgetSpend(weekSpend, calculatorTotal)
   const hasWeeklyBudget = weeklyBudget > 0
   const budget = hasWeeklyBudget ? budgetProgress(budgetSpend, weeklyBudget) : null
 
-  const listEstimate = estimateOpenListCost(activeItems, priceProfiles)
+  const listEstimate = estimateOpenListCost(activeItems, priceProfiles, currency)
 
   const summaryParts: string[] = []
   if (hasWeeklyBudget) {

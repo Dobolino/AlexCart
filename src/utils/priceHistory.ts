@@ -1,5 +1,5 @@
 import { normalize } from './text'
-import type { PurchaseLogEntry } from '@/types'
+import type { Currency, PurchaseLogEntry } from '@/types'
 
 export interface ProductPriceStats {
   name: string
@@ -12,8 +12,11 @@ export interface ProductPriceStats {
   maxPrice: number
 }
 
-/** Preisstatistik pro Produkt aus dem Einkaufslog (nur Einträge mit Preis). */
-export function productPriceHistory(log: PurchaseLogEntry[]): ProductPriceStats[] {
+/** Preisstatistik pro Produkt aus dem Einkaufslog (nur Einträge mit Preis in der Währung). */
+export function productPriceHistory(
+  log: PurchaseLogEntry[],
+  currency?: Currency
+): ProductPriceStats[] {
   const byName = new Map<
     string,
     { label: string; category: string; prices: { price: number; date: string }[] }
@@ -21,6 +24,7 @@ export function productPriceHistory(log: PurchaseLogEntry[]): ProductPriceStats[
 
   for (const entry of log) {
     if (!entry.price || entry.price <= 0) continue
+    if (currency && (entry.currency ?? 'CHF') !== currency) continue
     const key = normalize(entry.name)
     const existing = byName.get(key)
     const point = { price: entry.price, date: entry.date }
@@ -65,10 +69,15 @@ export interface SpendWeekBucket {
 }
 
 /** Ausgaben pro Woche (nur erfasste Preise), letzte `weeks` Wochen. */
-export function spendPerWeek(log: PurchaseLogEntry[], weeks = 8): SpendWeekBucket[] {
+export function spendPerWeek(
+  log: PurchaseLogEntry[],
+  weeks = 8,
+  currency?: Currency
+): SpendWeekBucket[] {
   const buckets = new Map<string, number>()
   for (const entry of log) {
     if (!entry.price || entry.price <= 0) continue
+    if (currency && (entry.currency ?? 'CHF') !== currency) continue
     const key = isoWeekStart(entry.date)
     buckets.set(key, Math.round(((buckets.get(key) || 0) + entry.price) * 100) / 100)
   }

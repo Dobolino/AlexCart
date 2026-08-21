@@ -281,4 +281,58 @@ describe('priceProfiles', () => {
     expect(profile?.variants).toHaveLength(1)
     expect(second.variantId).toBe(first.variantId)
   })
+
+  it('schätzt nur Preise der aktiven Währung', () => {
+    let variant = applyPurchaseToVariant(
+      { id: 'v1', name: 'Standard', purchaseCount: 0, lastPurchaseWasSale: false, salePurchaseCount: 0 },
+      1.2,
+      '2026-08-01',
+      false,
+      'EUR'
+    )
+    variant = applyPurchaseToVariant(variant, 2.5, '2026-08-02', false, 'CHF')
+
+    const profiles: ProductPriceProfile[] = [
+      {
+        id: 'p1',
+        itemName: 'Milch',
+        category: 'Milch & Käse',
+        baseKey: profileBaseKey('Milch', 'Milch & Käse'),
+        preferredVariantId: 'v1',
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [variant],
+      },
+    ]
+
+    expect(estimateItemPrice(profiles, item(), 'CHF')).toBe(2.5)
+    expect(estimateItemPrice(profiles, item(), 'EUR')).toBe(1.2)
+    expect(estimateVariantPrice(variant, 'EUR')).toBe(1.2)
+    expect(estimateVariantPrice(variant, 'CHF')).toBe(2.5)
+  })
+
+  it('nutzt keine EUR-Preise für CHF-Schätzung wenn nur EUR erfasst', () => {
+    const variant = applyPurchaseToVariant(
+      { id: 'v1', name: 'Standard', purchaseCount: 0, lastPurchaseWasSale: false, salePurchaseCount: 0 },
+      1.99,
+      '2026-08-01',
+      false,
+      'EUR'
+    )
+    const profiles: ProductPriceProfile[] = [
+      {
+        id: 'p1',
+        itemName: 'Milch',
+        category: 'Milch & Käse',
+        baseKey: profileBaseKey('Milch', 'Milch & Käse'),
+        preferredVariantId: 'v1',
+        createdAt: 0,
+        updatedAt: 0,
+        variants: [variant],
+      },
+    ]
+    expect(estimateItemPrice(profiles, item(), 'CHF')).toBeNull()
+    expect(estimateOpenListCost([item()], profiles, 'CHF').pricedItemCount).toBe(0)
+    expect(estimateOpenListCost([item()], profiles, 'EUR').total).toBe(1.99)
+  })
 })

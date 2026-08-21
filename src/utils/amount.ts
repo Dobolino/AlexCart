@@ -210,10 +210,14 @@ export function mergeItems(items: ImportItemPayload[]): ShoppingItem[] {
     const name = String(raw.name || '').trim()
     if (!name) continue
     const category = normalizeCategory(String(raw.category || 'Sonstiges').trim())
+    const note = String(raw.note || '').trim() || undefined
     const key = normalize(name)
     const existing = map.get(key)
     if (existing) {
       existing.amount = combineAmounts(existing.amount, String(raw.amount || '').trim())
+      if (note) {
+        existing.note = existing.note && existing.note !== note ? `${existing.note}; ${note}` : note
+      }
     } else {
       map.set(key, {
         id: uid(),
@@ -222,6 +226,7 @@ export function mergeItems(items: ImportItemPayload[]): ShoppingItem[] {
         category,
         done: false,
         addedAt: Date.now(),
+        ...(note ? { note } : {}),
       })
     }
   }

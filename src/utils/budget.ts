@@ -1,4 +1,4 @@
-import type { PurchaseLogEntry } from '@/types'
+import type { Currency, PurchaseLogEntry } from '@/types'
 
 /** Montag der ISO-Woche für ein YYYY-MM-DD Datum. */
 export function isoWeekStart(dateKey: string): string {
@@ -12,13 +12,18 @@ export function currentWeekStart(reference = new Date()): string {
   return isoWeekStart(reference.toLocaleDateString('sv-SE'))
 }
 
-/** Summe erfasster Preise in der aktuellen Kalenderwoche. */
-export function currentWeekSpend(log: PurchaseLogEntry[], reference = new Date()): number {
+/** Summe erfasster Preise in der aktuellen Kalenderwoche (optional nur eine Währung). */
+export function currentWeekSpend(
+  log: PurchaseLogEntry[],
+  reference = new Date(),
+  currency?: Currency
+): number {
   const weekStart = currentWeekStart(reference)
   let total = 0
   for (const entry of log) {
     if (!entry.price || entry.price <= 0) continue
     if (isoWeekStart(entry.date) !== weekStart) continue
+    if (currency && (entry.currency ?? 'CHF') !== currency) continue
     total += entry.price
   }
   return Math.round(total * 100) / 100

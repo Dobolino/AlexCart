@@ -1,4 +1,4 @@
-import type { PurchaseLogEntry, ShoppingItem } from '@/types'
+import type { Currency, PurchaseLogEntry, ShoppingItem } from '@/types'
 import { todayKey } from '@/utils/date'
 
 /** Stabile ID – Legacy-Einträge ohne id bekommen einen Index-basierten Schlüssel. */
@@ -6,27 +6,30 @@ export function purchaseLogEntryId(entry: PurchaseLogEntry, index = 0): string {
   return entry.id || `legacy:${entry.date}|${entry.name}|${entry.category}|${index}`
 }
 
-/** Heutige Einträge mit erfasstem Preis (optional ohne Rechner-ausgeblendete). */
+/** Heutige Einträge mit erfasstem Preis (optional ohne Rechner-ausgeblendete, optional Währung). */
 export function todayPricedEntries(
   purchaseLog: PurchaseLogEntry[],
   today: string = todayKey(),
-  excludedIds: ReadonlySet<string> = new Set()
+  excludedIds: ReadonlySet<string> = new Set(),
+  currency?: Currency
 ): PurchaseLogEntry[] {
   return purchaseLog.filter(
     (e, i) =>
       e.date === today &&
       (e.price ?? 0) > 0 &&
-      !excludedIds.has(purchaseLogEntryId(e, i))
+      !excludedIds.has(purchaseLogEntryId(e, i)) &&
+      (!currency || (e.currency ?? 'CHF') === currency)
   )
 }
 
 export function todayPricedTotal(
   purchaseLog: PurchaseLogEntry[],
   today: string = todayKey(),
-  excludedIds: ReadonlySet<string> = new Set()
+  excludedIds: ReadonlySet<string> = new Set(),
+  currency?: Currency
 ): number {
   return Math.round(
-    todayPricedEntries(purchaseLog, today, excludedIds).reduce((sum, e) => sum + (e.price ?? 0), 0) * 100
+    todayPricedEntries(purchaseLog, today, excludedIds, currency).reduce((sum, e) => sum + (e.price ?? 0), 0) * 100
   ) / 100
 }
 
@@ -35,7 +38,8 @@ export function todayPricedTotalForList(
   purchaseLog: PurchaseLogEntry[],
   listItems: ShoppingItem[],
   today: string = todayKey(),
-  excludedIds: ReadonlySet<string> = new Set()
+  excludedIds: ReadonlySet<string> = new Set(),
+  currency?: Currency
 ): number {
   const done = listItems.filter((i) => i.done)
   const total = purchaseLog
@@ -44,6 +48,7 @@ export function todayPricedTotalForList(
         e.date === today &&
         (e.price ?? 0) > 0 &&
         !excludedIds.has(purchaseLogEntryId(e, i)) &&
+        (!currency || (e.currency ?? 'CHF') === currency) &&
         done.some((item) => matchesListItem(e, item))
     )
     .reduce((sum, e) => sum + (e.price ?? 0), 0)

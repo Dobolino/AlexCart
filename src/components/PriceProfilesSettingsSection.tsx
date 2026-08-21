@@ -6,9 +6,10 @@ import { Sheet } from '@/components/Sheet'
 import { ICON_PATHS } from '@/constants/icons'
 import { formatVariantLabel } from '@/utils/brands'
 import { isProduceCategory } from '@/utils/producePrice'
-import { formatMoney, parseMoneyInput } from '@/utils/currency'
+import { formatMoney, parseMoneyInput, currencySymbol } from '@/utils/currency'
 import { HOUSE_BRAND_PRESETS } from '@/constants/houseBrands'
 import { isBrandNameTaken } from '@/utils/houseBrands'
+import { pricesForCurrency } from '@/utils/priceProfiles'
 import type { Currency, GlobalBrand, ProductPriceProfile, ProductVariant } from '@/types'
 
 export function PriceProfilesSettingsSection() {
@@ -301,9 +302,15 @@ function VariantEditor({
   produce: boolean
   onUpdate: (profileId: string, variantId: string, patch: Partial<Pick<ProductVariant, 'name' | 'brandId' | 'lastPrice' | 'pricePerKg'>>) => void
 }) {
-  const [priceInput, setPriceInput] = useState(
-    String(produce ? (variant.pricePerKg ?? variant.lastPrice ?? '') : (variant.lastPrice ?? ''))
-  )
+  const prices = pricesForCurrency(variant, currency)
+  const seed = String(produce ? (prices.pricePerKg ?? prices.lastPrice ?? '') : (prices.lastPrice ?? ''))
+  const [priceInput, setPriceInput] = useState(seed)
+  const syncKey = `${currency}|${variant.id}|${seed}`
+  const [appliedSyncKey, setAppliedSyncKey] = useState(syncKey)
+  if (syncKey !== appliedSyncKey) {
+    setAppliedSyncKey(syncKey)
+    setPriceInput(seed)
+  }
 
   function savePrice() {
     const parsed = parseMoneyInput(priceInput)
@@ -334,7 +341,7 @@ function VariantEditor({
       </div>
       <div className="flex items-center gap-2">
         <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-          {produce ? 'CHF/kg' : 'Preis'}
+          {produce ? `${currencySymbol(currency)}/kg` : 'Preis'}
         </span>
         <input
           type="text"
@@ -347,9 +354,9 @@ function VariantEditor({
             if (e.key === 'Enter') savePrice()
           }}
         />
-        {variant.lastPrice ? (
+        {prices.lastPrice ? (
           <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-            {formatMoney(variant.lastPrice, currency)}
+            {formatMoney(prices.lastPrice, currency)}
           </span>
         ) : null}
       </div>
