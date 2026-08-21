@@ -1388,7 +1388,11 @@ export const useStore = create<AppState>()(
               ...currentState,
               ...persisted,
               stats: { ...defaultStats(), ...persisted.stats },
-              settings: { ...defaultSettings(), ...persisted.settings },
+              settings: {
+                ...defaultSettings(),
+                ...persisted.settings,
+                customStores: persisted.settings?.customStores ?? [],
+              },
               activeListId: persisted.activeListId || persisted.lists![0].id,
               calculatorEntries: calc.entries,
               calculatorDate: calc.date,
