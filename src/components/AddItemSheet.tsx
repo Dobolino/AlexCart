@@ -22,6 +22,8 @@ import type { ImportMode } from '@/types'
 interface AddItemSheetProps {
   onClose: () => void
   onImported: (message: string) => void
+  /** Öffnet den Kassenbon-Import (separates Sheet). */
+  onOpenReceiptImport?: () => void
 }
 
 type Mode = 'search' | 'form' | 'import' | 'recipe'
@@ -29,7 +31,7 @@ type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom'
 
 const EMPTY_FORM: ProductFormValues = { name: '', category: CATEGORIES[0], amountValue: '', unit: DEFAULT_UNIT, note: '' }
 
-export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
+export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddItemSheetProps) {
   const customProducts = useStore((s) => s.customProducts)
   const addItemToActiveList = useStore((s) => s.addItemToActiveList)
   const addCustomProduct = useStore((s) => s.addCustomProduct)
@@ -201,6 +203,20 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
         ))}
       </div>
 
+      {onOpenReceiptImport && (
+        <button
+          type="button"
+          className="btn-soft tap-scale mb-3 flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-bold"
+          onClick={() => {
+            onClose()
+            onOpenReceiptImport()
+          }}
+        >
+          <Icon path={ICON_PATHS.import} size={16} />
+          Kassenbon (Foto / PDF)
+        </button>
+      )}
+
       {mode === 'search' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="shrink-0">
@@ -305,6 +321,19 @@ export function AddItemSheet({ onClose, onImported }: AddItemSheetProps) {
             <Icon path={ICON_PATHS.copy} size={16} />
             Letzte Woche wiederholen
           </button>
+          {onOpenReceiptImport && (
+            <button
+              type="button"
+              className="btn-soft tap-scale mb-3 flex w-full items-center justify-center gap-2 py-3 text-[14px] font-bold"
+              onClick={() => {
+                onClose()
+                onOpenReceiptImport()
+              }}
+            >
+              <Icon path={ICON_PATHS.import} size={16} />
+              Kassenbon importieren (Foto / PDF)
+            </button>
+          )}
           <details className="mb-3 rounded-xl px-3.5 py-3 text-[12px]" style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}>
             <summary className="cursor-pointer font-bold" style={{ color: 'var(--text)' }}>
               Claude-Prompt für den Import
