@@ -12,6 +12,7 @@ import { parseMoneyInput, currencySymbol } from '@/utils/currency'
 import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
 import { getStorageInfo } from '@/utils/storageInfo'
 import { PriceProfilesSettingsSection } from '@/components/PriceProfilesSettingsSection'
+import { PriceExportSection } from '@/components/PriceExportSection'
 import type { Currency, CustomProduct, Theme } from '@/types'
 
 type SettingsTab = 'general' | 'prices'
@@ -44,6 +45,10 @@ export function SettingsPage() {
   const resetAll = useStore((s) => s.resetAll)
   const customProducts = useStore((s) => s.customProducts)
   const removeCustomProduct = useStore((s) => s.removeCustomProduct)
+  const purchaseLog = useStore((s) => s.purchaseLog)
+  const priceProfiles = useStore((s) => s.priceProfiles)
+  const brands = useStore((s) => s.brands)
+  const completedTrips = useStore((s) => s.completedTrips)
   const [editing, setEditing] = useState<CustomProduct | null>(null)
   const [backupMessage, setBackupMessage] = useState('')
   const [budgetInput, setBudgetInput] = useState(weeklyBudget > 0 ? String(weeklyBudget) : '')
@@ -132,7 +137,23 @@ export function SettingsPage() {
         </div>
 
         {settingsTab === 'prices' ? (
-          <PriceProfilesSettingsSection />
+          <>
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Preis-Export
+            </div>
+            <PriceExportSection
+              purchaseLog={purchaseLog}
+              priceProfiles={priceProfiles}
+              brands={brands}
+              completedTrips={completedTrips}
+              currency={currency}
+              compact
+            />
+            <PriceProfilesSettingsSection />
+          </>
         ) : (
           <>
         <div

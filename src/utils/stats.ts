@@ -29,6 +29,43 @@ export function categoryBreakdown(log: PurchaseLogEntry[]): CountEntry[] {
   return Array.from(counts.values()).sort((a, b) => b.count - a.count)
 }
 
+export interface CategorySpendEntry {
+  label: string
+  total: number
+  count: number
+  /** Anteil an den erfassten Ausgaben, 0–100. */
+  percent: number
+}
+
+/** Ausgaben nach Kategorie inkl. Prozentanteil (nur Einträge mit Preis). */
+export function categorySpendBreakdown(log: PurchaseLogEntry[]): CategorySpendEntry[] {
+  const byCategory = new Map<string, { label: string; total: number; count: number }>()
+  let grandTotal = 0
+
+  for (const entry of log) {
+    if (!entry.price || entry.price <= 0) continue
+    grandTotal += entry.price
+    const existing = byCategory.get(entry.category)
+    if (existing) {
+      existing.total += entry.price
+      existing.count += 1
+    } else {
+      byCategory.set(entry.category, { label: entry.category, total: entry.price, count: 1 })
+    }
+  }
+
+  if (!grandTotal) return []
+
+  return Array.from(byCategory.values())
+    .map(({ label, total, count }) => ({
+      label,
+      total: Math.round(total * 100) / 100,
+      count,
+      percent: Math.round((total / grandTotal) * 1000) / 10,
+    }))
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'de'))
+}
+
 /** Montag der ISO-Woche für ein YYYY-MM-DD Datum, als YYYY-MM-DD. */
 function isoWeekStart(dateKey: string): string {
   const d = new Date(dateKey + 'T00:00:00')

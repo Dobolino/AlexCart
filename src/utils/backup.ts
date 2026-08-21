@@ -35,17 +35,22 @@ export function backupFilename(): string {
   return `alexshop-sicherung-${date}.json`
 }
 
-/** Teilt die Sicherung als Datei (iOS-Freigabemenü), falls unterstützt,
+/** Teilt eine Datei (iOS-Freigabemenü), falls unterstützt,
  *  sonst Fallback auf klassischen Datei-Download. */
-export async function shareOrDownloadBackup(json: string, filename: string): Promise<void> {
-  const blob = new Blob([json], { type: 'application/json' })
+export async function shareOrDownloadFile(
+  content: string,
+  filename: string,
+  mimeType = 'application/json',
+  title = 'AlexShop'
+): Promise<void> {
+  const blob = new Blob([content], { type: mimeType })
 
   const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean }
   if (nav.canShare && nav.share) {
-    const file = new File([blob], filename, { type: 'application/json' })
+    const file = new File([blob], filename, { type: mimeType })
     if (nav.canShare({ files: [file] })) {
       try {
-        await nav.share({ files: [file], title: 'AlexShop Sicherung' })
+        await nav.share({ files: [file], title })
         return
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return
@@ -62,4 +67,10 @@ export async function shareOrDownloadBackup(json: string, filename: string): Pro
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+}
+
+/** Teilt die Sicherung als Datei (iOS-Freigabemenü), falls unterstützt,
+ *  sonst Fallback auf klassischen Datei-Download. */
+export async function shareOrDownloadBackup(json: string, filename: string): Promise<void> {
+  await shareOrDownloadFile(json, filename, 'application/json', 'AlexShop Sicherung')
 }
