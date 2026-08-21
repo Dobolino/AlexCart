@@ -204,10 +204,17 @@ interface AppState {
     items: ImportItemPayload[],
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
-  /** Kassenbon: Preise aktualisieren oder Artikel auf die Liste übernehmen. */
+  /** Kassenbon: bestehende Liste abgleichen oder neuen Kassenbon (Liste) anlegen. */
   applyReceiptImport: (input: {
     store: string
-    mode: 'create' | 'prices'
+    /** Bestehende Liste prüfen / Preise zuordnen, oder neue Liste aus dem Bon. */
+    target: 'existing' | 'new'
+    /** Bei target=existing: welche Liste abgeglichen wird. */
+    listId?: string
+    /** Bei target=new: Name der neuen Liste. */
+    newListName?: string
+    /** Bei target=existing: fehlende Bon-Artikel auch auf die Liste setzen. */
+    addMissingItems?: boolean
     items: Array<{
       name: string
       amount: string
@@ -411,23 +418,41 @@ export const useStore = create<AppState>()(
         return get().importIntoActiveList(JSON.stringify({ items }), mode)
       },
 
-      applyReceiptImport: ({ store, mode, items }) => {
-        const list = get().activeList()
-        if (!list) return { ok: false, error: 'Keine aktive Liste.', message: '' }
+      applyReceiptImport: ({ store, target, listId, newListName, addMissingItems, items }) => {
         if (!items.length) return { ok: false, error: 'Keine Artikel.', message: '' }
 
         const today = todayKey()
         const currency = get().settings.currency
         let priceProfiles = get().priceProfiles
         let purchaseLog = [...get().purchaseLog]
-        let lists = get().lists
+        let lists = [...get().lists]
         let pantry = get().pantry
+        let activeListId = get().activeListId
         let matched = 0
         let added = 0
 
+        let list =
+          target === 'existing'
+            ? lists.find((l) => l.id === listId) ?? get().activeList()
+            : undefined
+
+        if (target === 'new') {
+          const name =
+            newListName?.trim() ||
+            [store.trim(), today.split('-').reverse().join('.')].filter(Boolean).join(' ') ||
+            'Kassenbon'
+          list = newList(name)
+          lists = [...lists, list]
+          activeListId = list.id
+        }
+
+        if (!list) return { ok: false, error: 'Keine Liste gewählt.', message: '' }
+
+        const targetListId = list.id
+
         const findMatch = (name: string) => {
           const key = normalize(name)
-          const current = lists.find((l) => l.id === list.id)?.items ?? list.items
+          const current = lists.find((l) => l.id === targetListId)?.items ?? list!.items
           return (
             current.find((i) => normalize(i.name) === key) ||
             current.find((i) => {
@@ -437,7 +462,8 @@ export const useStore = create<AppState>()(
           )
         }
 
-        if (mode === 'create') {
+        const shouldAddItems = target === 'new' || !!addMissingItems
+        if (shouldAddItems) {
           const payload: ImportItemPayload[] = items.map((i) => ({
             name: i.name,
             amount: i.amount,
@@ -447,12 +473,13 @@ export const useStore = create<AppState>()(
           if (!importResult.ok || !importResult.kept) {
             return { ok: false, error: importResult.error || 'Import fehlgeschlagen.', message: '' }
           }
+          const currentItems = lists.find((l) => l.id === targetListId)?.items ?? list.items
           const mergedItems = applyImportMode(
-            lists.find((l) => l.id === list.id)?.items ?? list.items,
+            currentItems,
             importResult.kept,
-            'append'
+            target === 'new' ? 'replace' : 'append'
           )
-          lists = lists.map((l) => (l.id === list.id ? { ...l, items: mergedItems } : l))
+          lists = lists.map((l) => (l.id === targetListId ? { ...l, items: mergedItems } : l))
           added = importResult.kept.length
         }
 
@@ -470,7 +497,7 @@ export const useStore = create<AppState>()(
               match,
               data,
               {
-                listId: list.id,
+                listId: targetListId,
                 itemId: match.id,
                 markDone: match.done,
                 wasDone: match.done,
@@ -510,6 +537,7 @@ export const useStore = create<AppState>()(
           }
         }
 
+        const finalList = lists.find((l) => l.id === targetListId) ?? list
         const tripItems: CompletedTripItem[] = items.map((i) => ({
           id: uid(),
           name: i.name,
@@ -518,8 +546,8 @@ export const useStore = create<AppState>()(
         }))
         const trip: CompletedTrip = {
           id: uid(),
-          listId: list.id,
-          listName: list.name,
+          listId: targetListId,
+          listName: finalList.name,
           completedAt: Date.now(),
           store: store.trim() || undefined,
           items: tripItems,
@@ -536,6 +564,7 @@ export const useStore = create<AppState>()(
           }
           return {
             lists,
+            activeListId,
             pantry,
             priceProfiles,
             purchaseLog,
@@ -545,14 +574,18 @@ export const useStore = create<AppState>()(
               ...state.stats,
               importsCount: state.stats.importsCount + 1,
               itemsAddedTotal: state.stats.itemsAddedTotal + added,
+              listsCreated: target === 'new' ? state.stats.listsCreated + 1 : state.stats.listsCreated,
             },
           }
         })
 
+        const listLabel = finalList.name
         const message =
-          mode === 'create'
-            ? `${added} Artikel angelegt · ${matched} Preise gespeichert${store ? ` (${store})` : ''}`
-            : `${matched} Preise gespeichert${store ? ` · ${store}` : ''}`
+          target === 'new'
+            ? `Neuer Kassenbon „${listLabel}" · ${added} Artikel · ${matched} Preise${store ? ` (${store})` : ''}`
+            : addMissingItems
+              ? `„${listLabel}" abgeglichen · ${added} ergänzt · ${matched} Preise${store ? ` · ${store}` : ''}`
+              : `„${listLabel}" abgeglichen · ${matched} Preise${store ? ` · ${store}` : ''}`
         return { ok: true, message }
       },
 
