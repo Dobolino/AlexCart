@@ -22,6 +22,7 @@ import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/sto
 import { normalizeCategory } from '@/utils/icon'
 import { groupByCategory } from '@/utils/group'
 import { mergeHouseBrandPresets } from '@/utils/houseBrands'
+import { isKnownStoreName, STORE_PRESETS } from '@/constants/stores'
 import type {
   AppSettings,
   AppStats,
@@ -44,7 +45,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 18
+const STORE_VERSION = 19
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -81,6 +82,7 @@ function defaultSettings(): AppSettings {
     weeklyBudget: 0,
     currency: 'CHF',
     shoppingAutoCollapse: true,
+    customStores: [],
   }
 }
 
@@ -264,6 +266,9 @@ interface AppState {
   setShoppingAutoCollapse: (autoCollapse: boolean) => void
   setWeeklyBudget: (amount: number) => void
   setCurrency: (currency: AppSettings['currency']) => void
+  /** Speichert eine neue Einkaufskette für Bon-Import / Filial-Vergleich. */
+  addCustomStore: (name: string) => void
+  removeCustomStore: (name: string) => void
   setHasSeenOnboarding: () => void
   resetAll: () => void
 
@@ -520,18 +525,29 @@ export const useStore = create<AppState>()(
           items: tripItems,
         }
 
-        set((state) => ({
-          lists,
-          pantry,
-          priceProfiles,
-          purchaseLog,
-          completedTrips: [trip, ...state.completedTrips].slice(0, 100),
-          stats: {
-            ...state.stats,
-            importsCount: state.stats.importsCount + 1,
-            itemsAddedTotal: state.stats.itemsAddedTotal + added,
-          },
-        }))
+        set((state) => {
+          let nextSettings = state.settings
+          const storeName = store.trim()
+          if (storeName && !isKnownStoreName(storeName, state.settings.customStores ?? [])) {
+            nextSettings = {
+              ...state.settings,
+              customStores: [...(state.settings.customStores ?? []), storeName],
+            }
+          }
+          return {
+            lists,
+            pantry,
+            priceProfiles,
+            purchaseLog,
+            settings: nextSettings,
+            completedTrips: [trip, ...state.completedTrips].slice(0, 100),
+            stats: {
+              ...state.stats,
+              importsCount: state.stats.importsCount + 1,
+              itemsAddedTotal: state.stats.itemsAddedTotal + added,
+            },
+          }
+        })
 
         const message =
           mode === 'create'
@@ -983,6 +999,32 @@ export const useStore = create<AppState>()(
           },
         })),
       setCurrency: (currency) => set((state) => ({ settings: { ...state.settings, currency } })),
+      addCustomStore: (name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return
+        set((state) => {
+          const existing = state.settings.customStores ?? []
+          const key = trimmed.toLowerCase()
+          if (existing.some((s) => s.toLowerCase() === key)) return state
+          if ((STORE_PRESETS as readonly string[]).some((s) => s.toLowerCase() === key)) return state
+          return {
+            settings: {
+              ...state.settings,
+              customStores: [...existing, trimmed],
+            },
+          }
+        })
+      },
+      removeCustomStore: (name) => {
+        const key = name.trim().toLowerCase()
+        if (!key) return
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            customStores: (state.settings.customStores ?? []).filter((s) => s.toLowerCase() !== key),
+          },
+        }))
+      },
       setHasSeenOnboarding: () =>
         set((state) => ({ settings: { ...state.settings, hasSeenOnboarding: true } })),
 
@@ -1301,6 +1343,13 @@ export const useStore = create<AppState>()(
                   }
                 }),
               }))
+            }
+          }
+          if (version < 19) {
+            state.settings = {
+              ...defaultSettings(),
+              ...(state.settings as Partial<AppSettings>),
+              customStores: (state.settings as Partial<AppSettings>)?.customStores ?? [],
             }
           }
           return state as AppState
