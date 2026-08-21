@@ -1,5 +1,5 @@
 import { normalize } from './text'
-import type { CompletedTrip, PurchaseLogEntry } from '@/types'
+import type { CompletedTrip, Currency, PurchaseLogEntry } from '@/types'
 
 export interface CountEntry {
   label: string
@@ -37,13 +37,14 @@ export interface CategorySpendEntry {
   percent: number
 }
 
-/** Ausgaben nach Kategorie inkl. Prozentanteil (nur Einträge mit Preis). */
-export function categorySpendBreakdown(log: PurchaseLogEntry[]): CategorySpendEntry[] {
+/** Ausgaben nach Kategorie inkl. Prozentanteil (nur Einträge mit Preis in der Währung). */
+export function categorySpendBreakdown(log: PurchaseLogEntry[], currency?: Currency): CategorySpendEntry[] {
   const byCategory = new Map<string, { label: string; total: number; count: number }>()
   let grandTotal = 0
 
   for (const entry of log) {
     if (!entry.price || entry.price <= 0) continue
+    if (currency && (entry.currency ?? 'CHF') !== currency) continue
     grandTotal += entry.price
     const existing = byCategory.get(entry.category)
     if (existing) {

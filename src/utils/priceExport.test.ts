@@ -115,8 +115,9 @@ describe('priceExport', () => {
   })
 
   it('exports CSV with header and currency column', () => {
+    const eurLog: PurchaseLogEntry[] = log.map((entry) => ({ ...entry, currency: 'EUR' }))
     const payload = buildPriceExport({
-      purchaseLog: log,
+      purchaseLog: eurLog,
       priceProfiles: profiles,
       brands,
       completedTrips: trips,
@@ -127,6 +128,20 @@ describe('priceExport', () => {
     expect(lines[0]).toContain('date,name,category,price,currency')
     expect(lines[1]).toContain('EUR')
     expect(lines).toHaveLength(4)
+  })
+
+  it('excludes purchases recorded in a different currency', () => {
+    const mixedLog: PurchaseLogEntry[] = [...log, { name: 'Käse', category: 'Milch & Käse', date: '2026-08-09', price: 4.2, currency: 'EUR' }]
+    const payload = buildPriceExport({
+      purchaseLog: mixedLog,
+      priceProfiles: profiles,
+      brands,
+      completedTrips: trips,
+      currency: 'CHF',
+    })
+    expect(payload.purchases).toHaveLength(3)
+    expect(payload.purchases.some((p) => p.name === 'Käse')).toBe(false)
+    expect(payload.productAverages.some((p) => p.name === 'Käse')).toBe(false)
   })
 
   it('builds an AI prompt containing the JSON payload', () => {

@@ -60,7 +60,7 @@ export function StatsPage() {
 
   const top = topItems(purchaseLog)
   const categories = categoryBreakdown(purchaseLog)
-  const categorySpend = categorySpendBreakdown(purchaseLog)
+  const categorySpend = categorySpendBreakdown(purchaseLog, currency)
   const weeks = productsPerWeek(purchaseLog, 8)
   const maxCategoryCount = categories[0]?.count ?? 1
   const maxTopCount = top[0]?.count ?? 1

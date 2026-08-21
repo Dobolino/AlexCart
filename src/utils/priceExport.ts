@@ -92,8 +92,9 @@ export function buildPriceExport(input: {
 }): PriceExportPayload {
   const stores = storeByPurchaseKey(input.completedTrips)
   const purchases: PriceExportPurchaseRow[] = []
+  const logInCurrency = input.purchaseLog.filter((entry) => (entry.currency ?? 'CHF') === input.currency)
 
-  for (const entry of input.purchaseLog) {
+  for (const entry of logInCurrency) {
     if (!entry.price || entry.price <= 0) continue
     const store = stores.get(`${entry.date}|${normalize(entry.name)}`)
     const brand = resolveBrand(entry, input.priceProfiles, input.brands)
@@ -111,7 +112,7 @@ export function buildPriceExport(input: {
 
   purchases.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'de'))
 
-  const productAverages = productPriceHistory(input.purchaseLog).map((p) => ({
+  const productAverages = productPriceHistory(input.purchaseLog, input.currency).map((p) => ({
     name: p.name,
     category: p.category,
     count: p.count,
@@ -122,7 +123,7 @@ export function buildPriceExport(input: {
     maxPrice: p.maxPrice,
   }))
 
-  const categorySpend = categorySpendBreakdown(input.purchaseLog).map((c) => ({
+  const categorySpend = categorySpendBreakdown(input.purchaseLog, input.currency).map((c) => ({
     category: c.label,
     total: c.total,
     percent: c.percent,

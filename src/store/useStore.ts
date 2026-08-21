@@ -449,10 +449,13 @@ export const useStore = create<AppState>()(
         if (!list) return { ok: false, error: 'Keine Liste gewählt.', message: '' }
 
         const targetListId = list.id
+        const matchedItemIds = new Set<string>()
 
         const findMatch = (name: string) => {
           const key = normalize(name)
-          const current = lists.find((l) => l.id === targetListId)?.items ?? list!.items
+          const current = (lists.find((l) => l.id === targetListId)?.items ?? list!.items).filter(
+            (i) => !matchedItemIds.has(i.id)
+          )
           return (
             current.find((i) => normalize(i.name) === key) ||
             current.find((i) => {
@@ -464,23 +467,26 @@ export const useStore = create<AppState>()(
 
         const shouldAddItems = target === 'new' || !!addMissingItems
         if (shouldAddItems) {
-          const payload: ImportItemPayload[] = items.map((i) => ({
-            name: i.name,
-            amount: i.amount,
-            category: i.category,
-          }))
-          const importResult = importFromJSON(JSON.stringify({ items: payload }), get().pantry)
-          if (!importResult.ok || !importResult.kept) {
-            return { ok: false, error: importResult.error || 'Import fehlgeschlagen.', message: '' }
+          const itemsToAdd = target === 'new' ? items : items.filter((i) => !findMatch(i.name))
+          if (itemsToAdd.length) {
+            const payload: ImportItemPayload[] = itemsToAdd.map((i) => ({
+              name: i.name,
+              amount: i.amount,
+              category: i.category,
+            }))
+            const importResult = importFromJSON(JSON.stringify({ items: payload }), get().pantry)
+            if (!importResult.ok || !importResult.kept) {
+              return { ok: false, error: importResult.error || 'Import fehlgeschlagen.', message: '' }
+            }
+            const currentItems = lists.find((l) => l.id === targetListId)?.items ?? list.items
+            const mergedItems = applyImportMode(
+              currentItems,
+              importResult.kept,
+              target === 'new' ? 'replace' : 'append'
+            )
+            lists = lists.map((l) => (l.id === targetListId ? { ...l, items: mergedItems } : l))
+            added = importResult.kept.length
           }
-          const currentItems = lists.find((l) => l.id === targetListId)?.items ?? list.items
-          const mergedItems = applyImportMode(
-            currentItems,
-            importResult.kept,
-            target === 'new' ? 'replace' : 'append'
-          )
-          lists = lists.map((l) => (l.id === targetListId ? { ...l, items: mergedItems } : l))
-          added = importResult.kept.length
         }
 
         for (const line of items) {
@@ -492,6 +498,7 @@ export const useStore = create<AppState>()(
           }
           const match = findMatch(line.name)
           if (match) {
+            matchedItemIds.add(match.id)
             const result = commitItemPurchase(
               { purchaseLog, priceProfiles, lists, pantry },
               match,
