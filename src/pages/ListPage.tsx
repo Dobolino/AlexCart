@@ -21,6 +21,7 @@ import { RecurringSection } from '@/components/RecurringSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
 import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
+import { ReceiptImportSheet } from '@/components/ReceiptImportSheet'
 import { BudgetBar } from '@/components/BudgetBar'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { formatMoney } from '@/utils/currency'
@@ -62,6 +63,7 @@ export function ListPage() {
   const currency = useStore((s) => s.settings.currency)
 
   const [addOpen, setAddOpen] = useState(false)
+  const [receiptOpen, setReceiptOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [filteredOpen, setFilteredOpen] = useState(false)
   const [doneOpen, setDoneOpen] = useState(false)
@@ -301,6 +303,8 @@ export function ListPage() {
                 category={g.category}
                 items={g.items}
                 viewMode={listViewMode}
+                priceProfiles={priceProfiles}
+                currency={currency}
                 onReorder={(ids) => reorderItemsInCategory(g.category, ids)}
                 onToggle={handleToggle}
                 onDelete={handleDelete}
@@ -312,11 +316,25 @@ export function ListPage() {
               />
             ))}
 
+            {listEstimate.pricedItemCount > 0 && (
+              <div
+                className="mb-3 flex items-center justify-between rounded-[14px] px-4 py-3.5"
+                style={{ background: 'var(--surface)', boxShadow: 'var(--shadow-card)' }}
+              >
+                <span className="text-[15px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                  Ungefähres Total
+                </span>
+                <span className="text-[18px] font-extrabold tabular-nums">
+                  {formatMoney(listEstimate.total, currency)}
+                </span>
+              </div>
+            )}
+
             {doneItems.length > 0 && (
               <>
                 <div
-                  className="card-surface tap-scale mt-1 flex cursor-pointer items-center justify-between px-4 py-3.5 text-[14px] font-bold"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="tap-scale mt-1 flex cursor-pointer items-center justify-between rounded-[14px] px-4 py-3.5 text-[14px] font-bold"
+                  style={{ color: 'var(--text-muted)', background: 'var(--surface)', boxShadow: 'var(--shadow-card)' }}
                   onClick={() => setDoneOpen((o) => !o)}
                 >
                   <span>Erledigt</span>
@@ -324,7 +342,7 @@ export function ListPage() {
                     className="rounded-full px-2.5 py-0.5 text-[12px] font-extrabold"
                     style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
                   >
-                    {doneItems.length} erledigt
+                    {doneItems.length}
                   </span>
                 </div>
                 {doneOpen && (
@@ -342,6 +360,8 @@ export function ListPage() {
                     category="Erledigt"
                     items={doneItems}
                     viewMode={listViewMode}
+                    priceProfiles={priceProfiles}
+                    currency={currency}
                     onReorder={reorderDoneItems}
                     onToggle={handleToggle}
                     onDelete={handleDelete}
@@ -372,7 +392,16 @@ export function ListPage() {
         </button>
       </FloatingPortal>
 
-      {addOpen && <AddItemSheet onClose={() => setAddOpen(false)} onImported={showToast} />}
+      {addOpen && (
+        <AddItemSheet
+          onClose={() => setAddOpen(false)}
+          onImported={showToast}
+          onOpenReceiptImport={() => setReceiptOpen(true)}
+        />
+      )}
+      {receiptOpen && (
+        <ReceiptImportSheet onClose={() => setReceiptOpen(false)} onDone={showToast} />
+      )}
       {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
       {switcherOpen && (
         <ListSwitcherSheet

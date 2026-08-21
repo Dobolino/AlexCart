@@ -3,13 +3,15 @@ import { AnimatePresence } from 'framer-motion'
 import { ItemRow } from './ItemRow'
 import { ItemTile } from './ItemTile'
 import { useDragReorder } from '@/hooks/useDragReorder'
-import type { ListViewMode } from '@/types'
-import type { ShoppingItem } from '@/types'
+import { estimateItemPrice } from '@/utils/priceProfiles'
+import type { Currency, ListViewMode, ProductPriceProfile, ShoppingItem } from '@/types'
 
 interface CategorySectionProps {
   category: string
   items: ShoppingItem[]
   viewMode: ListViewMode
+  priceProfiles: ProductPriceProfile[]
+  currency: Currency
   onReorder: (orderedIds: string[]) => void
   onToggle: (id: string) => void
   onDelete: (id: string) => void
@@ -24,6 +26,8 @@ export function CategorySection({
   category,
   items,
   viewMode,
+  priceProfiles,
+  currency,
   onReorder,
   onToggle,
   onDelete,
@@ -47,7 +51,7 @@ export function CategorySection({
   if (viewMode === 'tiles') {
     return (
       <div className="mb-5">
-        <div className="category-heading px-1.5 pb-2 text-[15px] font-bold" style={{ color: 'var(--text)' }}>
+        <div className="category-heading px-1.5 pb-2 text-[17px] font-extrabold" style={{ color: 'var(--text)' }}>
           {category}
         </div>
         <div
@@ -82,14 +86,13 @@ export function CategorySection({
   }
 
   return (
-    <div className="mb-4.5">
-      <div
-        className="px-1.5 pb-2 pt-1 text-[13px] font-extrabold uppercase tracking-wide"
-        style={{ color: 'var(--category-fg)' }}
-      >
+    <div className="mb-4">
+      <div className="px-1 pb-2 pt-1 text-[17px] font-extrabold" style={{ color: 'var(--text)' }}>
         {category}
       </div>
-      <div ref={containerRef} className={`card-surface${anyDragging ? ' select-none' : ''}`}
+      <div
+        ref={containerRef}
+        className={anyDragging ? 'select-none' : undefined}
         style={anyDragging ? { WebkitUserSelect: 'none', userSelect: 'none' } : undefined}
       >
         <AnimatePresence initial={false}>
@@ -97,6 +100,8 @@ export function CategorySection({
             <ItemRow
               key={item.id}
               item={item}
+              estimatedPrice={estimateItemPrice(priceProfiles, item, currency)}
+              currency={currency}
               onToggle={onToggle}
               onDelete={onDelete}
               onEdit={onEdit}

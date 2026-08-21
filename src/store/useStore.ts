@@ -14,7 +14,9 @@ import {
   buildProfilesFromPurchaseLog,
   ensureBrandVariant,
   pricesForCurrency,
+  recordVariantPurchase,
   setPricesForCurrency,
+  upsertPriceProfile,
 } from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
@@ -200,6 +202,19 @@ interface AppState {
     items: ImportItemPayload[],
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
+  /** Kassenbon: Preise aktualisieren oder Artikel auf die Liste übernehmen. */
+  applyReceiptImport: (input: {
+    store: string
+    mode: 'create' | 'prices'
+    items: Array<{
+      name: string
+      amount: string
+      category: string
+      price: number
+      unitPrice?: number
+      wasSale?: boolean
+    }>
+  }) => { ok: boolean; error?: string; message: string }
   addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string; variantId?: string }) => void
   updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note' | 'variantId'>>) => void
   toggleItemDone: (itemId: string, priceOrData?: number | CheckoffPriceData) => void
@@ -389,6 +404,140 @@ export const useStore = create<AppState>()(
       importRecipeItemsToActiveList: (items, mode = 'append') => {
         if (!items.length) return { ok: false, error: 'Keine Zutaten ausgewählt.' }
         return get().importIntoActiveList(JSON.stringify({ items }), mode)
+      },
+
+      applyReceiptImport: ({ store, mode, items }) => {
+        const list = get().activeList()
+        if (!list) return { ok: false, error: 'Keine aktive Liste.', message: '' }
+        if (!items.length) return { ok: false, error: 'Keine Artikel.', message: '' }
+
+        const today = todayKey()
+        const currency = get().settings.currency
+        let priceProfiles = get().priceProfiles
+        let purchaseLog = [...get().purchaseLog]
+        let lists = get().lists
+        let pantry = get().pantry
+        let matched = 0
+        let added = 0
+
+        const findMatch = (name: string) => {
+          const key = normalize(name)
+          const current = lists.find((l) => l.id === list.id)?.items ?? list.items
+          return (
+            current.find((i) => normalize(i.name) === key) ||
+            current.find((i) => {
+              const n = normalize(i.name)
+              return n.includes(key) || key.includes(n)
+            })
+          )
+        }
+
+        if (mode === 'create') {
+          const payload: ImportItemPayload[] = items.map((i) => ({
+            name: i.name,
+            amount: i.amount,
+            category: i.category,
+          }))
+          const importResult = importFromJSON(JSON.stringify({ items: payload }), get().pantry)
+          if (!importResult.ok || !importResult.kept) {
+            return { ok: false, error: importResult.error || 'Import fehlgeschlagen.', message: '' }
+          }
+          const mergedItems = applyImportMode(
+            lists.find((l) => l.id === list.id)?.items ?? list.items,
+            importResult.kept,
+            'append'
+          )
+          lists = lists.map((l) => (l.id === list.id ? { ...l, items: mergedItems } : l))
+          added = importResult.kept.length
+        }
+
+        for (const line of items) {
+          const data: CheckoffPriceData = {
+            price: line.price,
+            unitPrice: line.unitPrice,
+            wasSale: !!line.wasSale,
+            variantName: store.trim() || 'Standard',
+          }
+          const match = findMatch(line.name)
+          if (match) {
+            const result = commitItemPurchase(
+              { purchaseLog, priceProfiles, lists, pantry },
+              match,
+              data,
+              {
+                listId: list.id,
+                itemId: match.id,
+                markDone: match.done,
+                wasDone: match.done,
+                currency,
+              }
+            )
+            purchaseLog = result.purchaseLog
+            priceProfiles = result.priceProfiles
+            lists = result.lists
+            pantry = result.pantry
+            matched += 1
+          } else {
+            const purchase = recordVariantPurchase(
+              priceProfiles,
+              line.name,
+              normalizeCategory(line.category),
+              data,
+              today,
+              uid,
+              currency
+            )
+            priceProfiles = purchase.createdNewProfile
+              ? [...priceProfiles, purchase.profile]
+              : upsertPriceProfile(priceProfiles, purchase.profile)
+            purchaseLog.push({
+              id: uid(),
+              name: line.name,
+              category: normalizeCategory(line.category),
+              date: today,
+              price: line.price,
+              currency,
+              variantId: purchase.variantId,
+              variantName: purchase.variantName,
+              wasSale: !!line.wasSale,
+            })
+            matched += 1
+          }
+        }
+
+        const tripItems: CompletedTripItem[] = items.map((i) => ({
+          id: uid(),
+          name: i.name,
+          amount: i.amount,
+          price: i.price,
+        }))
+        const trip: CompletedTrip = {
+          id: uid(),
+          listId: list.id,
+          listName: list.name,
+          completedAt: Date.now(),
+          store: store.trim() || undefined,
+          items: tripItems,
+        }
+
+        set((state) => ({
+          lists,
+          pantry,
+          priceProfiles,
+          purchaseLog,
+          completedTrips: [trip, ...state.completedTrips].slice(0, 100),
+          stats: {
+            ...state.stats,
+            importsCount: state.stats.importsCount + 1,
+            itemsAddedTotal: state.stats.itemsAddedTotal + added,
+          },
+        }))
+
+        const message =
+          mode === 'create'
+            ? `${added} Artikel angelegt · ${matched} Preise gespeichert${store ? ` (${store})` : ''}`
+            : `${matched} Preise gespeichert${store ? ` · ${store}` : ''}`
+        return { ok: true, message }
       },
 
       addItemToActiveList: (item) => {
