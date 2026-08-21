@@ -5,12 +5,13 @@ import { ICON_PATHS } from '@/constants/icons'
 import { mergeStoreOptions, STORE_PRESETS } from '@/constants/stores'
 import { buildClaudeReceiptPrompt } from '@/utils/claudeReceiptPrompt'
 import { formatMoney } from '@/utils/currency'
+import { todayKey } from '@/utils/date'
 import { isReceiptImageFile, ocrReceiptImage, readTextFile } from '@/utils/receiptOcr'
 import { parseReceiptInput, type ReceiptLineItem } from '@/utils/receiptParse'
 import { useStore } from '@/store/useStore'
 import type { Currency } from '@/types'
 
-type ReceiptMode = 'create' | 'prices'
+type ReceiptTarget = 'existing' | 'new'
 type Step = 'setup' | 'review'
 
 interface ReceiptImportSheetProps {
@@ -18,9 +19,17 @@ interface ReceiptImportSheetProps {
   onDone: (message: string) => void
 }
 
+function defaultNewListName(store: string): string {
+  const date = todayKey().split('-').reverse().join('.')
+  const label = store.trim() || 'Kassenbon'
+  return `${label} ${date}`
+}
+
 export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps) {
   const currency = useStore((s) => s.settings.currency)
   const customStores = useStore((s) => s.settings.customStores ?? [])
+  const lists = useStore((s) => s.lists)
+  const activeListId = useStore((s) => s.activeListId)
   const addCustomStore = useStore((s) => s.addCustomStore)
   const removeCustomStore = useStore((s) => s.removeCustomStore)
   const applyReceiptImport = useStore((s) => s.applyReceiptImport)
@@ -28,7 +37,10 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const storeOptions = useMemo(() => mergeStoreOptions(customStores), [customStores])
   const [store, setStore] = useState<string>(STORE_PRESETS[0])
   const [newStore, setNewStore] = useState('')
-  const [mode, setMode] = useState<ReceiptMode>('prices')
+  const [target, setTarget] = useState<ReceiptTarget>('existing')
+  const [listId, setListId] = useState<string>(activeListId || lists[0]?.id || '')
+  const [newListName, setNewListName] = useState(() => defaultNewListName(STORE_PRESETS[0]))
+  const [addMissingItems, setAddMissingItems] = useState(false)
   const [step, setStep] = useState<Step>('setup')
   const [text, setText] = useState('')
   const [items, setItems] = useState<ReceiptLineItem[]>([])
@@ -44,11 +56,18 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     [items]
   )
 
+  function selectStore(name: string) {
+    setStore(name)
+    if (target === 'new') {
+      setNewListName(defaultNewListName(name))
+    }
+  }
+
   function submitNewStore() {
     const trimmed = newStore.trim()
     if (!trimmed) return
     addCustomStore(trimmed)
-    setStore(trimmed)
+    selectStore(trimmed)
     setNewStore('')
   }
 
@@ -114,8 +133,19 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
 
   function apply() {
     if (!items.length) return
+    if (target === 'existing' && !listId) {
+      setError('Bitte eine bestehende Liste wählen.')
+      return
+    }
     if (store.trim()) addCustomStore(store)
-    const result = applyReceiptImport({ store, mode, items })
+    const result = applyReceiptImport({
+      store,
+      target,
+      listId: target === 'existing' ? listId : undefined,
+      newListName: target === 'new' ? newListName : undefined,
+      addMissingItems: target === 'existing' ? addMissingItems : undefined,
+      items,
+    })
     if (!result.ok) {
       setError(result.error || 'Import fehlgeschlagen.')
       return
@@ -124,12 +154,14 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     onClose()
   }
 
+  const selectedListName = lists.find((l) => l.id === listId)?.name
+
   return (
     <Sheet onClose={onClose} tall>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-4">
         <h2 className="mb-1 text-lg font-bold">Kassenbon importieren</h2>
         <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-          Foto oder Text vom Bon – Preise in AlexShop übernehmen oder Liste anlegen.
+          Foto oder PDF vom Bon – mit einer Liste abgleichen oder als neuen Kassenbon anlegen.
         </p>
 
         {step === 'setup' && (
@@ -150,7 +182,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                       color: store === s ? 'var(--accent)' : 'var(--text)',
                       outline: store === s ? '2px solid var(--accent)' : 'none',
                     }}
-                    onClick={() => setStore(s)}
+                    onClick={() => selectStore(s)}
                   >
                     {s}
                     {isCustom ? (
@@ -161,13 +193,13 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                         onClick={(e) => {
                           e.stopPropagation()
                           removeCustomStore(s)
-                          if (store === s) setStore(STORE_PRESETS[0])
+                          if (store === s) selectStore(STORE_PRESETS[0])
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.stopPropagation()
                             removeCustomStore(s)
-                            if (store === s) setStore(STORE_PRESETS[0])
+                            if (store === s) selectStore(STORE_PRESETS[0])
                           }
                         }}
                         aria-label={`${s} entfernen`}
@@ -204,13 +236,21 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
             </div>
 
             <div className="mb-2 text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-              Ziel
+              Kassenbon zuordnen
             </div>
-            <div className="mb-3 flex flex-col gap-1.5">
+            <div className="mb-2 flex flex-col gap-1.5">
               {(
                 [
-                  ['prices', 'Preise aktualisieren', 'Passt erkannte Artikel an die aktuelle Liste / Preisgedächtnis'],
-                  ['create', 'Liste anlegen', 'Übernimmt Bon-Artikel als neue Listeneinträge'],
+                  [
+                    'existing',
+                    'Bestehende Liste abgleichen',
+                    'Prüft den Bon gegen eine vorhandene Einkaufsliste und speichert die Preise',
+                  ],
+                  [
+                    'new',
+                    'Neuen Kassenbon anlegen',
+                    'Erstellt eine neue Liste aus dem Bon und legt die Quittung an',
+                  ],
                 ] as const
               ).map(([value, label, hint]) => (
                 <button
@@ -218,10 +258,13 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                   type="button"
                   className="tap-scale rounded-xl px-3.5 py-2.5 text-left"
                   style={{
-                    background: mode === value ? 'var(--accent-soft)' : 'var(--chip-bg)',
-                    outline: mode === value ? '2px solid var(--accent)' : 'none',
+                    background: target === value ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                    outline: target === value ? '2px solid var(--accent)' : 'none',
                   }}
-                  onClick={() => setMode(value)}
+                  onClick={() => {
+                    setTarget(value)
+                    if (value === 'new') setNewListName(defaultNewListName(store))
+                  }}
                 >
                   <div className="text-[14px] font-bold">{label}</div>
                   <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -230,6 +273,52 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                 </button>
               ))}
             </div>
+
+            {target === 'existing' && (
+              <div className="mb-3">
+                <div className="mb-1.5 text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                  Welche Liste?
+                </div>
+                <select
+                  className="input w-full py-3 text-[14px] font-semibold"
+                  value={listId}
+                  onChange={(e) => setListId(e.target.value)}
+                >
+                  {lists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                      {l.id === activeListId ? ' (aktuell)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <label className="mt-2 flex items-start gap-2.5 px-0.5 text-[13px]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={addMissingItems}
+                    onChange={(e) => setAddMissingItems(e.target.checked)}
+                  />
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Fehlende Bon-Artikel auch auf die Liste setzen
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {target === 'new' && (
+              <div className="mb-3">
+                <div className="mb-1.5 text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                  Name des neuen Kassenbons
+                </div>
+                <input
+                  type="text"
+                  className="input w-full py-3 text-[14px] font-semibold"
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  placeholder="z. B. Migros 21.08.2026"
+                />
+              </div>
+            )}
 
             <input
               ref={fileRef}
@@ -305,7 +394,13 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
               ← Zurück
             </button>
             <div className="mb-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-              {store} · {items.length} Positionen · {mode === 'prices' ? 'Preise aktualisieren' : 'Liste anlegen'}
+              {store}
+              {' · '}
+              {target === 'new'
+                ? `Neuer Kassenbon „${newListName.trim() || defaultNewListName(store)}"`
+                : `Abgleich „${selectedListName || 'Liste'}"`}
+              {' · '}
+              {items.length} Positionen
             </div>
             <div className="mb-3 flex flex-col gap-1.5">
               {items.map((item, index) => (
@@ -328,7 +423,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
               {error}
             </div>
             <button className="btn-primary mt-1 w-full py-3.5 text-[15px]" onClick={apply}>
-              {mode === 'prices' ? 'Preise übernehmen' : 'Liste übernehmen'}
+              {target === 'new' ? 'Neuen Kassenbon anlegen' : 'Liste abgleichen'}
             </button>
           </>
         )}
