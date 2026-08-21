@@ -1,15 +1,15 @@
 import { CATEGORIES } from '@/data/products'
-import { STORE_PRESETS } from '@/constants/stores'
+import { mergeStoreOptions } from '@/constants/stores'
 
 /** Prompt für Claude: Bon-Foto/PDF → JSON für AlexShop. */
-export function buildClaudeReceiptPrompt(store: string): string {
+export function buildClaudeReceiptPrompt(store: string, customStores: string[] = []): string {
   const categories = CATEGORIES.join(', ')
-  const stores = STORE_PRESETS.join(', ')
+  const stores = mergeStoreOptions(customStores).join(', ')
 
   return `Du liest einen Schweizer/EU-Kassenbon (Foto oder PDF-Text) für die App AlexShop.
 
 FILIALE (Kontext): ${store || 'unbekannt'}
-Andere mögliche Filialen: ${stores}
+Bekannte Filialen/Ketten: ${stores}
 
 AUFGABE
 Erkenne alle gekauften Artikel mit Preis. Antworte NUR mit gültigem JSON – kein Markdown, keine Erklärung.
@@ -39,6 +39,7 @@ Regeln:
 - Keine MwSt-/Total-Zeilen als Artikel.
 - Aktionspreise: wasSale true wenn klar Aktion/Rabatt.
 - Namen auf Deutsch, kurz (Ladenname).
+- "store" = erkannte Kette/Filiale (auch Einkaufszentrum möglich).
 
 Nur JSON ausgeben.`
 }

@@ -14,6 +14,8 @@ export interface AppSettings {
   currency: Currency
   /** Einkaufsmodus: nur eine Kategorie offen (true) oder alle gleichzeitig sichtbar (false). */
   shoppingAutoCollapse: boolean
+  /** Vom Nutzer hinzugefügte Supermarkt-/Einkaufsketten (zusätzlich zu den Presets). */
+  customStores: string[]
 }
 
 export interface ShoppingItem {
