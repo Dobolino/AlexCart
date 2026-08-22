@@ -30,6 +30,8 @@ import { PromoSavingsHighlight } from '@/components/PromoSavingsHighlight'
 import { StoreComparisonSection } from '@/components/StoreComparisonSection'
 import { CategorySpendSection } from '@/components/CategorySpendSection'
 import { PriceExportSection } from '@/components/PriceExportSection'
+import { TripCalendarSection } from '@/components/TripCalendarSection'
+import { timestampToDateKey } from '@/utils/date'
 import { ICON_PATHS } from '@/constants/icons'
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -54,9 +56,11 @@ export function StatsPage() {
   const resetStats = useStore((s) => s.resetStats)
   const updateCompletedTripItemPrice = useStore((s) => s.updateCompletedTripItemPrice)
   const updateCompletedTripStore = useStore((s) => s.updateCompletedTripStore)
+  const updateCompletedTripDate = useStore((s) => s.updateCompletedTripDate)
   const removeCompletedTrip = useStore((s) => s.removeCompletedTrip)
   const removeCompletedTripItem = useStore((s) => s.removeCompletedTripItem)
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
+  const [calendarDate, setCalendarDate] = useState<string | null>(null)
 
   const top = topItems(purchaseLog)
   const categories = categoryBreakdown(purchaseLog)
@@ -73,7 +77,10 @@ export function StatsPage() {
   const hasCompletedTrips = completedTrips.length > 0
   const tripWeeks = completedTripsPerWeek(completedTrips, 8)
   const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
-  const tripMonths = tripsByMonth(completedTrips)
+  const filteredTrips = calendarDate
+    ? completedTrips.filter((t) => timestampToDateKey(t.completedAt) === calendarDate)
+    : completedTrips
+  const filteredTripMonths = tripsByMonth(filteredTrips)
   const selectedTrip = completedTrips.find((t) => t.id === selectedTripId) ?? null
   const storeStats = avgBasketByStore(completedTrips)
   const promoSavings = promoSavingsInYear(purchaseLog, priceProfiles)
@@ -107,11 +114,21 @@ export function StatsPage() {
         </div>
 
         {hasCompletedTrips && (
-          <div className="mb-4.5 grid grid-cols-3 gap-2.5">
-            <StatTile value={completedTrips.length} label="Abgeschlossene Einkäufe" />
-            <StatTile value={avgItemsPerCompletedTrip(completedTrips).toFixed(1)} label="Ø Artikel/Liste" />
-            <StatTile value={formatMoney(avgSpendPerCompletedTrip(completedTrips), currency)} label="Ø Wert/Liste" />
-          </div>
+          <>
+            <TripCalendarSection
+              trips={completedTrips}
+              currency={currency}
+              selectedDateKey={calendarDate}
+              onSelectDate={(dateKey) =>
+                setCalendarDate((prev) => (prev === dateKey ? null : dateKey))
+              }
+            />
+            <div className="mb-4.5 grid grid-cols-3 gap-2.5">
+              <StatTile value={completedTrips.length} label="Abgeschlossene Einkäufe" />
+              <StatTile value={avgItemsPerCompletedTrip(completedTrips).toFixed(1)} label="Ø Artikel/Liste" />
+              <StatTile value={formatMoney(avgSpendPerCompletedTrip(completedTrips), currency)} label="Ø Wert/Liste" />
+            </div>
+          </>
         )}
 
         {hasCompletedTrips && (
@@ -142,8 +159,11 @@ export function StatsPage() {
               style={{ color: 'var(--category-fg)' }}
             >
               Einkaufsverlauf
+              {calendarDate
+                ? ` · ${new Date(calendarDate + 'T12:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                : ''}
             </div>
-            {tripMonths.map((group) => (
+            {filteredTripMonths.map((group) => (
               <div key={group.key} className="mb-4.5">
                 <div className="mb-1.5 flex items-center justify-between px-1.5">
                   <span className="text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>
@@ -340,6 +360,7 @@ export function StatsPage() {
           onClose={() => setSelectedTripId(null)}
           onUpdatePrice={(itemId, price) => updateCompletedTripItemPrice(selectedTrip.id, itemId, price)}
           onUpdateStore={(store) => updateCompletedTripStore(selectedTrip.id, store)}
+          onUpdateDate={(dateKey) => updateCompletedTripDate(selectedTrip.id, dateKey)}
           onRemoveItem={(itemId) => removeCompletedTripItem(selectedTrip.id, itemId)}
           onDeleteTrip={() => {
             removeCompletedTrip(selectedTrip.id)

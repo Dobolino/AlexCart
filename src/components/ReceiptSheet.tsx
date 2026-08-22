@@ -3,6 +3,7 @@ import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
+import { timestampToDateKey } from '@/utils/date'
 import { tripTotalSpent } from '@/utils/stats'
 import { shareReceiptImage } from '@/utils/receiptExport'
 import type { CompletedTrip, Currency } from '@/types'
@@ -13,6 +14,7 @@ interface ReceiptSheetProps {
   onClose: () => void
   onUpdatePrice: (itemId: string, price: number | undefined) => void
   onUpdateStore: (store: string | undefined) => void
+  onUpdateDate: (dateKey: string) => void
   onRemoveItem: (itemId: string) => void
   onDeleteTrip: () => void
 }
@@ -27,10 +29,11 @@ function formatTripDate(completedAt: number): string {
 
 /** Quittung eines abgeschlossenen Einkaufs - Preise pro Artikel und das Einkaufszentrum lassen
  *  sich hier nachträglich korrigieren, z. B. wenn beim Abhaken etwas falsch eingegeben wurde. */
-export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore, onRemoveItem, onDeleteTrip }: ReceiptSheetProps) {
+export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore, onUpdateDate, onRemoveItem, onDeleteTrip }: ReceiptSheetProps) {
   const total = tripTotalSpent(trip)
   const [editingStore, setEditingStore] = useState(false)
   const [storeDraft, setStoreDraft] = useState('')
+  const purchaseDate = timestampToDateKey(trip.completedAt)
 
   function startEditStore() {
     setStoreDraft(trip.store ?? '')
@@ -50,6 +53,19 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
           <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             {formatTripDate(trip.completedAt)} · {trip.items.length} Artikel
           </p>
+          <label className="mb-2 block text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>
+            Einkaufsdatum
+          </label>
+          <input
+            type="date"
+            className="input mb-3 w-full py-3 text-[15px] font-semibold"
+            value={purchaseDate}
+            max={new Date().toLocaleDateString('sv-SE')}
+            onChange={(e) => {
+              const next = e.target.value
+              if (next) onUpdateDate(next)
+            }}
+          />
           <button
             type="button"
             className="tap-scale mb-3 flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-left text-[14px]"

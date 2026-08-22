@@ -400,6 +400,10 @@ select.input {
   background-size: 14px;
   padding-right: 38px;
 }
+input[type='date'].input {
+  min-height: 48px;
+  color-scheme: light dark;
+}
 
 .progress-track {
   background: var(--progress-track);
