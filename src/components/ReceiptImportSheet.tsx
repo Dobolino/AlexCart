@@ -7,14 +7,15 @@ import { ICON_PATHS } from '@/constants/icons'
 import { mergeStoreOptions, STORE_PRESETS } from '@/constants/stores'
 import { buildClaudeReceiptPrompt } from '@/utils/claudeReceiptPrompt'
 import { formatMoney } from '@/utils/currency'
-import { todayKey, findReceiptDateInText, formatDateKeyDe } from '@/utils/date'
+import { todayKey, findReceiptDateInText, formatDateKeyDe, timestampToDateKey } from '@/utils/date'
+import { tripTotalSpent } from '@/utils/stats'
 import { isReceiptImageFile, ocrReceiptImage, readTextFile } from '@/utils/receiptOcr'
 import { extractReceiptFromPdf, isPdfFile } from '@/utils/receiptPdf'
 import { parseReceiptInput, type ReceiptLineItem } from '@/utils/receiptParse'
 import { useStore } from '@/store/useStore'
 import type { Currency } from '@/types'
 
-type ReceiptTarget = 'existing' | 'new'
+type ReceiptTarget = 'existing' | 'trip' | 'new'
 type Step = 'setup' | 'review'
 
 interface ReceiptImportSheetProps {
@@ -30,6 +31,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const currency = useStore((s) => s.settings.currency)
   const customStores = useStore((s) => s.settings.customStores ?? [])
   const lists = useStore((s) => s.lists)
+  const completedTrips = useStore((s) => s.completedTrips)
   const activeListId = useStore((s) => s.activeListId)
   const addCustomStore = useStore((s) => s.addCustomStore)
   const removeCustomStore = useStore((s) => s.removeCustomStore)
@@ -38,11 +40,15 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const storeOptions = useMemo(() => mergeStoreOptions(customStores), [customStores])
   const [store, setStore] = useState<string>(STORE_PRESETS[0])
   const [newStore, setNewStore] = useState('')
-  const [target, setTarget] = useState<ReceiptTarget>('existing')
+  const [target, setTarget] = useState<ReceiptTarget>(() =>
+    completedTrips.length > 0 ? 'trip' : 'existing'
+  )
   const [listId, setListId] = useState<string>(activeListId || lists[0]?.id || '')
+  const [tripId, setTripId] = useState<string>(completedTrips[0]?.id || '')
   const [newListName, setNewListName] = useState(() => defaultNewListName(STORE_PRESETS[0]))
   const [purchaseDate, setPurchaseDate] = useState(todayKey)
   const [addMissingItems, setAddMissingItems] = useState(false)
+  const [addMissingTripItems, setAddMissingTripItems] = useState(true)
   const [step, setStep] = useState<Step>('setup')
   const [text, setText] = useState('')
   const [items, setItems] = useState<ReceiptLineItem[]>([])
@@ -67,9 +73,27 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     }
   }, [lists, listId, activeListId])
 
+  useEffect(() => {
+    if (!completedTrips.length) {
+      if (tripId) setTripId('')
+      return
+    }
+    if (!tripId || !completedTrips.some((t) => t.id === tripId)) {
+      setTripId(completedTrips[0]!.id)
+    }
+  }, [completedTrips, tripId])
+
   function selectStore(name: string) {
     setStore(name)
     if (target === 'new') setNewListName(defaultNewListName(name))
+  }
+
+  function selectTrip(id: string) {
+    setTripId(id)
+    const trip = completedTrips.find((t) => t.id === id)
+    if (!trip) return
+    if (trip.store?.trim()) setStore(trip.store.trim())
+    setPurchaseDate(timestampToDateKey(trip.completedAt))
   }
 
   function submitNewStore() {
@@ -165,14 +189,20 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
       setError('Bitte eine bestehende Liste wählen.')
       return
     }
+    if (target === 'trip' && !tripId) {
+      setError('Bitte einen bestehenden Kassenbon wählen.')
+      return
+    }
     if (store.trim()) addCustomStore(store)
     const result = applyReceiptImport({
       store,
       target,
       listId: target === 'existing' ? listId : undefined,
+      tripId: target === 'trip' ? tripId : undefined,
       newListName: target === 'new' ? newListName : undefined,
       purchaseDate,
       addMissingItems: target === 'existing' ? addMissingItems : undefined,
+      addMissingTripItems: target === 'trip' ? addMissingTripItems : undefined,
       items,
     })
     if (!result.ok) {
@@ -184,6 +214,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   }
 
   const selectedListName = lists.find((l) => l.id === listId)?.name
+  const selectedTrip = completedTrips.find((t) => t.id === tripId)
 
   return (
     <Sheet onClose={onClose} tall>
@@ -273,10 +304,16 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
             <SectionLabel>Kassenbon zuordnen</SectionLabel>
             <div className="mb-2 flex flex-col gap-1.5">
               <OptionCard
+                selected={target === 'trip'}
+                onClick={() => setTarget('trip')}
+                title="Bestehenden Kassenbon abgleichen"
+                hint="Preise und Artikel auf einer vorhandenen Quittung aktualisieren"
+              />
+              <OptionCard
                 selected={target === 'existing'}
                 onClick={() => setTarget('existing')}
                 title="Bestehende Liste abgleichen"
-                hint="Bon gegen eine vorhandene Einkaufsliste prüfen und Preise speichern"
+                hint="Bon gegen eine Einkaufsliste prüfen und Preise speichern"
               />
               <OptionCard
                 selected={target === 'new'}
@@ -288,6 +325,44 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                 hint="Neue Liste aus dem Bon erstellen und Quittung speichern"
               />
             </div>
+
+            {target === 'trip' && (
+              <div className="mb-4">
+                <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--text)' }}>
+                  Welcher Kassenbon?
+                </div>
+                {!completedTrips.length ? (
+                  <p className="rounded-xl px-3.5 py-3 text-[13px]" style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}>
+                    Noch keine Quittungen. Lege zuerst einen neuen Kassenbon an oder schliesse einen Einkauf ab.
+                  </p>
+                ) : (
+                  <div className="flex max-h-[240px] flex-col gap-1.5 overflow-y-auto overscroll-contain pr-0.5">
+                    {completedTrips.slice(0, 30).map((trip) => {
+                      const dateLabel = formatDateKeyDe(timestampToDateKey(trip.completedAt))
+                      const title = trip.store?.trim() || trip.listName
+                      return (
+                        <OptionCard
+                          key={trip.id}
+                          selected={tripId === trip.id}
+                          onClick={() => selectTrip(trip.id)}
+                          title={title}
+                          hint={`${dateLabel} · ${trip.items.length} Artikel · ${formatMoney(tripTotalSpent(trip), currency)}${trip.store && trip.listName !== trip.store ? ` · ${trip.listName}` : ''}`}
+                        />
+                      )
+                    })}
+                  </div>
+                )}
+                <label className="mt-3 flex items-start gap-2.5 rounded-xl px-1 py-1 text-[13px]">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-[18px] w-[18px] shrink-0 accent-[var(--accent)]"
+                    checked={addMissingTripItems}
+                    onChange={(e) => setAddMissingTripItems(e.target.checked)}
+                  />
+                  <span style={{ color: 'var(--text)' }}>Fehlende Bon-Artikel auch auf die Quittung setzen</span>
+                </label>
+              </div>
+            )}
 
             {target === 'existing' && (
               <div className="mb-4">
@@ -434,7 +509,9 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
               {' · '}
               {target === 'new'
                 ? `Neuer Kassenbon „${newListName.trim() || defaultNewListName(store)}" · ${formatDateKeyDe(purchaseDate)}`
-                : `Abgleich „${selectedListName || 'Liste'}" · ${formatDateKeyDe(purchaseDate)}`}
+                : target === 'trip'
+                  ? `Abgleich Kassenbon „${selectedTrip?.store || selectedTrip?.listName || 'Quittung'}" · ${formatDateKeyDe(purchaseDate)}`
+                  : `Abgleich „${selectedListName || 'Liste'}" · ${formatDateKeyDe(purchaseDate)}`}
               {' · '}
               {items.length} Positionen
             </div>
@@ -459,7 +536,11 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
               {error}
             </div>
             <button className="btn-primary mt-1 w-full py-3.5 text-[15px]" onClick={apply}>
-              {target === 'new' ? 'Neuen Kassenbon anlegen' : 'Liste abgleichen'}
+              {target === 'new'
+                ? 'Neuen Kassenbon anlegen'
+                : target === 'trip'
+                  ? 'Kassenbon abgleichen'
+                  : 'Liste abgleichen'}
             </button>
           </>
         )}
