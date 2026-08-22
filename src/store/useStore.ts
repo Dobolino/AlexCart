@@ -204,19 +204,23 @@ interface AppState {
     items: ImportItemPayload[],
     mode?: ImportMode
   ) => { ok: boolean; error?: string; keptCount?: number; filteredCount?: number; addedCount?: number }
-  /** Kassenbon: bestehende Liste abgleichen oder neuen Kassenbon (Liste) anlegen. */
+  /** Kassenbon: bestehende Liste abgleichen, bestehenden Bon aktualisieren oder neuen anlegen. */
   applyReceiptImport: (input: {
     store: string
-    /** Bestehende Liste prüfen / Preise zuordnen, oder neue Liste aus dem Bon. */
-    target: 'existing' | 'new'
+    /** Bestehende Liste, bestehenden Kassenbon, oder neuen Kassenbon. */
+    target: 'existing' | 'trip' | 'new'
     /** Bei target=existing: welche Liste abgeglichen wird. */
     listId?: string
+    /** Bei target=trip: welcher Kassenbon (Quittung) aktualisiert wird. */
+    tripId?: string
     /** Bei target=new: Name der neuen Liste. */
     newListName?: string
     /** Einkaufsdatum (YYYY-MM-DD) – für Quittung und Preisprotokoll. */
     purchaseDate?: string
     /** Bei target=existing: fehlende Bon-Artikel auch auf die Liste setzen. */
     addMissingItems?: boolean
+    /** Bei target=trip: fehlende Bon-Artikel auch auf die Quittung setzen. */
+    addMissingTripItems?: boolean
     items: Array<{
       name: string
       amount: string
@@ -422,11 +426,142 @@ export const useStore = create<AppState>()(
         return get().importIntoActiveList(JSON.stringify({ items }), mode)
       },
 
-      applyReceiptImport: ({ store, target, listId, newListName, purchaseDate, addMissingItems, items }) => {
+      applyReceiptImport: ({
+        store,
+        target,
+        listId,
+        tripId,
+        newListName,
+        purchaseDate,
+        addMissingItems,
+        addMissingTripItems,
+        items,
+      }) => {
         if (!items.length) return { ok: false, error: 'Keine Artikel.', message: '' }
 
         const purchaseDay = purchaseDate?.trim() || todayKey()
         const currency = get().settings.currency
+
+        // --- Bestehenden Kassenbon (Quittung) abgleichen ---
+        if (target === 'trip') {
+          const trips = [...get().completedTrips]
+          const tripIndex = trips.findIndex((t) => t.id === tripId)
+          if (tripIndex < 0) return { ok: false, error: 'Kein Kassenbon gewählt.', message: '' }
+
+          const trip = trips[tripIndex]!
+          const matchedIds = new Set<string>()
+          let matched = 0
+          let added = 0
+          let nextItems = [...trip.items]
+
+          const findTripMatch = (name: string) => {
+            const key = normalize(name)
+            const available = nextItems.filter((i) => !matchedIds.has(i.id))
+            return (
+              available.find((i) => normalize(i.name) === key) ||
+              available.find((i) => {
+                const n = normalize(i.name)
+                return n.includes(key) || key.includes(n)
+              })
+            )
+          }
+
+          for (const line of items) {
+            const match = findTripMatch(line.name)
+            if (match) {
+              matchedIds.add(match.id)
+              nextItems = nextItems.map((i) =>
+                i.id !== match.id
+                  ? i
+                  : {
+                      ...i,
+                      price: line.price,
+                      ...(line.amount ? { amount: line.amount } : {}),
+                    }
+              )
+              matched += 1
+            } else if (addMissingTripItems) {
+              nextItems.push({
+                id: uid(),
+                name: line.name,
+                amount: line.amount,
+                price: line.price,
+              })
+              added += 1
+              matched += 1
+            }
+          }
+
+          let priceProfiles = get().priceProfiles
+          let purchaseLog = [...get().purchaseLog]
+          for (const line of items) {
+            const data: CheckoffPriceData = {
+              price: line.price,
+              unitPrice: line.unitPrice,
+              wasSale: !!line.wasSale,
+              variantName: store.trim() || trip.store || 'Standard',
+            }
+            const purchase = recordVariantPurchase(
+              priceProfiles,
+              line.name,
+              normalizeCategory(line.category),
+              data,
+              purchaseDay,
+              uid,
+              currency
+            )
+            priceProfiles = purchase.createdNewProfile
+              ? [...priceProfiles, purchase.profile]
+              : upsertPriceProfile(priceProfiles, purchase.profile)
+            purchaseLog.push({
+              id: uid(),
+              name: line.name,
+              category: normalizeCategory(line.category),
+              date: purchaseDay,
+              price: line.price,
+              currency,
+              variantId: purchase.variantId,
+              variantName: purchase.variantName,
+              wasSale: !!line.wasSale,
+            })
+          }
+
+          const updatedTrip: CompletedTrip = {
+            ...trip,
+            items: nextItems,
+            completedAt: dateKeyToTimestamp(purchaseDay),
+            store: store.trim() || trip.store,
+          }
+          trips[tripIndex] = updatedTrip
+
+          set((state) => {
+            let nextSettings = state.settings
+            const storeName = store.trim()
+            if (storeName && !isKnownStoreName(storeName, state.settings.customStores ?? [])) {
+              nextSettings = {
+                ...state.settings,
+                customStores: [...(state.settings.customStores ?? []), storeName],
+              }
+            }
+            return {
+              priceProfiles,
+              purchaseLog,
+              settings: nextSettings,
+              completedTrips: trips,
+              stats: {
+                ...state.stats,
+                importsCount: state.stats.importsCount + 1,
+              },
+            }
+          })
+
+          const label = [updatedTrip.store, updatedTrip.listName].filter(Boolean).join(' · ') || 'Kassenbon'
+          const message = addMissingTripItems
+            ? `Kassenbon „${label}" abgeglichen · ${matched} Preise · ${added} ergänzt`
+            : `Kassenbon „${label}" abgeglichen · ${matched} Preise`
+          return { ok: true, message }
+        }
+
         let priceProfiles = get().priceProfiles
         let purchaseLog = [...get().purchaseLog]
         let lists = [...get().lists]

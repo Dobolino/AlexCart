@@ -92,4 +92,41 @@ describe('applyReceiptImport', () => {
     expect(new Date(trip.completedAt).toLocaleDateString('sv-SE')).toBe('2026-07-15')
     expect(useStore.getState().purchaseLog[0]?.date).toBe('2026-07-15')
   })
+
+  it('updates prices on an existing completed trip (Kassenbon)', () => {
+    useStore.setState({
+      completedTrips: [
+        {
+          id: 'trip1',
+          listId: 'l1',
+          listName: 'Wocheneinkauf',
+          completedAt: Date.parse('2026-08-20T12:00:00'),
+          store: 'Migros',
+          items: [
+            { id: 'a', name: 'Milch', amount: '1 l', price: 1.5 },
+            { id: 'b', name: 'Brot', amount: '', price: 2.0 },
+          ],
+        },
+      ],
+    })
+
+    const result = useStore.getState().applyReceiptImport({
+      store: 'Migros',
+      target: 'trip',
+      tripId: 'trip1',
+      purchaseDate: '2026-08-21',
+      addMissingTripItems: true,
+      items: [
+        { name: 'Milch', amount: '1 l', category: 'Milch & Käse', price: 1.95 },
+        { name: 'Käse', amount: '', category: 'Milch & Käse', price: 4.2 },
+      ],
+    })
+
+    expect(result.ok).toBe(true)
+    const trip = useStore.getState().completedTrips.find((t) => t.id === 'trip1')!
+    expect(trip.items.find((i) => i.name === 'Milch')?.price).toBe(1.95)
+    expect(trip.items.find((i) => i.name === 'Brot')?.price).toBe(2.0)
+    expect(trip.items.find((i) => i.name === 'Käse')?.price).toBe(4.2)
+    expect(new Date(trip.completedAt).toLocaleDateString('sv-SE')).toBe('2026-08-21')
+  })
 })
