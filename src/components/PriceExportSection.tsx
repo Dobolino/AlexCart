@@ -97,7 +97,7 @@ export function PriceExportSection({
         document.execCommand('copy')
         document.body.removeChild(ta)
       }
-      setMessage('KI-Prompt kopiert – in ChatGPT/Claude einfügen.')
+      setMessage('Prompt kopiert.')
     } catch {
       setMessage('Kopieren fehlgeschlagen.')
     }
@@ -115,9 +115,8 @@ export function PriceExportSection({
       )}
       <div className="card-surface flex flex-col">
         {!compact && (
-          <p className="border-b px-3.5 py-3 text-[12px] leading-snug" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-            {pricedCount} Preise mit Datum, Kategorie, Ø und Filiale (wenn gesetzt). CSV für Tabellen, JSON +
-            Prompt für Legenden/Diagramme mit KI.
+          <p className="border-b px-3.5 py-3 text-[12px] leading-snug" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
+            {pricedCount} Preise mit Datum, Kategorie, Ø und Filiale (wenn gesetzt).
           </p>
         )}
         <button
@@ -131,22 +130,26 @@ export function PriceExportSection({
         </button>
         <button
           type="button"
-          className="tap-scale flex items-center gap-3 border-b px-3.5 py-3.5 text-left text-[14px] font-semibold"
-          style={{ borderColor: 'var(--border)' }}
+          className="tap-scale flex items-center gap-3 px-3.5 py-3.5 text-left text-[14px] font-semibold"
           onClick={() => void handleExportJson()}
         >
           <Icon path={ICON_PATHS.share} size={18} />
           Als JSON exportieren
         </button>
+      </div>
+      <details className="mt-2 rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+        <summary className="cursor-pointer text-[13px] font-bold" style={{ color: 'var(--text-muted)' }}>
+          Optional: Diagramme per KI
+        </summary>
         <button
           type="button"
-          className="tap-scale flex items-center gap-3 px-3.5 py-3.5 text-left text-[14px] font-semibold"
+          className="btn-soft tap-scale mt-2 flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-bold"
           onClick={() => void handleCopyAiPrompt()}
         >
           <Icon path={ICON_PATHS.copy} size={18} />
-          KI-Prompt für Diagramme kopieren
+          Prompt mit Daten kopieren
         </button>
-      </div>
+      </details>
       {message && (
         <p className="mt-2 px-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {message}
