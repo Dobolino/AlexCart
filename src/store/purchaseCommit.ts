@@ -64,9 +64,9 @@ export function commitItemPurchase(
   state: PurchaseState,
   item: ShoppingItem,
   data: CheckoffPriceData,
-  opts: { listId: string; itemId: string; markDone: boolean; wasDone: boolean; currency?: Currency }
+  opts: { listId: string; itemId: string; markDone: boolean; wasDone: boolean; currency?: Currency; purchaseDate?: string }
 ): PurchaseState {
-  const today = todayKey()
+  const today = opts.purchaseDate ?? todayKey()
   const currency = opts.currency ?? 'CHF'
   const purchase = recordVariantPurchase(
     state.priceProfiles,

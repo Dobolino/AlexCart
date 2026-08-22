@@ -78,4 +78,18 @@ describe('applyReceiptImport', () => {
     expect(milch?.price).toBe(1.95)
     expect(kokosmilch?.price).toBe(2.6)
   })
+
+  it('uses purchaseDate for trip and purchase log', () => {
+    useStore.getState().applyReceiptImport({
+      store: 'Migros',
+      target: 'new',
+      newListName: 'Migros',
+      purchaseDate: '2026-07-15',
+      items: [{ name: 'Milch', amount: '1 l', category: 'Milch & Käse', price: 1.95 }],
+    })
+
+    const trip = useStore.getState().completedTrips[0]!
+    expect(new Date(trip.completedAt).toLocaleDateString('sv-SE')).toBe('2026-07-15')
+    expect(useStore.getState().purchaseLog[0]?.date).toBe('2026-07-15')
+  })
 })

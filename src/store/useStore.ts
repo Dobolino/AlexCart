@@ -7,7 +7,7 @@ import { buildRepeatCandidates, candidatesToItems } from '@/utils/repeatWeek'
 import { parseRecipeText } from '@/utils/recipe'
 import { replenishPantryItem, decrementPantryAmount, prepareLowStockListAddition } from '@/utils/pantry'
 import { normalize } from '@/utils/text'
-import { todayKey } from '@/utils/date'
+import { todayKey, dateKeyToTimestamp, timestampToDateKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
 import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList, syncPurchaseLogForItemRename } from '@/utils/purchaseLog'
 import {
@@ -213,6 +213,8 @@ interface AppState {
     listId?: string
     /** Bei target=new: Name der neuen Liste. */
     newListName?: string
+    /** Einkaufsdatum (YYYY-MM-DD) – für Quittung und Preisprotokoll. */
+    purchaseDate?: string
     /** Bei target=existing: fehlende Bon-Artikel auch auf die Liste setzen. */
     addMissingItems?: boolean
     items: Array<{
@@ -300,6 +302,8 @@ interface AppState {
   updateCompletedTripItemPrice: (tripId: string, itemId: string, price: number | undefined) => void
   /** Einkaufszentrum/Filiale nachträglich auf der Quittung erfassen. */
   updateCompletedTripStore: (tripId: string, store: string | undefined) => void
+  /** Einkaufsdatum der Quittung ändern (Kalender). */
+  updateCompletedTripDate: (tripId: string, dateKey: string) => void
   /** Ganzen abgeschlossenen Einkauf aus dem Verlauf entfernen. */
   removeCompletedTrip: (tripId: string) => void
   /** Einzelne Position aus der Quittung eines abgeschlossenen Einkaufs entfernen. */
@@ -418,10 +422,10 @@ export const useStore = create<AppState>()(
         return get().importIntoActiveList(JSON.stringify({ items }), mode)
       },
 
-      applyReceiptImport: ({ store, target, listId, newListName, addMissingItems, items }) => {
+      applyReceiptImport: ({ store, target, listId, newListName, purchaseDate, addMissingItems, items }) => {
         if (!items.length) return { ok: false, error: 'Keine Artikel.', message: '' }
 
-        const today = todayKey()
+        const purchaseDay = purchaseDate?.trim() || todayKey()
         const currency = get().settings.currency
         let priceProfiles = get().priceProfiles
         let purchaseLog = [...get().purchaseLog]
@@ -439,7 +443,7 @@ export const useStore = create<AppState>()(
         if (target === 'new') {
           const name =
             newListName?.trim() ||
-            [store.trim(), today.split('-').reverse().join('.')].filter(Boolean).join(' ') ||
+            store.trim() ||
             'Kassenbon'
           list = newList(name)
           lists = [...lists, list]
@@ -509,6 +513,7 @@ export const useStore = create<AppState>()(
                 markDone: match.done,
                 wasDone: match.done,
                 currency,
+                purchaseDate: purchaseDay,
               }
             )
             purchaseLog = result.purchaseLog
@@ -522,7 +527,7 @@ export const useStore = create<AppState>()(
               line.name,
               normalizeCategory(line.category),
               data,
-              today,
+              purchaseDay,
               uid,
               currency
             )
@@ -533,7 +538,7 @@ export const useStore = create<AppState>()(
               id: uid(),
               name: line.name,
               category: normalizeCategory(line.category),
-              date: today,
+              date: purchaseDay,
               price: line.price,
               currency,
               variantId: purchase.variantId,
@@ -555,7 +560,7 @@ export const useStore = create<AppState>()(
           id: uid(),
           listId: targetListId,
           listName: finalList.name,
-          completedAt: Date.now(),
+          completedAt: dateKeyToTimestamp(purchaseDay),
           store: store.trim() || undefined,
           items: tripItems,
         }
@@ -1225,6 +1230,25 @@ export const useStore = create<AppState>()(
             trip.id !== tripId ? trip : { ...trip, store: store?.trim() || undefined }
           ),
         })),
+
+      updateCompletedTripDate: (tripId, dateKey) =>
+        set((state) => {
+          const trip = state.completedTrips.find((t) => t.id === tripId)
+          if (!trip) return state
+          const oldDate = timestampToDateKey(trip.completedAt)
+          const newTs = dateKeyToTimestamp(dateKey)
+          const itemNames = new Set(trip.items.map((i) => i.name))
+          const purchaseLog = state.purchaseLog.map((entry) => {
+            if (entry.date !== oldDate || !itemNames.has(entry.name)) return entry
+            return { ...entry, date: dateKey }
+          })
+          return {
+            purchaseLog,
+            completedTrips: state.completedTrips.map((t) =>
+              t.id !== tripId ? t : { ...t, completedAt: newTs }
+            ),
+          }
+        }),
 
       removeCompletedTrip: (tripId) =>
         set((state) => ({

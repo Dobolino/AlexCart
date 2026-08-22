@@ -7,7 +7,7 @@ import { ICON_PATHS } from '@/constants/icons'
 import { mergeStoreOptions, STORE_PRESETS } from '@/constants/stores'
 import { buildClaudeReceiptPrompt } from '@/utils/claudeReceiptPrompt'
 import { formatMoney } from '@/utils/currency'
-import { todayKey } from '@/utils/date'
+import { todayKey, findReceiptDateInText, formatDateKeyDe } from '@/utils/date'
 import { isReceiptImageFile, ocrReceiptImage, readTextFile } from '@/utils/receiptOcr'
 import { extractReceiptFromPdf, isPdfFile } from '@/utils/receiptPdf'
 import { parseReceiptInput, type ReceiptLineItem } from '@/utils/receiptParse'
@@ -23,9 +23,7 @@ interface ReceiptImportSheetProps {
 }
 
 function defaultNewListName(store: string): string {
-  const date = todayKey().split('-').reverse().join('.')
-  const label = store.trim() || 'Kassenbon'
-  return `${label} ${date}`
+  return store.trim() || 'Kassenbon'
 }
 
 export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps) {
@@ -43,6 +41,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const [target, setTarget] = useState<ReceiptTarget>('existing')
   const [listId, setListId] = useState<string>(activeListId || lists[0]?.id || '')
   const [newListName, setNewListName] = useState(() => defaultNewListName(STORE_PRESETS[0]))
+  const [purchaseDate, setPurchaseDate] = useState(todayKey)
   const [addMissingItems, setAddMissingItems] = useState(false)
   const [step, setStep] = useState<Step>('setup')
   const [text, setText] = useState('')
@@ -86,6 +85,11 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     setShowAiHelp(true)
   }
 
+  function applyParsedText(source: string) {
+    const detected = findReceiptDateInText(source)
+    if (detected) setPurchaseDate(detected)
+  }
+
   async function handleFile(file: File | undefined) {
     if (!file) return
     setError('')
@@ -98,6 +102,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
         setProgressLabel('Text wird erkannt…')
         const ocrText = await ocrReceiptImage(file, setProgressPct)
         setText(ocrText)
+        applyParsedText(ocrText)
         const parsed = parseReceiptInput(ocrText, store)
         if (!parsed.items.length) {
           failParse('Keine Artikel erkannt – Text prüfen oder unten einfügen.')
@@ -109,6 +114,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
         setProgressLabel('PDF wird ausgelesen…')
         const pdfText = await extractReceiptFromPdf(file, setProgressPct)
         setText(pdfText)
+        applyParsedText(pdfText)
         if (!pdfText.trim()) {
           failParse('PDF konnte nicht gelesen werden – Foto vom Bon oder Text einfügen.')
           return
@@ -139,6 +145,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   function goParse(source = text) {
     setError('')
     setShowAiHelp(false)
+    applyParsedText(source)
     const parsed = parseReceiptInput(source, store)
     if (!parsed.items.length) {
       failParse('Keine Artikel gefunden – Bon-Text oder JSON prüfen.')
@@ -164,6 +171,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
       target,
       listId: target === 'existing' ? listId : undefined,
       newListName: target === 'new' ? newListName : undefined,
+      purchaseDate,
       addMissingItems: target === 'existing' ? addMissingItems : undefined,
       items,
     })
@@ -247,6 +255,21 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
               </button>
             </div>
 
+            <SectionLabel>Einkaufsdatum</SectionLabel>
+            <div className="mb-4">
+              <input
+                type="date"
+                className="input w-full py-3 text-[15px] font-semibold"
+                value={purchaseDate}
+                max={todayKey()}
+                onChange={(e) => setPurchaseDate(e.target.value || todayKey())}
+              />
+              <p className="mt-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                Wann war der Einkauf? Wird im Kalender und Einkaufsverlauf angezeigt
+                {purchaseDate !== todayKey() ? ` · ${formatDateKeyDe(purchaseDate)}` : ''}.
+              </p>
+            </div>
+
             <SectionLabel>Kassenbon zuordnen</SectionLabel>
             <div className="mb-2 flex flex-col gap-1.5">
               <OptionCard
@@ -310,14 +333,14 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
             {target === 'new' && (
               <div className="mb-4">
                 <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--text)' }}>
-                  Name des neuen Kassenbons
+                  Name der Liste
                 </div>
                 <input
                   type="text"
                   className="input w-full py-3 text-[14px] font-semibold"
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
-                  placeholder="z. B. Migros 21.08.2026"
+                  placeholder="z. B. Migros"
                 />
               </div>
             )}
@@ -410,8 +433,8 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
               <span className="font-bold">{store}</span>
               {' · '}
               {target === 'new'
-                ? `Neuer Kassenbon „${newListName.trim() || defaultNewListName(store)}"`
-                : `Abgleich „${selectedListName || 'Liste'}"`}
+                ? `Neuer Kassenbon „${newListName.trim() || defaultNewListName(store)}" · ${formatDateKeyDe(purchaseDate)}`
+                : `Abgleich „${selectedListName || 'Liste'}" · ${formatDateKeyDe(purchaseDate)}`}
               {' · '}
               {items.length} Positionen
             </div>
