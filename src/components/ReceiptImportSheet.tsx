@@ -4,7 +4,7 @@ import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { OptionCard } from './OptionCard'
 import { ICON_PATHS } from '@/constants/icons'
-import { mergeStoreOptions, STORE_PRESETS } from '@/constants/stores'
+import { mergeStoreOptions, STORE_PRESETS, storePresetsForCurrency } from '@/constants/stores'
 import { buildClaudeReceiptPrompt } from '@/utils/claudeReceiptPrompt'
 import { formatMoney } from '@/utils/currency'
 import { todayKey, findReceiptDateInText, formatDateKeyDe, timestampToDateKey } from '@/utils/date'
@@ -37,15 +37,16 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const removeCustomStore = useStore((s) => s.removeCustomStore)
   const applyReceiptImport = useStore((s) => s.applyReceiptImport)
 
-  const storeOptions = useMemo(() => mergeStoreOptions(customStores), [customStores])
-  const [store, setStore] = useState<string>(STORE_PRESETS[0])
+  const storeOptions = useMemo(() => mergeStoreOptions(customStores, currency), [customStores, currency])
+  const countryPresets = useMemo(() => storePresetsForCurrency(currency), [currency])
+  const [store, setStore] = useState<string>(() => storePresetsForCurrency(currency)[0] ?? STORE_PRESETS[0])
   const [newStore, setNewStore] = useState('')
   const [target, setTarget] = useState<ReceiptTarget>(() =>
     completedTrips.length > 0 ? 'trip' : 'existing'
   )
   const [listId, setListId] = useState<string>(activeListId || lists[0]?.id || '')
   const [tripId, setTripId] = useState<string>(completedTrips[0]?.id || '')
-  const [newListName, setNewListName] = useState(() => defaultNewListName(STORE_PRESETS[0]))
+  const [newListName, setNewListName] = useState(() => storePresetsForCurrency(currency)[0] ?? 'Kassenbon')
   const [purchaseDate, setPurchaseDate] = useState(todayKey)
   const [addMissingItems, setAddMissingItems] = useState(false)
   const [addMissingTripItems, setAddMissingTripItems] = useState(true)
@@ -60,7 +61,10 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const [promptCopied, setPromptCopied] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const prompt = useMemo(() => buildClaudeReceiptPrompt(store, customStores), [store, customStores])
+  const prompt = useMemo(
+    () => buildClaudeReceiptPrompt(store, customStores, currency),
+    [store, customStores, currency]
+  )
   const total = useMemo(
     () => Math.round(items.reduce((s, i) => s + i.price, 0) * 100) / 100,
     [items]
@@ -82,6 +86,16 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
       setTripId(completedTrips[0]!.id)
     }
   }, [completedTrips, tripId])
+
+  useEffect(() => {
+    const presets = storePresetsForCurrency(currency)
+    const stillValid = storeOptions.some((s) => s === store)
+    if (!stillValid) {
+      const next = presets[0] ?? storeOptions[0] ?? 'Migros'
+      setStore(next)
+      if (target === 'new') setNewListName(defaultNewListName(next))
+    }
+  }, [currency, storeOptions, store, target])
 
   function selectStore(name: string) {
     setStore(name)
@@ -226,10 +240,13 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
 
         {step === 'setup' && (
           <>
-            <SectionLabel>Kette / Filiale</SectionLabel>
+            <SectionLabel>Kette / Filiale ({currency === 'EUR' ? 'Deutschland' : 'Schweiz'})</SectionLabel>
+            <p className="mb-2 text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+              Vorschläge folgen der Währung in den Einstellungen ({currency}). Eigene Ketten bleiben sichtbar.
+            </p>
             <div className="mb-2 flex flex-wrap gap-1.5">
               {storeOptions.map((s) => {
-                const isCustom = !(STORE_PRESETS as readonly string[]).includes(s)
+                const isCustom = customStores.some((c) => c.trim().toLowerCase() === s.toLowerCase())
                 const selected = store === s
                 return (
                   <div key={s} className="inline-flex max-w-full">
@@ -251,7 +268,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                         style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
                         onClick={() => {
                           removeCustomStore(s)
-                          if (store === s) selectStore(STORE_PRESETS[0])
+                          if (store === s) selectStore(countryPresets[0] ?? STORE_PRESETS[0])
                         }}
                         aria-label={`${s} entfernen`}
                       >
@@ -442,8 +459,24 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                 : 'Foto oder PDF wählen'}
             </button>
 
-            <div className="mb-1 text-[13px] font-bold" style={{ color: 'var(--text)' }}>
-              Oder Bon-Text / JSON einfügen
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>
+                Oder Bon-Text / JSON einfügen
+              </div>
+              {text.trim() ? (
+                <button
+                  type="button"
+                  className="tap-scale rounded-full px-2.5 py-1 text-[12px] font-bold"
+                  style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                  onClick={() => {
+                    setText('')
+                    setError('')
+                    setShowAiHelp(false)
+                  }}
+                >
+                  Alles löschen
+                </button>
+              ) : null}
             </div>
             <textarea
               className="input min-h-[120px] font-mono text-[13px]"

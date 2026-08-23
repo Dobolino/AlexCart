@@ -338,8 +338,24 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
               Kassenbon importieren (Foto / PDF)
             </button>
           )}
-          <div className="mb-1 text-[13px] font-bold" style={{ color: 'var(--text)' }}>
-            JSON einfügen
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>
+              JSON einfügen
+            </div>
+            {importText.trim() ? (
+              <button
+                type="button"
+                className="tap-scale rounded-full px-2.5 py-1 text-[12px] font-bold"
+                style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                onClick={() => {
+                  setImportText('')
+                  setImportError('')
+                  setShowImportAiHelp(false)
+                }}
+              >
+                Alles löschen
+              </button>
+            ) : null}
           </div>
           <textarea
             className="input min-h-[160px] font-mono text-[14px]"

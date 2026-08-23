@@ -125,8 +125,11 @@ describe('priceExport', () => {
     })
     const csv = exportPriceCsv(payload)
     const lines = csv.split('\n')
-    expect(lines[0]).toContain('date,name,category,price,currency')
+    expect(lines[0]).toContain('key,id,date,name,category,price,currency')
     expect(lines[1]).toContain('EUR')
+    expect(payload.purchases[0]?.key).toContain('|')
+    expect(payload.country).toBe('DE')
+    expect(payload.trips.length).toBe(2)
     expect(lines).toHaveLength(4)
   })
 

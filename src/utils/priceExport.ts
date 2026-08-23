@@ -1,8 +1,9 @@
 import { brandNameById } from '@/utils/brands'
 import { findPriceProfile, findVariant } from '@/utils/priceProfiles'
 import { productPriceHistory } from '@/utils/priceHistory'
-import { categorySpendBreakdown } from '@/utils/stats'
+import { categorySpendBreakdown, tripTotalSpent } from '@/utils/stats'
 import { avgBasketByStore } from '@/utils/storeStats'
+import { storeCountryFromCurrency } from '@/constants/stores'
 import { normalize } from '@/utils/text'
 import type {
   CompletedTrip,
@@ -13,21 +14,45 @@ import type {
 } from '@/types'
 
 export interface PriceExportPurchaseRow {
+  /** Stabiler Schlüssel zum Diffen / Nachverfolgen von Änderungen. */
+  key: string
+  id?: string
   date: string
   name: string
   category: string
   price: number
+  currency: Currency
   variant?: string
   brand?: string
   wasSale: boolean
   store?: string
 }
 
+export interface PriceExportTripRow {
+  key: string
+  id: string
+  date: string
+  store?: string
+  listName: string
+  itemCount: number
+  totalSpent: number
+  items: Array<{
+    key: string
+    id: string
+    name: string
+    amount: string
+    price?: number
+  }>
+}
+
 export interface PriceExportPayload {
   exportedAt: string
   currency: Currency
+  country: 'CH' | 'DE'
   purchases: PriceExportPurchaseRow[]
+  trips: PriceExportTripRow[]
   productAverages: Array<{
+    key: string
     name: string
     category: string
     count: number
@@ -50,6 +75,16 @@ export interface PriceExportPayload {
     totalSpent: number
     percentAboveCheapest: number
   }>
+}
+
+/** Stabiler KEY für eine Kaufzeile (Datum|Produkt|Filiale|Währung). */
+export function purchaseChangeKey(parts: {
+  date: string
+  name: string
+  store?: string
+  currency: Currency
+}): string {
+  return [parts.date, normalize(parts.name), normalize(parts.store || ''), parts.currency].join('|')
 }
 
 function tripDateKey(completedAt: number): string {
@@ -98,11 +133,15 @@ export function buildPriceExport(input: {
     if (!entry.price || entry.price <= 0) continue
     const store = stores.get(`${entry.date}|${normalize(entry.name)}`)
     const brand = resolveBrand(entry, input.priceProfiles, input.brands)
+    const currency = (entry.currency ?? input.currency) as Currency
     purchases.push({
+      key: purchaseChangeKey({ date: entry.date, name: entry.name, store, currency }),
+      ...(entry.id ? { id: entry.id } : {}),
       date: entry.date,
       name: entry.name,
       category: entry.category,
       price: entry.price,
+      currency,
       ...(entry.variantName ? { variant: entry.variantName } : {}),
       ...(brand ? { brand } : {}),
       wasSale: Boolean(entry.wasSale),
@@ -112,7 +151,35 @@ export function buildPriceExport(input: {
 
   purchases.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'de'))
 
+  const trips: PriceExportTripRow[] = [...input.completedTrips]
+    .sort((a, b) => a.completedAt - b.completedAt)
+    .map((trip) => {
+      const date = tripDateKey(trip.completedAt)
+      return {
+        key: `trip|${trip.id}`,
+        id: trip.id,
+        date,
+        ...(trip.store ? { store: trip.store } : {}),
+        listName: trip.listName,
+        itemCount: trip.items.length,
+        totalSpent: tripTotalSpent(trip),
+        items: trip.items.map((item) => ({
+          key: purchaseChangeKey({
+            date,
+            name: item.name,
+            store: trip.store,
+            currency: input.currency,
+          }),
+          id: item.id,
+          name: item.name,
+          amount: item.amount,
+          ...(item.price !== undefined ? { price: item.price } : {}),
+        })),
+      }
+    })
+
   const productAverages = productPriceHistory(input.purchaseLog, input.currency).map((p) => ({
+    key: `avg|${normalize(p.name)}|${normalize(p.category)}|${input.currency}`,
     name: p.name,
     category: p.category,
     count: p.count,
@@ -130,7 +197,7 @@ export function buildPriceExport(input: {
     count: c.count,
   }))
 
-  const storeBaskets = avgBasketByStore(input.completedTrips).map((s) => ({
+  const storeBaskets = avgBasketByStore(input.completedTrips, input.currency).map((s) => ({
     store: s.store,
     tripCount: s.tripCount,
     avgSpent: s.avgSpent,
@@ -141,7 +208,9 @@ export function buildPriceExport(input: {
   return {
     exportedAt: (input.now ?? new Date()).toISOString(),
     currency: input.currency,
+    country: storeCountryFromCurrency(input.currency),
     purchases,
+    trips,
     productAverages,
     categorySpend,
     storeBaskets,
@@ -160,16 +229,18 @@ function csvEscape(value: string | number | boolean): string {
 
 /** Flache Kaufzeilen als CSV – ideal für Tabellen und KI-Diagramme. */
 export function exportPriceCsv(payload: PriceExportPayload): string {
-  const header = ['date', 'name', 'category', 'price', 'currency', 'variant', 'brand', 'wasSale', 'store']
+  const header = ['key', 'id', 'date', 'name', 'category', 'price', 'currency', 'variant', 'brand', 'wasSale', 'store']
   const lines = [header.join(',')]
   for (const row of payload.purchases) {
     lines.push(
       [
+        csvEscape(row.key),
+        csvEscape(row.id ?? ''),
         csvEscape(row.date),
         csvEscape(row.name),
         csvEscape(row.category),
         csvEscape(row.price),
-        csvEscape(payload.currency),
+        csvEscape(row.currency),
         csvEscape(row.variant ?? ''),
         csvEscape(row.brand ?? ''),
         csvEscape(row.wasSale),
@@ -187,7 +258,7 @@ export function priceExportFilename(ext: 'json' | 'csv', now = new Date()): stri
 
 /** Prompt zum Einfügen in ChatGPT/Claude für Legende/Diagramme. */
 export function buildPriceAnalysisPrompt(payload: PriceExportPayload): string {
-  return `Du analysierst meine Einkaufspreise aus der App AlexShop (Währung: ${payload.currency}).
+  return `Du analysierst meine Einkaufspreise aus der App AlexShop (Währung: ${payload.currency}, Land: ${payload.country}).
 
 AUFGABE
 Erstelle eine klare Auswertung mit:
@@ -195,6 +266,7 @@ Erstelle eine klare Auswertung mit:
 2. Durchschnittspreise der wichtigsten Produkte (Ø, Min, Max, Trend über Datum)
 3. Filial-Vergleich: wo der Ø-Warenkorb günstiger ist (inkl. Prozentaufschlag zur günstigsten Filiale)
 4. Kurze Empfehlung: welche Kategorien / Filialen relativ teuer sind
+5. Bei Bedarf Änderungen anhand der stabilen "key"-Felder markieren (was teurer/günstiger wurde)
 
 REGELN
 - Antworte auf Deutsch

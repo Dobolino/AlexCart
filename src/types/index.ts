@@ -202,6 +202,8 @@ export interface CompletedTrip {
   items: CompletedTripItem[]
   /** Einkaufszentrum/Filiale – optional, nachträglich in der Quittung editierbar. */
   store?: string
+  /** Währung zum Zeitpunkt des Einkaufs – für Filial-Vergleich und Export. */
+  currency?: Currency
   /** Aktive Einkaufszeit in ms (ohne Pausen). */
   durationMs?: number
 }

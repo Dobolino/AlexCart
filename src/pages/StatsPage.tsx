@@ -82,7 +82,7 @@ export function StatsPage() {
     : completedTrips
   const filteredTripMonths = tripsByMonth(filteredTrips)
   const selectedTrip = completedTrips.find((t) => t.id === selectedTripId) ?? null
-  const storeStats = avgBasketByStore(completedTrips)
+  const storeStats = avgBasketByStore(completedTrips, currency)
   const promoSavings = promoSavingsInYear(purchaseLog, priceProfiles)
 
   return (
