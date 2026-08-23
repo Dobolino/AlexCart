@@ -116,7 +116,7 @@ export function PriceExportSection({
       <div className="card-surface flex flex-col">
         {!compact && (
           <p className="border-b px-3.5 py-3 text-[12px] leading-snug" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-            {pricedCount} Preise mit Datum, Kategorie, Ø und Filiale (wenn gesetzt).
+            {pricedCount} Preise · vollständiger Export mit stabilem KEY (Datum|Produkt|Filiale|Währung) zum Nachverfolgen von Änderungen. Enthält auch Quittungen.
           </p>
         )}
         <button

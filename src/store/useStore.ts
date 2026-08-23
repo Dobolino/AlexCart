@@ -531,6 +531,7 @@ export const useStore = create<AppState>()(
             items: nextItems,
             completedAt: dateKeyToTimestamp(purchaseDay),
             store: store.trim() || trip.store,
+            currency,
           }
           trips[tripIndex] = updatedTrip
 
@@ -697,6 +698,7 @@ export const useStore = create<AppState>()(
           listName: finalList.name,
           completedAt: dateKeyToTimestamp(purchaseDay),
           store: store.trim() || undefined,
+          currency,
           items: tripItems,
         }
 
@@ -1296,6 +1298,7 @@ export const useStore = create<AppState>()(
               listId: entry.listId,
               listName: entry.listName,
               completedAt: Date.now(),
+              currency: state.settings.currency,
               items: entry.items,
               ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
             },

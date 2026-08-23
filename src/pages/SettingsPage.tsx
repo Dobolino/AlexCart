@@ -187,7 +187,7 @@ export function SettingsPage() {
         <div className="card-surface mb-4.5 px-3.5 py-3.5">
           <span className="block text-[15px] font-semibold">Währung</span>
           <span className="mb-3 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            Für Preise, Budget und Rechner – z. B. CHF in der Schweiz, EUR in Deutschland
+            Für Preise, Budget, Rechner und Filial-Vorschläge – CHF = Schweiz (Migros, Coop…), EUR = Deutschland (Marktkauf, Edeka…)
           </span>
           <div className="flex gap-2">
             {CURRENCY_OPTIONS.map((opt) => (

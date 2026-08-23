@@ -2,11 +2,16 @@ import { CATEGORIES } from '@/data/products'
 import { mergeStoreOptions } from '@/constants/stores'
 
 /** Prompt für Claude: Bon-Foto/PDF → JSON für AlexShop. */
-export function buildClaudeReceiptPrompt(store: string, customStores: string[] = []): string {
+export function buildClaudeReceiptPrompt(
+  store: string,
+  customStores: string[] = [],
+  currency: 'CHF' | 'EUR' = 'CHF'
+): string {
   const categories = CATEGORIES.join(', ')
-  const stores = mergeStoreOptions(customStores).join(', ')
+  const stores = mergeStoreOptions(customStores, currency).join(', ')
+  const region = currency === 'EUR' ? 'Deutschland/EU' : 'Schweiz'
 
-  return `Du liest einen Schweizer/EU-Kassenbon (Foto oder PDF-Text) für die App AlexShop.
+  return `Du liest einen Kassenbon (${region}, ${currency}) für die App AlexShop.
 
 FILIALE (Kontext): ${store || 'unbekannt'}
 Bekannte Filialen/Ketten: ${stores}
@@ -16,7 +21,7 @@ Erkenne alle gekauften Artikel mit Preis. Antworte NUR mit gültigem JSON – ke
 
 Schema:
 {
-  "store": "${store || 'Migros'}",
+  "store": "${store || (currency === 'EUR' ? 'Marktkauf' : 'Migros')}",
   "total": 34.65,
   "items": [
     {
@@ -32,7 +37,7 @@ Schema:
 }
 
 Regeln:
-- "price" = bezahlter Zeilenpreis (Gesamt für diese Position).
+- "price" = bezahlter Zeilenpreis (Gesamt für diese Position) in ${currency}.
 - Bei "2 x 1.80" → quantity 2, unitPrice 1.80, price 3.60, amount "2 Stück" oder passende Einheit.
 - Packungsgrösse getrennt halten: "4× Cottage Cheese 200g" → amount "4 × 200 g", price = Zeilenpreis.
 - Kategorie EXAKT eine von: ${categories}

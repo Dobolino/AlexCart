@@ -1,7 +1,7 @@
 import { findPriceProfile, findVariant, pricesForCurrency } from '@/utils/priceProfiles'
 import { tripTotalSpent } from '@/utils/stats'
 import { normalize } from '@/utils/text'
-import type { CompletedTrip, ProductPriceProfile, PurchaseLogEntry } from '@/types'
+import type { CompletedTrip, Currency, ProductPriceProfile, PurchaseLogEntry } from '@/types'
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
@@ -16,11 +16,13 @@ export interface StoreBasketStat {
   percentAboveCheapest: number
 }
 
-/** Ø Warenkorb pro Filiale aus abgeschlossenen Einkäufen mit gesetzter `store`. */
-export function avgBasketByStore(trips: CompletedTrip[]): StoreBasketStat[] {
+/** Ø Warenkorb pro Filiale aus abgeschlossenen Einkäufen mit gesetzter `store`.
+ *  Optional nur Trips der aktiven Währung (ältere ohne currency zählen als CHF). */
+export function avgBasketByStore(trips: CompletedTrip[], currency?: Currency): StoreBasketStat[] {
   const byKey = new Map<string, { label: string; total: number; count: number }>()
 
   for (const trip of trips) {
+    if (currency && (trip.currency ?? 'CHF') !== currency) continue
     const store = trip.store?.trim()
     if (!store) continue
     const key = normalize(store)
