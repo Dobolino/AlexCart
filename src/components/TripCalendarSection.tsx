@@ -16,11 +16,11 @@ export function TripCalendarSection({
   onSelectDate,
   selectedDateKey,
 }: TripCalendarSectionProps) {
-  if (!trips.length) return null
-
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
+
+  if (!trips.length) return null
 
   const byDay = tripsByDateKey(trips)
   const grid = buildMonthGrid(year, month)

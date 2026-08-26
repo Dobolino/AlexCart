@@ -493,7 +493,7 @@ export const useStore = create<AppState>()(
           }
 
           let priceProfiles = get().priceProfiles
-          let purchaseLog = [...get().purchaseLog]
+          const purchaseLog = [...get().purchaseLog]
           for (const line of items) {
             const data: CheckoffPriceData = {
               price: line.price,

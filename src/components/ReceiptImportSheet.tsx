@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Sheet } from './Sheet'
 import { Icon } from './Icon'
 import { OptionCard } from './OptionCard'
@@ -70,32 +70,37 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     [items]
   )
 
-  useEffect(() => {
-    if (!lists.length) return
-    if (!listId || !lists.some((l) => l.id === listId)) {
+  // Ausgewählte Liste/Kassenbon/Filiale an geänderte Optionen anpassen - während des Renderns
+  // statt in einem Effect (React-Muster "Zustand beim Ändern eines Werts anpassen").
+  const [syncedLists, setSyncedLists] = useState(lists)
+  if (lists !== syncedLists) {
+    setSyncedLists(lists)
+    if (lists.length && (!listId || !lists.some((l) => l.id === listId))) {
       setListId(activeListId || lists[0]!.id)
     }
-  }, [lists, listId, activeListId])
+  }
 
-  useEffect(() => {
+  const [syncedTrips, setSyncedTrips] = useState(completedTrips)
+  if (completedTrips !== syncedTrips) {
+    setSyncedTrips(completedTrips)
     if (!completedTrips.length) {
       if (tripId) setTripId('')
-      return
-    }
-    if (!tripId || !completedTrips.some((t) => t.id === tripId)) {
+    } else if (!tripId || !completedTrips.some((t) => t.id === tripId)) {
       setTripId(completedTrips[0]!.id)
     }
-  }, [completedTrips, tripId])
+  }
 
-  useEffect(() => {
-    const presets = storePresetsForCurrency(currency)
+  const [syncedStoreOptions, setSyncedStoreOptions] = useState(storeOptions)
+  if (storeOptions !== syncedStoreOptions) {
+    setSyncedStoreOptions(storeOptions)
     const stillValid = storeOptions.some((s) => s === store)
     if (!stillValid) {
+      const presets = storePresetsForCurrency(currency)
       const next = presets[0] ?? storeOptions[0] ?? 'Migros'
       setStore(next)
       if (target === 'new') setNewListName(defaultNewListName(next))
     }
-  }, [currency, storeOptions, store, target])
+  }
 
   function selectStore(name: string) {
     setStore(name)
