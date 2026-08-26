@@ -201,30 +201,29 @@ export function ItemRow({
             </div>
           </div>
 
-          {(display.detailLine || hasPrice || item.note) && (
-            <div
-              className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[13px] tabular-nums"
-              style={{ color: 'var(--text-muted)' }}
+          <div
+            className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[13px] tabular-nums"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {showStepper || showProduceWeight ? (
+              <ItemAmountColumn
+                item={item}
+                showStepper={!!showStepper}
+                onAdjustAmount={onAdjustAmount}
+                onProduceWeightChange={onProduceWeightChange}
+                variant="row"
+              />
+            ) : display.detailLine ? (
+              <span className="font-medium">{display.detailLine}</span>
+            ) : null}
+            <span
+              className="font-bold"
+              style={{ color: hasPrice && !item.done ? 'var(--text)' : 'var(--text-muted)' }}
             >
-              {showStepper || showProduceWeight ? (
-                <ItemAmountColumn
-                  item={item}
-                  showStepper={!!showStepper}
-                  onAdjustAmount={onAdjustAmount}
-                  onProduceWeightChange={onProduceWeightChange}
-                  variant="row"
-                />
-              ) : display.detailLine ? (
-                <span className="font-medium">{display.detailLine}</span>
-              ) : null}
-              {hasPrice ? (
-                <span className="font-bold" style={{ color: item.done ? 'var(--text-muted)' : 'var(--text)' }}>
-                  {formatMoney(estimatedPrice!, currency)}
-                </span>
-              ) : null}
-              {item.note ? <span className="truncate font-medium">{item.note}</span> : null}
-            </div>
-          )}
+              {hasPrice ? formatMoney(estimatedPrice!, currency) : '–'}
+            </span>
+            {item.note ? <span className="truncate font-medium">{item.note}</span> : null}
+          </div>
         </div>
 
         <button
