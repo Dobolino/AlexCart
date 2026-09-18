@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
+import { BACKUP_VERSION } from '@/utils/backup'
 import { importFromJSON } from '@/utils/import'
 import { applyImportMode } from '@/utils/mergeList'
 import { buildRepeatCandidates, candidatesToItems } from '@/utils/repeatWeek'
@@ -15,6 +16,7 @@ import {
   ensureBrandVariant,
   pricesForCurrency,
   recordVariantPurchase,
+  repriceRecordedPurchase,
   setPricesForCurrency,
   upsertPriceProfile,
 } from '@/utils/priceProfiles'
@@ -45,7 +47,7 @@ import type {
   ImportMode,
 } from '@/types'
 
-const STORE_VERSION = 19
+const STORE_VERSION = BACKUP_VERSION
 const STORE_NAME = 'alexshop-store'
 
 /** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
@@ -453,6 +455,11 @@ export const useStore = create<AppState>()(
           let matched = 0
           let added = 0
           let nextItems = [...trip.items]
+          let priceProfiles = get().priceProfiles
+          const purchaseLog = [...get().purchaseLog]
+          const otherTripLogIds = new Set(
+            trips.filter((t) => t.id !== trip.id).flatMap((t) => t.items.map((i) => i.purchaseLogId).filter((id): id is string => !!id))
+          )
 
           const findTripMatch = (name: string) => {
             const key = normalize(name)
@@ -470,19 +477,68 @@ export const useStore = create<AppState>()(
             const match = findTripMatch(line.name)
             if (match) {
               matchedIds.add(match.id)
+              const oldDate = timestampToDateKey(trip.completedAt)
+              const candidates = purchaseLog.filter((entry) =>
+                entry.date === oldDate && entry.name === match.name && entry.price === match.price &&
+                !!entry.id && !otherTripLogIds.has(entry.id)
+              )
+              const logId = match.purchaseLogId ?? (candidates.length === 1 ? candidates[0]?.id : undefined)
+              const logIndex = logId ? purchaseLog.findIndex((entry) => entry.id === logId) : -1
+              if (logIndex >= 0) {
+                const oldEntry = purchaseLog[logIndex]!
+                const nextProfilePrice = line.unitPrice ?? line.price
+                if (oldEntry.profilePrice !== nextProfilePrice || oldEntry.price !== line.price) {
+                  priceProfiles = repriceRecordedPurchase(priceProfiles, oldEntry, nextProfilePrice)
+                }
+                purchaseLog[logIndex] = {
+                  ...oldEntry,
+                  date: purchaseDay,
+                  price: line.price,
+                  profilePrice: nextProfilePrice,
+                }
+              }
               nextItems = nextItems.map((i) =>
                 i.id !== match.id
                   ? i
                   : {
                       ...i,
                       price: line.price,
+                      ...(logId ? { purchaseLogId: logId } : {}),
                       ...(line.amount ? { amount: line.amount } : {}),
                     }
               )
               matched += 1
             } else if (addMissingTripItems) {
+              const data: CheckoffPriceData = {
+                price: line.price,
+                unitPrice: line.unitPrice,
+                wasSale: !!line.wasSale,
+                variantName: store.trim() || trip.store || 'Standard',
+              }
+              const purchase = recordVariantPurchase(
+                priceProfiles, line.name, normalizeCategory(line.category), data, purchaseDay, uid, currency
+              )
+              priceProfiles = purchase.createdNewProfile
+                ? [...priceProfiles, purchase.profile]
+                : upsertPriceProfile(priceProfiles, purchase.profile)
+              const logId = uid()
+              purchaseLog.push({
+                id: logId,
+                name: line.name,
+                category: normalizeCategory(line.category),
+                date: purchaseDay,
+                price: line.price,
+                profilePrice: line.unitPrice ?? line.price,
+                currency,
+                variantId: purchase.variantId,
+                variantName: purchase.variantName,
+                wasSale: !!line.wasSale,
+              })
+              const newTripItemId = uid()
+              matchedIds.add(newTripItemId)
               nextItems.push({
-                id: uid(),
+                id: newTripItemId,
+                purchaseLogId: logId,
                 name: line.name,
                 amount: line.amount,
                 price: line.price,
@@ -490,40 +546,6 @@ export const useStore = create<AppState>()(
               added += 1
               matched += 1
             }
-          }
-
-          let priceProfiles = get().priceProfiles
-          const purchaseLog = [...get().purchaseLog]
-          for (const line of items) {
-            const data: CheckoffPriceData = {
-              price: line.price,
-              unitPrice: line.unitPrice,
-              wasSale: !!line.wasSale,
-              variantName: store.trim() || trip.store || 'Standard',
-            }
-            const purchase = recordVariantPurchase(
-              priceProfiles,
-              line.name,
-              normalizeCategory(line.category),
-              data,
-              purchaseDay,
-              uid,
-              currency
-            )
-            priceProfiles = purchase.createdNewProfile
-              ? [...priceProfiles, purchase.profile]
-              : upsertPriceProfile(priceProfiles, purchase.profile)
-            purchaseLog.push({
-              id: uid(),
-              name: line.name,
-              category: normalizeCategory(line.category),
-              date: purchaseDay,
-              price: line.price,
-              currency,
-              variantId: purchase.variantId,
-              variantName: purchase.variantName,
-              wasSale: !!line.wasSale,
-            })
           }
 
           const updatedTrip: CompletedTrip = {
@@ -629,6 +651,7 @@ export const useStore = create<AppState>()(
           }
         }
 
+        const receiptLogIds: Array<string | undefined> = []
         for (const line of items) {
           const data: CheckoffPriceData = {
             price: line.price,
@@ -656,6 +679,7 @@ export const useStore = create<AppState>()(
             priceProfiles = result.priceProfiles
             lists = result.lists
             pantry = result.pantry
+            receiptLogIds.push([...purchaseLog].reverse().find((e) => e.itemId === match.id && e.date === purchaseDay)?.id)
             matched += 1
           } else {
             const purchase = recordVariantPurchase(
@@ -670,24 +694,28 @@ export const useStore = create<AppState>()(
             priceProfiles = purchase.createdNewProfile
               ? [...priceProfiles, purchase.profile]
               : upsertPriceProfile(priceProfiles, purchase.profile)
+            const logId = uid()
             purchaseLog.push({
-              id: uid(),
+              id: logId,
               name: line.name,
               category: normalizeCategory(line.category),
               date: purchaseDay,
               price: line.price,
+              profilePrice: line.unitPrice ?? line.price,
               currency,
               variantId: purchase.variantId,
               variantName: purchase.variantName,
               wasSale: !!line.wasSale,
             })
+            receiptLogIds.push(logId)
             matched += 1
           }
         }
 
         const finalList = lists.find((l) => l.id === targetListId) ?? list
-        const tripItems: CompletedTripItem[] = items.map((i) => ({
+        const tripItems: CompletedTripItem[] = items.map((i, index) => ({
           id: uid(),
+          purchaseLogId: receiptLogIds[index],
           name: i.name,
           amount: i.amount,
           price: i.price,
@@ -1373,11 +1401,10 @@ export const useStore = create<AppState>()(
         set((state) => {
           const trip = state.completedTrips.find((t) => t.id === tripId)
           if (!trip) return state
-          const oldDate = timestampToDateKey(trip.completedAt)
           const newTs = dateKeyToTimestamp(dateKey)
-          const itemNames = new Set(trip.items.map((i) => i.name))
+          const logIds = new Set(trip.items.map((i) => i.purchaseLogId).filter((id): id is string => !!id))
           const purchaseLog = state.purchaseLog.map((entry) => {
-            if (entry.date !== oldDate || !itemNames.has(entry.name)) return entry
+            if (!entry.id || !logIds.has(entry.id)) return entry
             return { ...entry, date: dateKey }
           })
           return {

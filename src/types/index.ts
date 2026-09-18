@@ -59,6 +59,8 @@ export interface PurchaseLogEntry {
   date: string
   /** Optionaler Preis in der gewählten Währung beim Abhaken. */
   price?: number
+  /** Preiswert, der in das Variantenprofil eingeflossen ist (z. B. Stückpreis). */
+  profilePrice?: number
   /** Währung des erfassten Preises – Schätzung nutzt nur die aktive Währung. */
   currency?: Currency
   variantId?: string
@@ -185,6 +187,8 @@ export interface AppStats {
 /** Einzelposten auf der Quittung eines abgeschlossenen Einkaufs. */
 export interface CompletedTripItem {
   id: string
+  /** Kaufprotokoll-Eintrag zu dieser Quittungszeile, falls bekannt. */
+  purchaseLogId?: string
   name: string
   amount: string
   /** Fehlt, wenn beim Abhaken kein Preis erfasst wurde. */

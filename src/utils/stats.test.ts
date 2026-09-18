@@ -25,6 +25,20 @@ const log = [
   { name: 'Milch', category: 'Milch & Käse', date: '2026-07-02' },
 ]
 
+describe('Ausgaben nach Währung', () => {
+  it('mischt CHF und EUR in den angezeigten Summen nicht', () => {
+    const purchases = [
+      { name: 'Milch', category: 'Milch', date: '2026-07-01', price: 10, currency: 'CHF' as const },
+      { name: 'Brot', category: 'Brot', date: '2026-07-01', price: 20, currency: 'EUR' as const },
+      { name: 'Käse', category: 'Milch', date: '2026-07-02', price: 6, currency: 'CHF' as const },
+    ]
+    expect(totalSpent(purchases, 'CHF')).toBe(16)
+    expect(maxTripSpend(purchases, 'CHF')).toBe(10)
+    expect(avgSpendPerTrip(purchases, 'CHF')).toBe(8)
+    expect(pricedPurchaseCount(purchases, 'CHF')).toBe(2)
+  })
+})
+
 describe('topItems', () => {
   it('counts case-insensitively and sorts descending', () => {
     const result = topItems(log)

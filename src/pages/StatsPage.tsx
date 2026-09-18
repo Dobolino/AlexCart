@@ -70,7 +70,7 @@ export function StatsPage() {
   const maxTopCount = top[0]?.count ?? 1
   const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
   const completionRate = stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
-  const hasPriceData = pricedPurchaseCount(purchaseLog) > 0
+  const hasPriceData = pricedPurchaseCount(purchaseLog, currency) > 0
   const priceHistory = productPriceHistory(purchaseLog, currency)
   const spendWeeks = spendPerWeek(purchaseLog, 8, currency)
   const maxSpendWeek = Math.max(0.01, ...spendWeeks.map((w) => w.amount))
@@ -205,9 +205,9 @@ export function StatsPage() {
 
         {hasPriceData && (
           <div className="mb-4.5 grid grid-cols-3 gap-2.5">
-            <StatTile value={formatMoney(avgSpendPerTrip(purchaseLog), currency)} label="Ø Ausgaben" />
-            <StatTile value={formatMoney(maxTripSpend(purchaseLog), currency)} label="Teuerster Tag" />
-            <StatTile value={formatMoney(totalSpent(purchaseLog), currency)} label="Gesamt erfasst" />
+            <StatTile value={formatMoney(avgSpendPerTrip(purchaseLog, currency), currency)} label="Ø Ausgaben" />
+            <StatTile value={formatMoney(maxTripSpend(purchaseLog, currency), currency)} label="Teuerster Tag" />
+            <StatTile value={formatMoney(totalSpent(purchaseLog, currency), currency)} label="Gesamt erfasst" />
           </div>
         )}
 

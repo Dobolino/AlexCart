@@ -296,6 +296,36 @@ export function upsertPriceProfile(profiles: ProductPriceProfile[], updated: Pro
   return next
 }
 
+/** Korrigiert einen bereits gezählten Kauf, ohne die Kaufanzahl erneut zu erhöhen. */
+export function repriceRecordedPurchase(
+  profiles: ProductPriceProfile[],
+  entry: PurchaseLogEntry,
+  newPrice: number
+): ProductPriceProfile[] {
+  if (!entry.variantId || !entry.price || entry.price <= 0) return profiles
+  const profile = findPriceProfile(profiles, entry.name, entry.category)
+  if (!profile) return profiles
+  const variant = findVariant(profile, entry.variantId)
+  if (!variant) return profiles
+  const currency = entry.currency ?? 'CHF'
+  const prices = pricesForCurrency(variant, currency)
+  const isSale = !!entry.wasSale
+  const count = isSale ? prices.salePurchaseCount : prices.purchaseCount - prices.salePurchaseCount
+  if (count <= 0) return profiles
+  const oldAverage = isSale ? prices.avgSalePrice : prices.avgPrice
+  const oldProfilePrice = entry.profilePrice ?? entry.price
+  const average = oldAverage === undefined ? newPrice : roundMoney((oldAverage * count - oldProfilePrice + newPrice) / count)
+  const nextPrices = isSale
+    ? { ...prices, avgSalePrice: average, lastSalePrice: prices.lastSalePrice === oldProfilePrice ? newPrice : prices.lastSalePrice }
+    : { ...prices, avgPrice: average, lastPrice: prices.lastPrice === oldProfilePrice ? newPrice : prices.lastPrice }
+  const updatedVariant = setPricesForCurrency(variant, currency, nextPrices)
+  return upsertPriceProfile(profiles, {
+    ...profile,
+    variants: profile.variants.map((v) => v.id === variant.id ? updatedVariant : v),
+    updatedAt: Date.now(),
+  })
+}
+
 export interface EnsuredBrandVariant {
   profiles: ProductPriceProfile[]
   variantId: string

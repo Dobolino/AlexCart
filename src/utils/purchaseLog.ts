@@ -99,10 +99,10 @@ export function receiptItemsForSession(
   listItems: ShoppingItem[],
   checkedItemIds: string[],
   today: string = todayKey()
-): { id: string; name: string; amount: string; price?: number }[] {
+): { id: string; purchaseLogId?: string; name: string; amount: string; price?: number }[] {
   const byId = new Map(listItems.map((i) => [i.id, i]))
   const seen = new Set<string>()
-  const out: { id: string; name: string; amount: string; price?: number }[] = []
+  const out: { id: string; purchaseLogId?: string; name: string; amount: string; price?: number }[] = []
   for (const id of checkedItemIds) {
     if (seen.has(id)) continue
     seen.add(id)
@@ -110,7 +110,7 @@ export function receiptItemsForSession(
     if (!item) continue
     const entry = purchaseLog.find((e) => e.date === today && matchesListItem(e, item))
     const price = entry?.price && entry.price > 0 ? entry.price : undefined
-    out.push({ id: item.id, name: item.name, amount: item.amount, price })
+    out.push({ id: item.id, purchaseLogId: entry?.id, name: item.name, amount: item.amount, price })
   }
   return out
 }

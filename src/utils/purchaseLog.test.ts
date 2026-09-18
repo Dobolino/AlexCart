@@ -109,8 +109,8 @@ describe('purchaseLog', () => {
     // Session hat item-1 und item-2 abgehakt (item-2 doppelt in der Liste → nur einmal)
     const receipt = receiptItemsForSession(log, listItems, ['item-1', 'item-2', 'item-2', 'ghost'], today)
     expect(receipt).toEqual([
-      { id: 'item-1', name: 'Milch', amount: '1 l', price: 2.5 },
-      { id: 'item-2', name: 'Brot', amount: '1 Stk', price: undefined },
+      { id: 'item-1', purchaseLogId: 'x', name: 'Milch', amount: '1 l', price: 2.5 },
+      { id: 'item-2', purchaseLogId: 'y', name: 'Brot', amount: '1 Stk', price: undefined },
     ])
   })
 })

@@ -129,4 +129,43 @@ describe('applyReceiptImport', () => {
     expect(trip.items.find((i) => i.name === 'Käse')?.price).toBe(4.2)
     expect(new Date(trip.completedAt).toLocaleDateString('sv-SE')).toBe('2026-08-21')
   })
+
+  it('updates a reimported receipt without counting its purchase twice', () => {
+    const receipt = {
+      store: 'Migros',
+      purchaseDate: '2026-08-20',
+      items: [{ name: 'Milch', amount: '1 l', category: 'Milch & Käse', price: 1.5 }],
+    }
+    useStore.getState().applyReceiptImport({ ...receipt, target: 'new' })
+    const tripId = useStore.getState().completedTrips[0]!.id
+    useStore.getState().applyReceiptImport({
+      ...receipt,
+      target: 'trip',
+      tripId,
+      items: [{ ...receipt.items[0]!, price: 2.5 }],
+    })
+    const state = useStore.getState()
+    expect(state.purchaseLog).toHaveLength(1)
+    expect(state.purchaseLog[0]?.price).toBe(2.5)
+    expect(state.priceProfiles[0]?.variants[0]?.purchaseCount).toBe(1)
+    expect(state.priceProfiles[0]?.variants[0]?.avgPrice).toBe(2.5)
+  })
+
+  it('changes only linked purchases when a receipt date changes', () => {
+    const input = {
+      store: 'Migros',
+      target: 'new' as const,
+      purchaseDate: '2026-08-20',
+      items: [{ name: 'Milch', amount: '1 l', category: 'Milch & Käse', price: 1.5 }],
+    }
+    useStore.getState().applyReceiptImport(input)
+    useStore.getState().applyReceiptImport(input)
+    const state = useStore.getState()
+    const tripId = state.completedTrips[0]!.id
+    const changedLogId = state.completedTrips[0]!.items[0]!.purchaseLogId
+    useStore.getState().updateCompletedTripDate(tripId, '2026-08-21')
+    const log = useStore.getState().purchaseLog
+    expect(log.find((entry) => entry.id === changedLogId)?.date).toBe('2026-08-21')
+    expect(log.find((entry) => entry.id !== changedLogId)?.date).toBe('2026-08-20')
+  })
 })

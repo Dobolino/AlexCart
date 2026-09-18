@@ -14,6 +14,7 @@ import {
   findPriceProfile,
   findVariant,
   recordVariantPurchase,
+  repriceRecordedPurchase,
   revertLastPurchaseOnVariant,
   upsertPriceProfile,
 } from '@/utils/priceProfiles'
@@ -68,22 +69,34 @@ export function commitItemPurchase(
 ): PurchaseState {
   const today = opts.purchaseDate ?? todayKey()
   const currency = opts.currency ?? 'CHF'
-  const purchase = recordVariantPurchase(
-    state.priceProfiles,
-    item.name,
-    item.category,
-    data,
-    today,
-    uid,
-    currency
-  )
-  let priceProfiles = state.priceProfiles
-  priceProfiles = purchase.createdNewProfile
-    ? [...priceProfiles, purchase.profile]
-    : upsertPriceProfile(priceProfiles, purchase.profile)
-
   const purchaseLog = [...state.purchaseLog]
   const logIdx = findTodayLogIndex(purchaseLog, item, today)
+  const previous = logIdx >= 0 ? purchaseLog[logIdx] : undefined
+  const sameVariant = previous?.variantId &&
+    previous.name === item.name && previous.category === item.category &&
+    (previous.currency ?? 'CHF') === currency &&
+    (!data.variantId || data.variantId === previous.variantId) &&
+    (!data.variantName || data.variantName === previous.variantName) &&
+    !!data.wasSale === !!previous.wasSale &&
+    !!findPriceProfile(state.priceProfiles, previous.name, previous.category)?.variants.some((v) => v.id === previous.variantId)
+  let priceProfiles = state.priceProfiles
+  let variantId: string
+  let variantName: string
+  if (previous && sameVariant) {
+    priceProfiles = repriceRecordedPurchase(priceProfiles, previous, data.pricePerKg ?? data.unitPrice ?? data.price)
+    variantId = previous.variantId!
+    variantName = previous.variantName ?? data.variantName ?? item.name
+  } else {
+    if (previous) priceProfiles = revertProfilesForLogEntry(priceProfiles, previous)
+    const purchase = recordVariantPurchase(
+      priceProfiles, item.name, item.category, data, today, uid, currency
+    )
+    priceProfiles = purchase.createdNewProfile
+      ? [...priceProfiles, purchase.profile]
+      : upsertPriceProfile(priceProfiles, purchase.profile)
+    variantId = purchase.variantId
+    variantName = purchase.variantName
+  }
   const entry: PurchaseLogEntry = {
     id: logIdx >= 0 ? purchaseLog[logIdx]!.id || uid() : uid(),
     itemId: opts.itemId,
@@ -91,9 +104,10 @@ export function commitItemPurchase(
     category: item.category,
     date: today,
     price: data.price,
+    profilePrice: data.pricePerKg ?? data.unitPrice ?? data.price,
     currency,
-    variantId: purchase.variantId,
-    variantName: purchase.variantName,
+    variantId,
+    variantName,
     wasSale: !!data.wasSale,
   }
   if (logIdx >= 0) purchaseLog[logIdx] = entry
@@ -105,7 +119,7 @@ export function commitItemPurchase(
       : {
           ...l,
           items: l.items.map((i) =>
-            i.id === opts.itemId ? { ...i, done: opts.markDone, variantId: purchase.variantId } : i
+            i.id === opts.itemId ? { ...i, done: opts.markDone, variantId } : i
           ),
         }
   )

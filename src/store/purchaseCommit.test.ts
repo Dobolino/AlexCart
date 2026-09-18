@@ -59,6 +59,17 @@ describe('purchaseCommit', () => {
     expect(next.lists[0]?.items[0]?.done).toBe(true)
   })
 
+  it('zählt eine Preiskorrektur nicht als zweiten Kauf', () => {
+    const item = makeItem()
+    const options = { listId: 'list-1', itemId: 'item-1', markDone: true, wasDone: false }
+    const first = commitItemPurchase(baseState(item), item, { price: 2.5, variantName: 'Migros' }, options)
+    const corrected = commitItemPurchase(first, item, { price: 3, variantName: 'Migros' }, { ...options, wasDone: true })
+    expect(corrected.purchaseLog).toHaveLength(1)
+    expect(corrected.purchaseLog[0]?.price).toBe(3)
+    expect(corrected.priceProfiles[0]?.variants[0]?.purchaseCount).toBe(1)
+    expect(corrected.priceProfiles[0]?.variants[0]?.avgPrice).toBe(3)
+  })
+
   it('zwei gleiche Produkte erzeugen getrennte Log-Einträge', () => {
     const itemA = makeItem({ id: 'a', name: 'Milch' })
     const itemB = makeItem({ id: 'b', name: 'Milch' })

@@ -110,34 +110,38 @@ export function distinctShoppingDays(log: PurchaseLogEntry[]): number {
   return new Set(log.map((e) => e.date)).size
 }
 
-function spendByDay(log: PurchaseLogEntry[]): Map<string, number> {
+function spendByDay(log: PurchaseLogEntry[], currency?: Currency): Map<string, number> {
   const byDay = new Map<string, number>()
   for (const entry of log) {
     if (!entry.price || entry.price <= 0) continue
+    if (currency && (entry.currency ?? 'CHF') !== currency) continue
     byDay.set(entry.date, (byDay.get(entry.date) || 0) + entry.price)
   }
   return byDay
 }
 
-export function totalSpent(log: PurchaseLogEntry[]): number {
-  return log.reduce((sum, entry) => sum + (entry.price && entry.price > 0 ? entry.price : 0), 0)
+export function totalSpent(log: PurchaseLogEntry[], currency?: Currency): number {
+  return log.reduce(
+    (sum, entry) => sum + ((!currency || (entry.currency ?? 'CHF') === currency) && entry.price && entry.price > 0 ? entry.price : 0),
+    0
+  )
 }
 
-export function pricedPurchaseCount(log: PurchaseLogEntry[]): number {
-  return log.filter((entry) => entry.price && entry.price > 0).length
+export function pricedPurchaseCount(log: PurchaseLogEntry[], currency?: Currency): number {
+  return log.filter((entry) => entry.price && entry.price > 0 && (!currency || (entry.currency ?? 'CHF') === currency)).length
 }
 
 /** Ø Ausgaben pro Einkaufstag (nur Tage mit erfassten Preisen). */
-export function avgSpendPerTrip(log: PurchaseLogEntry[]): number {
-  const byDay = spendByDay(log)
+export function avgSpendPerTrip(log: PurchaseLogEntry[], currency?: Currency): number {
+  const byDay = spendByDay(log, currency)
   if (!byDay.size) return 0
   let total = 0
   for (const amount of byDay.values()) total += amount
   return total / byDay.size
 }
 
-export function maxTripSpend(log: PurchaseLogEntry[]): number {
-  const byDay = spendByDay(log)
+export function maxTripSpend(log: PurchaseLogEntry[], currency?: Currency): number {
+  const byDay = spendByDay(log, currency)
   if (!byDay.size) return 0
   return Math.max(...byDay.values())
 }

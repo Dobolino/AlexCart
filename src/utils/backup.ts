@@ -1,4 +1,5 @@
 export const BACKUP_STORAGE_KEY = 'alexshop-store'
+export const BACKUP_VERSION = 19
 
 export function readBackupJSON(): string | null {
   return localStorage.getItem(BACKUP_STORAGE_KEY)
@@ -22,11 +23,29 @@ export function restoreBackupJSON(json: string): RestoreResult {
     typeof parsed !== 'object' ||
     parsed === null ||
     !('state' in parsed) ||
-    !('version' in parsed)
+    !('version' in parsed) ||
+    typeof parsed.version !== 'number' ||
+    !Number.isInteger(parsed.version) ||
+    parsed.version < 0 ||
+    parsed.version > BACKUP_VERSION ||
+    typeof parsed.state !== 'object' ||
+    parsed.state === null ||
+    !('lists' in parsed.state) ||
+    !Array.isArray(parsed.state.lists) ||
+    parsed.state.lists.length === 0 ||
+    !parsed.state.lists.every((list: unknown) =>
+      typeof list === 'object' && list !== null &&
+      'id' in list && typeof list.id === 'string' &&
+      'items' in list && Array.isArray(list.items)
+    )
   ) {
     return { ok: false, error: 'Das sieht nicht nach einer AlexShop-Sicherung aus.' }
   }
-  localStorage.setItem(BACKUP_STORAGE_KEY, json)
+  try {
+    localStorage.setItem(BACKUP_STORAGE_KEY, json)
+  } catch {
+    return { ok: false, error: 'Sicherung konnte nicht gespeichert werden.' }
+  }
   return { ok: true }
 }
 
