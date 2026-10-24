@@ -1,12 +1,11 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
-import { ProductIconSlot } from './ProductIconSlot'
+import { Sheet } from './Sheet'
 import { ItemAmountColumn } from './ItemAmountColumn'
 import { ItemActionSheet } from './ItemActionSheet'
 import { SwipeDeleteAction } from './SwipeDeleteAction'
 import { ICON_PATHS } from '@/constants/icons'
-import { getIconKey } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
@@ -26,6 +25,7 @@ interface ItemTileProps {
   onToggleFavorite: (id: string) => void
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
   onProduceWeightChange?: (item: ShoppingItem, amount: string) => void
+  onStartReorder?: () => void
   dragHandleProps?: {
     onPointerDown: (e: React.PointerEvent, id: string) => void
     onPointerMove: (e: React.PointerEvent) => void
@@ -47,6 +47,7 @@ export function ItemTile({
   onToggleFavorite,
   onAdjustAmount,
   onProduceWeightChange,
+  onStartReorder,
   dragHandleProps,
   isDragging = false,
   dragFixedPos = null,
@@ -55,8 +56,8 @@ export function ItemTile({
 }: ItemTileProps) {
   const lastToggle = useRef(0)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [amountOpen, setAmountOpen] = useState(false)
 
-  const iconKey = getIconKey(item.name, item.category)
   const colors = getCategoryColor(category, item.done)
   const parsedAmount = parseAmount(item.amount)
   const showProduceWeight = !item.done && shouldUseExactProduceWeight(item.category, item.amount)
@@ -73,7 +74,7 @@ export function ItemTile({
   const swipe = useItemSwipe({
     onCheck: handleToggle,
     onDelete: () => onDelete(item.id),
-    blocked: anyDragging || isDragging,
+    blocked: anyDragging || isDragging || !!dragHandleProps,
   })
 
   const showDeleteAction = swipe.deleteOpen || swipe.dragX < -4
@@ -106,7 +107,7 @@ export function ItemTile({
       {!isDragging && showDeleteAction && <SwipeDeleteAction onDelete={swipe.confirmDelete} rounded />}
 
       <div
-        className="relative flex min-h-[80px] items-start gap-2 px-2 py-2.5"
+        className="relative flex min-h-16 items-center gap-1 pl-1.5 pr-1 py-1.5"
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
           borderLeft: `3px solid ${colors.fg}`,
@@ -140,36 +141,46 @@ export function ItemTile({
         onPointerCancel={swipe.handlePointerCancel}
         onClick={swipe.handleClick}
       >
-        <button
-          type="button"
-          className="tap-scale flex h-11 w-11 shrink-0 items-center justify-center"
-          aria-label={item.done ? `${item.name} wieder öffnen` : `${item.name} abhaken`}
-          onClick={(e) => {
-            e.stopPropagation()
-            swipe.handleClick()
-          }}
-        >
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-full border-2"
-            style={{
-              borderColor: item.done ? 'var(--accent)' : colors.fg,
-              background: item.done ? 'var(--accent)' : colors.bg,
-              color: 'var(--accent-fg)',
+        {dragHandleProps ? (
+          <button
+            type="button"
+            className="tap-scale flex h-11 w-11 shrink-0 touch-none select-none items-center justify-center"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label={`${item.name} verschieben`}
+            onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
+            onPointerUp={dragHandleProps.onPointerUp}
+            onPointerCancel={dragHandleProps.onPointerUp}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Icon path={ICON_PATHS.drag} size={16} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="tap-scale flex h-11 w-11 shrink-0 items-center justify-center"
+            aria-label={item.done ? `${item.name} wieder öffnen` : `${item.name} abhaken`}
+            onClick={(e) => {
+              e.stopPropagation()
+              swipe.handleClick()
             }}
           >
-            {item.done && <Icon path={ICON_PATHS.check} size={16} />}
-          </span>
-        </button>
-        <ProductIconSlot
-          iconKey={iconKey}
-          size={22}
-          wrapClassName="flex h-11 w-11 flex-none items-center justify-center"
-          wrapStyle={{ color: colors.fg }}
-        />
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded-full border-2"
+              style={{
+                borderColor: item.done ? 'var(--accent)' : colors.fg,
+                background: item.done ? 'var(--accent)' : colors.bg,
+                color: 'var(--accent-fg)',
+              }}
+            >
+              {item.done && <Icon path={ICON_PATHS.check} size={16} />}
+            </span>
+          </button>
+        )}
         <div className="min-w-0 flex-1">
           <button
             type="button"
             data-swipe-target
+            disabled={!!dragHandleProps}
             className="flex min-h-11 w-full items-center gap-1 text-left"
             onClick={(e) => {
               e.stopPropagation()
@@ -182,7 +193,7 @@ export function ItemTile({
               </span>
             )}
             <div
-              className="line-clamp-2 break-words text-[16px] font-bold leading-snug"
+              className="line-clamp-2 break-words text-[15px] font-bold leading-snug"
               style={{
                 color: item.done ? 'var(--text-muted)' : 'var(--text)',
                 textDecoration: item.done ? 'line-through' : 'none',
@@ -192,33 +203,36 @@ export function ItemTile({
               {productDisplayName(item.name)}
             </div>
           </button>
-          <div className="flex flex-wrap items-center justify-between gap-x-2">
-            <ItemAmountColumn
-              item={item}
-              showStepper={!!showStepper}
-              onAdjustAmount={onAdjustAmount}
-              onProduceWeightChange={onProduceWeightChange}
-              variant="row"
-            />
-            {dragHandleProps && (
-              <button
-                type="button"
-                className="tap-scale ml-auto flex h-11 w-11 shrink-0 touch-none select-none items-center justify-center"
-                style={{ color: 'var(--text-muted)' }}
-                aria-label={`${item.name} verschieben`}
-                onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
-                onPointerUp={dragHandleProps.onPointerUp}
-                onPointerCancel={dragHandleProps.onPointerUp}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Icon path={ICON_PATHS.drag} size={16} />
-              </button>
-            )}
-          </div>
           {item.note && (
             <div className="mt-0.5 truncate text-[12px]" style={{ color: colors.fg, opacity: 0.75 }}>
               {item.note}
             </div>
+          )}
+        </div>
+        <div
+          data-item-quantity
+          className="flex w-[84px] shrink-0 items-center justify-end"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {showStepper ? (
+            <button
+              type="button"
+              aria-label={`${item.name} Menge ändern`}
+              className="tap-scale min-h-11 max-w-full truncate rounded-xl px-2 text-right text-[13px] font-semibold tabular-nums"
+              style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+              onClick={() => setAmountOpen(true)}
+            >
+              {item.amount}
+            </button>
+          ) : (
+            <ItemAmountColumn
+              item={item}
+              showStepper={false}
+              onAdjustAmount={onAdjustAmount}
+              onProduceWeightChange={onProduceWeightChange}
+              variant="row"
+            />
           )}
         </div>
         <button
@@ -238,6 +252,14 @@ export function ItemTile({
         <ItemActionSheet
           item={item}
           onClose={() => setMenuOpen(false)}
+          onReorder={
+            onStartReorder
+              ? () => {
+                  setMenuOpen(false)
+                  onStartReorder()
+                }
+              : undefined
+          }
           onEdit={() => {
             setMenuOpen(false)
             onEdit(item)
@@ -255,6 +277,20 @@ export function ItemTile({
             onDelete(item.id)
           }}
         />
+      )}
+      {amountOpen && (
+        <Sheet onClose={() => setAmountOpen(false)}>
+          <h2 className="mb-1 text-lg font-bold">Menge ändern</h2>
+          <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+            {productDisplayName(item.name)}
+          </p>
+          <div className="mb-4 flex justify-center">
+            <ItemAmountColumn item={item} showStepper={true} onAdjustAmount={onAdjustAmount} variant="row" />
+          </div>
+          <button className="btn-primary min-h-12" onClick={() => setAmountOpen(false)}>
+            Fertig
+          </button>
+        </Sheet>
       )}
     </motion.div>
   )

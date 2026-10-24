@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { ItemRow } from './ItemRow'
 import { ItemTile } from './ItemTile'
@@ -38,6 +38,7 @@ export function CategorySection({
   onProduceWeightChange,
 }: CategorySectionProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [sorting, setSorting] = useState(false)
   const itemIds = items.map((i) => i.id)
   const drag = useDragReorder(itemIds, onReorder, containerRef)
   const anyDragging = !!drag.dragId
@@ -51,8 +52,21 @@ export function CategorySection({
   if (viewMode === 'tiles') {
     return (
       <div className="mb-5">
-        <div className="category-heading px-1.5 pb-2 text-[17px] font-extrabold" style={{ color: 'var(--text)' }}>
-          {category}
+        <div
+          className="category-heading flex items-center justify-between gap-2 px-1.5 pb-2 text-[17px] font-extrabold"
+          style={{ color: 'var(--text)' }}
+        >
+          <span>{category}</span>
+          {sorting && (
+            <button
+              className="min-h-11 text-[13px] font-bold"
+              style={{ color: 'var(--accent)' }}
+              onClick={() => setSorting(false)}
+              aria-label={`${category}: Sortieren beenden`}
+            >
+              Fertig
+            </button>
+          )}
         </div>
         <div
           ref={containerRef}
@@ -72,7 +86,8 @@ export function CategorySection({
                 onToggleFavorite={onToggleFavorite}
                 onAdjustAmount={onAdjustAmount}
                 onProduceWeightChange={onProduceWeightChange}
-                dragHandleProps={dragProps}
+                dragHandleProps={sorting ? dragProps : undefined}
+                onStartReorder={() => setSorting(true)}
                 isDragging={drag.dragId === item.id}
                 dragFixedPos={drag.dragId === item.id ? drag.dragFixedPos : null}
                 anyDragging={anyDragging}

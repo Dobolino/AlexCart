@@ -10,6 +10,7 @@ interface ItemActionSheetProps {
   onAddToPantry: () => void
   onToggleFavorite: () => void
   onUnavailable?: () => void
+  onReorder?: () => void
   onDelete: () => void
 }
 
@@ -44,6 +45,7 @@ export function ItemActionSheet({
   onToggleFavorite,
   onDelete,
   onUnavailable,
+  onReorder,
 }: ItemActionSheetProps) {
   return (
     <Sheet onClose={onClose}>
@@ -57,6 +59,7 @@ export function ItemActionSheet({
           />
         )}
         <ActionRow icon={ICON_PATHS.edit} label="Bearbeiten" onClick={onEdit} />
+        {onReorder && <ActionRow icon={ICON_PATHS.drag} label="Reihenfolge ändern" onClick={onReorder} />}
         <ActionRow icon={ICON_PATHS.pantry} label="In Vorrat übernehmen" onClick={onAddToPantry} />
         <ActionRow
           icon={ICON_PATHS.star}
