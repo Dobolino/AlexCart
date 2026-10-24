@@ -245,7 +245,7 @@ export function SettingsPage() {
               <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
                 <span className="block text-[15px] font-semibold">Wochenbudget</span>
                 <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                  Ausgaben der aktuellen Kalenderwoche (Montag–Sonntag) im Listen-Header verfolgen
+                  Ausgaben der aktuellen Kalenderwoche (Montag–Sonntag) auf der Einkaufsliste verfolgen
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[14px] font-bold" style={{ color: 'var(--text-muted)' }}>

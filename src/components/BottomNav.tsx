@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { Icon } from './Icon'
-import { FloatingPortal } from './FloatingPortal'
 import { ICON_PATHS } from '@/constants/icons'
 
 const TABS = [
@@ -12,10 +11,10 @@ const TABS = [
   { to: '/settings', label: 'Optionen', icon: 'settings' },
 ]
 
-/** Schwebende Tab-Pille – fixed Overlay, Inhalt scrollt dahinter durch. */
+/** A reserved navigation area keeps product controls clear of the tabs on iOS. */
 export function BottomNav() {
   return (
-    <FloatingPortal>
+    <div className="app-navigation">
       <nav className="nav-liquid" aria-label="Hauptnavigation">
         {TABS.map((tab) => (
           <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className="nav-liquid-tab tap-scale">
@@ -32,6 +31,6 @@ export function BottomNav() {
           </NavLink>
         ))}
       </nav>
-    </FloatingPortal>
+    </div>
   )
 }

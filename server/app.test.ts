@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createApp } from './app'
@@ -26,6 +26,21 @@ async function start(options: Parameters<typeof createApp>[0] = {}) {
 }
 const milk = { id: 'milk', name: 'Milch', category: 'Milch & Käse', amount: '1 l', done: false, addedAt: 1 }
 describe('self-hosted backend', () => {
+  it('does not exhaust API limits when loading or precaching application files', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'alexcart-static-'))
+    writeFileSync(join(directory, 'dev.html'), '<h1>AlexCart</h1>')
+    const { base, request } = await start({ staticRoot: directory })
+    cleanup.push(async () => rmSync(directory, { recursive: true, force: true }))
+    for (let index = 0; index < 305; index++) {
+      const response = await fetch(base.replace(/\/api$/, '/AlexCart/'))
+      expect(response.status).toBe(200)
+      await response.text()
+    }
+    expect((await request('/health')).status).toBe(200)
+    for (let index = 0; index < 299; index++) await request('/health')
+    expect((await request('/health')).status).toBe(429)
+    expect((await fetch(base.replace(/\/api$/, '/AlexCart/'))).status).toBe(200)
+  })
   it('merges independent clients and additive amounts, deduplicates retries and protects deleted items', async () => {
     const { request } = await start()
     const created = await request('/lists', { name: 'Gemeinsam', items: [milk] })

@@ -36,7 +36,14 @@ import { computePriceDelta } from '@/utils/priceDelta'
 import { productPriceHistory } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
 import { useStore } from '@/store/useStore'
-import type { CheckoffPriceData, Currency, GlobalBrand, ProductPriceProfile, ProductVariant, ShoppingItem } from '@/types'
+import type {
+  CheckoffPriceData,
+  Currency,
+  GlobalBrand,
+  ProductPriceProfile,
+  ProductVariant,
+  ShoppingItem,
+} from '@/types'
 
 const NEW_VARIANT = '__new__'
 
@@ -48,6 +55,7 @@ interface CheckoffPriceSheetProps {
   onClose: () => void
   onSave: (data: CheckoffPriceData) => void
   onSkip: () => void
+  skipLabel?: string
   onAmountChange?: (amount: string) => void
   /** Einkaufsmodus: Optionen (Pro Stück/Gesamt, Aktion) farblich hervorheben. */
   highlightOptions?: boolean
@@ -68,6 +76,7 @@ export function CheckoffPriceSheet({
   onClose,
   onSave,
   onSkip,
+  skipLabel,
   onAmountChange,
   highlightOptions = false,
 }: CheckoffPriceSheetProps) {
@@ -83,7 +92,7 @@ export function CheckoffPriceSheet({
   const forcedWeightGrams = packAmount ? null : explicitWeightGrams(item.amount)
 
   const [selection, setSelection] = useState<string>(
-    hasVariants ? initialVariant?.id ?? NEW_VARIANT : NEW_VARIANT
+    hasVariants ? (initialVariant?.id ?? NEW_VARIANT) : NEW_VARIANT
   )
   const [variantName, setVariantName] = useState('')
   const [brandId, setBrandId] = useState(initialVariant?.brandId || '')
@@ -124,13 +133,12 @@ export function CheckoffPriceSheet({
   }
 
   // Obst: wählbarer Modus (Banane kg / Kiwi Stück). Sonst: explizite g/kg → Waagenpreis.
-  const priceByWeight =
-    !packAmount && (forcedWeightGrams !== null || (isProduce && produceMode === 'weight'))
+  const priceByWeight = !packAmount && (forcedWeightGrams !== null || (isProduce && produceMode === 'weight'))
   const showProduceWeightInput = Boolean(isProduce && priceByWeight)
   const weightGrams = packAmount
     ? null
     : priceByWeight
-      ? weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount) ?? forcedWeightGrams
+      ? (weightGramsFromAmount(item.amount) ?? parseGramsInput(item.amount) ?? forcedWeightGrams)
       : null
 
   const showNewVariantName = selection === NEW_VARIANT
@@ -151,7 +159,7 @@ export function CheckoffPriceSheet({
       }
     } else {
       const prefilled = priceByWeight
-        ? selectedPrices.pricePerKg ?? selectedPrices.lastPrice
+        ? (selectedPrices.pricePerKg ?? selectedPrices.lastPrice)
         : selectedPrices.lastPrice
       if (prefilled && prefilled > 0) {
         setCents(amountToCents(prefilled))
@@ -290,7 +298,9 @@ export function CheckoffPriceSheet({
         >
           <h2 className="mb-0.5 text-lg font-bold leading-tight">Preis erfassen</h2>
           <p className="mb-0.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            <span className="font-semibold" style={{ color: 'var(--text)' }}>{item.name}</span>
+            <span className="font-semibold" style={{ color: 'var(--text)' }}>
+              {item.name}
+            </span>
           </p>
           {item.note ? (
             <p className="mb-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -321,15 +331,15 @@ export function CheckoffPriceSheet({
               <div className="mb-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
                 Abgewogenes Gewicht
               </div>
-              <ProduceWeightInput
-                amount={item.amount}
-                onChange={onAmountChange}
-              />
+              <ProduceWeightInput amount={item.amount} onChange={onAmountChange} />
             </div>
           )}
 
           {onAmountChange && !showProduceWeightInput && (
-            <div className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2" style={{ background: 'var(--chip-bg)' }}>
+            <div
+              className="mb-2 flex items-center justify-between gap-2 rounded-xl px-2.5 py-2"
+              style={{ background: 'var(--chip-bg)' }}
+            >
               <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
                 Menge
               </span>
@@ -362,12 +372,21 @@ export function CheckoffPriceSheet({
           )}
 
           <div className="mb-2">
-            <BrandSelect brands={brands} value={brandId} onChange={setBrandId} onCreateBrand={ensureBrand} label="Marke" />
+            <BrandSelect
+              brands={brands}
+              value={brandId}
+              onChange={setBrandId}
+              onCreateBrand={ensureBrand}
+              label="Marke"
+            />
           </div>
 
           {sizePresets.length > 0 && (
             <div className="mb-2">
-              <div className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+              <div
+                className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--category-fg)' }}
+              >
                 Grösse
               </div>
               <div className="flex flex-wrap gap-2">
@@ -398,7 +417,10 @@ export function CheckoffPriceSheet({
 
           {hasVariants ? (
             <div className="mb-2">
-              <label className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+              <label
+                className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--category-fg)' }}
+              >
                 Variante
               </label>
               <select
@@ -420,7 +442,10 @@ export function CheckoffPriceSheet({
             </div>
           ) : (
             <div className="mb-2">
-              <label className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+              <label
+                className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--category-fg)' }}
+              >
                 Variante (Marke / Grösse)
               </label>
               <input
@@ -509,8 +534,11 @@ export function CheckoffPriceSheet({
               className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
               style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
             >
-              {formatMoney(pricePer100gFromKg(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg), currency)}/100 g
-              {' · '}
+              {formatMoney(
+                pricePer100gFromKg(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg),
+                currency
+              )}
+              /100 g{' · '}
               {formatWeightGrams(weightGrams)}
             </div>
           )}
@@ -533,10 +561,7 @@ export function CheckoffPriceSheet({
           />
         </div>
 
-        <div
-          className="shrink-0 border-t pt-2.5"
-          style={{ borderColor: 'var(--border)' }}
-        >
+        <div className="shrink-0 border-t pt-2.5" style={{ borderColor: 'var(--border)' }}>
           {error && (
             <p className="mb-2 text-center text-[12px] font-bold" style={{ color: 'var(--danger)' }}>
               {error}
@@ -544,7 +569,7 @@ export function CheckoffPriceSheet({
           )}
           <div className="flex gap-2">
             <button className="btn-soft flex-1 py-3 text-[14px]" onClick={onSkip}>
-              Überspringen
+              {skipLabel ?? (item.done ? 'Ohne Änderung zurück' : 'Ohne Preis abhaken')}
             </button>
             <button className="btn-primary flex-1 py-3 text-[14px]" onClick={handleSave}>
               Speichern
@@ -577,11 +602,7 @@ function OptionSegment({
             type="button"
             className="tap-scale flex flex-1 items-center justify-center rounded-lg py-2 text-[12px] font-bold transition-colors"
             style={{
-              background: active
-                ? highlight
-                  ? 'var(--accent-soft)'
-                  : 'var(--surface)'
-                : 'transparent',
+              background: active ? (highlight ? 'var(--accent-soft)' : 'var(--surface)') : 'transparent',
               color: active ? (highlight ? 'var(--accent)' : 'var(--text)') : 'var(--text-muted)',
               boxShadow: active && !highlight ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               outline: active && highlight ? '2px solid var(--accent)' : 'none',

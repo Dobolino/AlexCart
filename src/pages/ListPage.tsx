@@ -52,7 +52,6 @@ interface ToastState {
 export function ListPage() {
   const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
-  const lists = useStore((s) => s.lists)
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
   const updatePurchaseLogPrice = useStore((s) => s.updatePurchaseLogPrice)
@@ -105,7 +104,6 @@ export function ListPage() {
   const calculatorTotal = calculatorEntries
     .filter((e) => (e.currency ?? 'CHF') === currency)
     .reduce((sum, e) => sum + e.amount, 0)
-  const hasCalculatorTotal = calculatorEntries.length > 0
   const weekSpend = currentWeekSpend(purchaseLog, undefined, currency)
   const budgetSpend = totalBudgetSpend(weekSpend, calculatorTotal)
   const hasWeeklyBudget = weeklyBudget > 0
@@ -114,14 +112,6 @@ export function ListPage() {
   const listEstimate = estimateOpenListCost(activeItems, priceProfiles, currency)
 
   const summaryParts: string[] = []
-  if (hasWeeklyBudget) {
-    summaryParts.push(`${formatMoney(budgetSpend, currency)} / ${formatMoney(weeklyBudget, currency)}`)
-  } else if (hasCalculatorTotal) {
-    summaryParts.push(formatMoney(calculatorTotal, currency))
-  }
-  if (listEstimate.pricedItemCount > 0) {
-    summaryParts.push(`Geschätzt ${formatMoney(listEstimate.total, currency)}`)
-  }
   summaryParts.push(`${activeItems.length} offen`)
   if (doneItems.length > 0) summaryParts.push(`${doneItems.length} erledigt`)
   const listSubtitle = summaryParts.join(' • ')
@@ -248,28 +238,23 @@ export function ListPage() {
           </div>
         }
       />
-      {lists.length === 1 && (
-        <p className="px-4 pb-1 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-          Tipp: Titel antippen für weitere Listen
-        </p>
-      )}
       {sharedEnabled && (
         <Suspense fallback={null}>
           <SyncIndicator listId={list.id} onOpen={() => setShareOpen(true)} />
         </Suspense>
       )}
-      {budget && <BudgetBar progress={budget} currency={currency} />}
       <InstallPrompt />
 
       <main className="scroll-behind-nav-fab flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3">
+        {budget && <BudgetBar progress={budget} currency={currency} />}
         {filteredItems.length > 0 && (
           <div
-            className="glass-card mb-3.5 flex items-center justify-between gap-2.5 px-3.5 py-3 text-[13px]"
+            className="glass-card mb-3.5 flex shrink-0 items-center justify-between gap-2.5 px-3.5 text-[12px]"
             style={{ color: 'var(--text-muted)' }}
           >
-            <span>{filteredItems.length} Artikel aus Vorrat automatisch gefiltert</span>
+            <span>{filteredItems.length} Artikel bereits im Vorrat</span>
             <button
-              className="tap-scale font-bold"
+              className="tap-scale min-h-11 shrink-0 font-bold"
               style={{ color: 'var(--accent)' }}
               onClick={() => setFilteredOpen(true)}
             >
@@ -278,9 +263,14 @@ export function ListPage() {
           </div>
         )}
 
-        <LowStockSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
-        <RecurringSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
-        <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
+        <details className="suggestions-panel shrink-0" open={activeItems.length === 0 || undefined}>
+          <summary>Vorschläge für deinen Einkauf</summary>
+          <div className="px-3 pb-1">
+            <LowStockSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
+            <RecurringSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
+            <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
+          </div>
+        </details>
 
         {!activeItems.length && !doneItems.length ? (
           <div className="flex flex-1 items-center justify-center">
@@ -385,34 +375,23 @@ export function ListPage() {
         )}
       </main>
 
-      <FloatingPortal>
+      <div
+        className="list-actions"
+        role="toolbar"
+        aria-label="Artikel verwalten"
+        style={{ flexDirection: handedness === 'left' ? 'row-reverse' : 'row' }}
+      >
+        <button className="btn-soft tap-scale" onClick={() => setScannerOpen(true)}>
+          Scannen
+        </button>
         <button
-          className="btn-primary tap-scale fixed z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
-          style={{
-            ...(handedness === 'left'
-              ? { left: 'calc(18px + var(--safe-left))' }
-              : { right: 'calc(18px + var(--safe-right))' }),
-            bottom: 'calc(var(--nav-scroll-padding) + 8px)',
-          }}
+          className="btn-primary tap-scale flex-1"
           onClick={() => setAddOpen(true)}
           aria-label="Artikel hinzufügen"
         >
-          <Icon path={ICON_PATHS.plus} size={26} />
+          <Icon path={ICON_PATHS.plus} size={20} /> Hinzufügen
         </button>
-      </FloatingPortal>
-
-      <FloatingPortal>
-        <button
-          className="btn-soft fixed z-20 min-h-11 rounded-full px-4 font-bold"
-          style={{
-            bottom: 'calc(var(--nav-scroll-padding) + 72px)',
-            ...(handedness === 'left' ? { left: 18 } : { right: 18 }),
-          }}
-          onClick={() => setScannerOpen(true)}
-        >
-          Scannen
-        </button>
-      </FloatingPortal>
+      </div>
       <Suspense fallback={null}>
         {shareOpen && <ShareListSheet onClose={() => setShareOpen(false)} />}
         {scannerOpen && (
@@ -500,6 +479,7 @@ export function ListPage() {
             onClose={() => setPriceSheetItem(null)}
             onSave={handlePriceSave}
             onSkip={handlePriceSkip}
+            skipLabel={priceSheetMode === 'add-later' ? 'Ohne Änderung zurück' : undefined}
             onAmountChange={(amount) => {
               updateItemInActiveList(priceSheetItem.id, { amount })
               setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))

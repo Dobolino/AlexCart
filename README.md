@@ -38,6 +38,8 @@ selbst betriebenen Backend abgeglichen; Preisgedächtnis, Vorrat und andere List
 ## Neue Funktionen
 
 - Schnelles Hinzufügen, große Trefferflächen, zugängliche Dialoge, Rückgängig und Offline-Start.
+- Produktkacheln bleiben beim Abbrechen der Preiseingabe sichtbar; erst bestätigtes Abhaken entfernt sie.
+- Navigation und Hinzufügen/Scannen reservieren eigenen Platz. Vorrat mit Suche und Eingabe per Dialog.
 - Filialbezogene Kategorienreihenfolge, Einkäufe pausieren/fortsetzen, „nicht gefunden“.
 - Getrennte CHF/EUR-Budgets, konsistente Bonkorrekturen und Vorratsbewegungen.
 - Barcode-Scanner mit nativer Erkennung und ZXing-Fallback sowie manueller Eingabe.

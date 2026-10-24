@@ -84,14 +84,17 @@ export function createApp(options: Options = {}) {
         })
         return res.end()
       }
-      const ip = req.socket.remoteAddress ?? 'unknown'
-      const previous = requests.get(ip)
-      const rate =
-        previous && previous.reset > Date.now() ? previous : { count: 0, reset: Date.now() + 60000 }
-      requests.set(ip, rate)
-      if (requests.size > 10000)
-        for (const [key, value] of requests) if (value.reset < Date.now()) requests.delete(key)
-      if (++rate.count > 300) return json(429, { error: 'Zu viele Anfragen. Bitte eine Minute warten.' })
+      // PWA precaching fetches many files. Keep that separate from API abuse limits.
+      if (url.pathname.startsWith('/api/')) {
+        const ip = req.socket.remoteAddress ?? 'unknown'
+        const previous = requests.get(ip)
+        const rate =
+          previous && previous.reset > Date.now() ? previous : { count: 0, reset: Date.now() + 60000 }
+        requests.set(ip, rate)
+        if (requests.size > 10000)
+          for (const [key, value] of requests) if (value.reset < Date.now()) requests.delete(key)
+        if (++rate.count > 300) return json(429, { error: 'Zu viele Anfragen. Bitte eine Minute warten.' })
+      }
       let body: unknown
       if (req.method === 'POST') {
         let text = ''

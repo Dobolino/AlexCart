@@ -59,11 +59,11 @@ export function CalculatorPage() {
     <>
       <PageHeader
         title="Rechner"
-        subtitle="Laufende Einkaufssumme – nach dem Einkauf zurücksetzen"
+        subtitle="Deine Einkaufssumme im Blick"
         right={
           hasAnything ? (
             <button
-              className="tap-scale rounded-full px-3 py-2 text-[12px] font-bold"
+              className="tap-scale min-h-11 rounded-full px-3 py-2 text-[12px] font-bold"
               style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
               onClick={handleResetAll}
             >
@@ -74,11 +74,13 @@ export function CalculatorPage() {
       />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div
-          className="mb-3 flex items-center justify-between rounded-3xl px-5 py-5"
-          style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+          className="card-surface mb-3 flex flex-wrap items-center justify-between gap-2 px-4 py-4"
+          style={{ borderTop: '3px solid var(--accent)' }}
         >
-          <span className="text-[14px] font-semibold opacity-80">Summe heute</span>
-          <span className="text-[28px] font-extrabold">{formatMoney(total, currency)}</span>
+          <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+            Summe heute
+          </span>
+          <span className="text-[28px] font-extrabold tabular-nums">{formatMoney(total, currency)}</span>
         </div>
 
         <MoneyNumpad cents={cents} onChange={setCents} currency={currency} display="summary" />
@@ -86,14 +88,14 @@ export function CalculatorPage() {
         <button
           className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]"
           onClick={handleAdd}
+          disabled={cents === 0}
         >
           <span className="inline-flex items-center gap-2">
             <Icon path={ICON_PATHS.plus} size={20} /> Manuell hinzufügen
           </span>
         </button>
         <p className="mb-4 px-1.5 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Preise beim Abhaken landen unter „Aus Liste abgehakt“. Nach dem Einkauf oben auf Zurücksetzen
-          tippen.
+          Erfasste Artikelpreise werden automatisch mitgezählt.
         </p>
 
         {checkoffEntries.length > 0 && (
@@ -163,12 +165,6 @@ export function CalculatorPage() {
               Nur manuelle Einträge löschen
             </button>
           </>
-        )}
-
-        {!hasAnything && (
-          <p className="px-1.5 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            Preise beim Abhaken der Liste erscheinen hier automatisch.
-          </p>
         )}
       </main>
     </>

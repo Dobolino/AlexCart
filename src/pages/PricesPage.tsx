@@ -2,6 +2,8 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { PageHeader } from '@/components/PageHeader'
 import { Sheet } from '@/components/Sheet'
+import { Icon } from '@/components/Icon'
+import { ICON_PATHS } from '@/constants/icons'
 import { compareProductPrices, compareBasket, minorMoney } from '@/utils/priceComparison'
 import { baseQuantity, quantityText } from '@/utils/quantity'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
@@ -25,6 +27,7 @@ export function PricesPage() {
   const [selected, setSelected] = useState(products[0]?.id ?? '')
   const [scan, setScan] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [creationError, setCreationError] = useState('')
   const [name, setName] = useState('')
   const [pack, setPack] = useState(products[0]?.netQuantity ? quantityText(products[0].netQuantity) : '1 l')
   const [shop, setShop] = useState('Coop')
@@ -98,10 +101,33 @@ export function PricesPage() {
             Barcode scannen
           </button>
         </div>
-        <p className="mb-3 px-1 text-sm">
-          Verglichen werden dieselben Produkte und Packungsinhalte. Preise sind Beobachtungen; Verfügbarkeit
-          und Bedingungen können sich ändern.
-        </p>
+        {!product ? (
+          <section className="card-surface mb-4 px-5 py-6">
+            <span
+              className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            >
+              <Icon path={ICON_PATHS.shopping} size={24} />
+            </span>
+            <h2 className="mb-2 text-xl font-bold">Dein erster Preisvergleich</h2>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              Scanne ein Produkt oder erfasse es selbst. Ergänze einen Preis aus der Schweiz oder Deutschland
+              – so siehst du, wo sich dein Einkauf lohnt.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full px-3 py-2" style={{ background: 'var(--chip-bg)' }}>
+                Schweiz · CHF
+              </span>
+              <span className="rounded-full px-3 py-2" style={{ background: 'var(--chip-bg)' }}>
+                Deutschland · EUR
+              </span>
+            </div>
+          </section>
+        ) : (
+          <p className="mb-3 px-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Gleiche Produkte, vergleichbare Mengen. Originalpreise bleiben in CHF oder EUR erhalten.
+          </p>
+        )}
         {!!baskets.length && (
           <section className="card-surface mb-4 p-4">
             <h2 className="mb-2 font-bold">Deine offene Einkaufsliste</h2>
@@ -335,17 +361,15 @@ export function PricesPage() {
                 setMessage('Ungültiger Wechselkurs.')
                 return
               }
-              useStore
-                .getState()
-                .setFxSnapshot({
-                  id: uid(),
-                  base: 'EUR',
-                  quote: 'CHF',
-                  quotePerBase: String(value),
-                  rateDate: todayKey(),
-                  fetchedAt: new Date().toISOString(),
-                  source: 'Eigener Kurs',
-                })
+              useStore.getState().setFxSnapshot({
+                id: uid(),
+                base: 'EUR',
+                quote: 'CHF',
+                quotePerBase: String(value),
+                rateDate: todayKey(),
+                fetchedAt: new Date().toISOString(),
+                source: 'Eigener Kurs',
+              })
               setMessage('Eigener Kurs gespeichert.')
             }}
           >
@@ -357,10 +381,15 @@ export function PricesPage() {
             {message}
           </p>
         )}
-        <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-          Open Food Facts / Open Prices: offene Community-Daten, ODbL. Keine vollständige Händlerabdeckung.
-          Produktinformationen und Preisbeobachtungen werden getrennt gespeichert.
-        </p>
+        <details className="mb-4 px-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          <summary className="flex min-h-11 cursor-pointer items-center font-semibold">
+            Quellen & Hinweise zum Vergleich
+          </summary>
+          <p>
+            Open Food Facts / Open Prices: offene Community-Daten, ODbL. Keine vollständige Händlerabdeckung.
+            Preise sind Beobachtungen; Verfügbarkeit und Bedingungen können sich ändern.
+          </p>
+        </details>
       </main>
       {creating && (
         <Sheet onClose={() => setCreating(false)}>
@@ -376,14 +405,27 @@ export function PricesPage() {
           </label>
           <label className="mb-3 text-sm">
             Packungsinhalt
-            <input className="input mt-2 w-full" value={pack} onChange={(e) => setPack(e.target.value)} />
+            <input
+              className="input mt-2 w-full"
+              placeholder="z. B. 500 g oder 1 l"
+              value={pack}
+              onChange={(e) => setPack(e.target.value)}
+            />
           </label>
+          {creationError && (
+            <p className="mb-3 text-sm" role="alert" style={{ color: 'var(--danger)' }}>
+              {creationError}
+            </p>
+          )}
           <button
             className="btn-primary min-h-12"
             disabled={!name.trim()}
             onClick={() => {
               const quantity = baseQuantity(pack)
-              if (!quantity || quantity.value <= 0) return
+              if (!quantity || quantity.value <= 0) {
+                setCreationError('Bitte einen Packungsinhalt wie 500 g, 1 l oder 6 Stück angeben.')
+                return
+              }
               const p: CatalogProduct = {
                 id: uid(),
                 name: name.trim(),
@@ -396,6 +438,8 @@ export function PricesPage() {
               useStore.getState().upsertProduct(p)
               setSelected(p.id)
               setCreating(false)
+              setCreationError('')
+              setMessage('Produkt gespeichert. Du kannst jetzt den ersten Preis erfassen.')
               setName('')
             }}
           >

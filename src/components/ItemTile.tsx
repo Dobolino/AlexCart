@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
 import { ProductIconSlot } from './ProductIconSlot'
@@ -7,9 +7,10 @@ import { ItemActionSheet } from './ItemActionSheet'
 import { SwipeDeleteAction } from './SwipeDeleteAction'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
-import { getCategoryTileColor } from '@/utils/categoryColor'
+import { getCategoryColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
+import { productDisplayName } from '@/utils/listItemDisplay'
 import { hapticSuccess } from '@/utils/haptics'
 import { useItemSwipe } from '@/hooks/useItemSwipe'
 import type { DragFixedPosition } from '@/hooks/useDragReorder'
@@ -36,8 +37,6 @@ interface ItemTileProps {
   isDragOver?: boolean
 }
 
-const EXIT_ANIMATION_MS = 320
-
 export function ItemTile({
   item,
   category,
@@ -54,23 +53,21 @@ export function ItemTile({
   anyDragging = false,
   isDragOver,
 }: ItemTileProps) {
-  const [exiting, setExiting] = useState(false)
+  const lastToggle = useRef(0)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const iconKey = getIconKey(item.name, item.category)
-  const colors = getCategoryTileColor(category, item.done)
+  const colors = getCategoryColor(category, item.done)
   const parsedAmount = parseAmount(item.amount)
   const showProduceWeight = !item.done && shouldUseExactProduceWeight(item.category, item.amount)
   const showStepper = parsedAmount && !item.done && !showProduceWeight
 
   function handleToggle() {
-    if (item.done) {
-      onToggle(item.id)
-      return
-    }
-    hapticSuccess()
-    setExiting(true)
-    setTimeout(() => onToggle(item.id), EXIT_ANIMATION_MS)
+    if (Date.now() - lastToggle.current < 300) return
+    lastToggle.current = Date.now()
+    if (!item.done) hapticSuccess()
+    // The parent may open a price dialog. Only a committed store change removes this tile.
+    onToggle(item.id)
   }
 
   const swipe = useItemSwipe({
@@ -88,8 +85,8 @@ export function ItemTile({
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: swipe.deleteExiting ? 0 : 1, scale: 1, height: swipe.deleteExiting ? 0 : 'auto' }}
       exit={{ opacity: 0, x: -40, transition: { duration: 0.12 } }}
-      className="item-tile relative overflow-hidden rounded-[12px]"
-      style={{ zIndex: isDragging ? 50 : undefined }}
+      className="item-tile relative overflow-hidden rounded-[18px] border"
+      style={{ zIndex: isDragging ? 50 : undefined, borderColor: 'var(--border)' }}
     >
       {isDragOver && (
         <div
@@ -109,9 +106,10 @@ export function ItemTile({
       {!isDragging && showDeleteAction && <SwipeDeleteAction onDelete={swipe.confirmDelete} rounded />}
 
       <div
-        className="relative flex min-h-[64px] items-center gap-2.5 px-3.5 py-3.5"
+        className="relative flex min-h-[80px] items-start gap-2 px-2 py-2.5"
         style={{
-          background: colors.bg,
+          background: item.done ? 'var(--done-bg)' : 'var(--surface)',
+          borderLeft: `3px solid ${colors.fg}`,
           ...(isDragging && dragFixedPos
             ? {
                 position: 'fixed',
@@ -127,37 +125,41 @@ export function ItemTile({
                 pointerEvents: 'none',
               }
             : {
-                transform: exiting ? 'translateX(96px)' : `translateX(${swipe.dragX}px)`,
+                transform: `translateX(${swipe.dragX}px)`,
                 transition:
-                  swipe.dragging || swipe.deleteExiting || exiting
-                    ? exiting
-                      ? 'transform 0.28s var(--ease-spring), opacity 0.28s ease'
-                      : 'none'
+                  swipe.dragging || swipe.deleteExiting
+                    ? 'none'
                     : 'transform 0.22s var(--ease-spring), opacity 0.32s ease',
-                opacity: exiting || swipe.deleteExiting ? 0 : 1,
+                opacity: swipe.deleteExiting ? 0 : 1,
                 touchAction: 'pan-y',
-                borderRadius: '12px',
               }),
         }}
         onPointerDown={swipe.handlePointerDown}
         onPointerMove={swipe.handlePointerMove}
         onPointerUp={swipe.handlePointerUp}
-        onPointerCancel={swipe.handlePointerUp}
+        onPointerCancel={swipe.handlePointerCancel}
         onClick={swipe.handleClick}
       >
-        {dragHandleProps && (
-          <button
-            className="tap-scale flex h-7 w-5 flex-none touch-none select-none items-center justify-center opacity-60"
-            style={{ color: colors.fg, WebkitUserSelect: 'none', userSelect: 'none' }}
-            aria-label="Verschieben"
-            onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
-            onPointerUp={dragHandleProps.onPointerUp}
-            onPointerCancel={dragHandleProps.onPointerUp}
-            onClick={(e) => e.stopPropagation()}
+        <button
+          type="button"
+          className="tap-scale flex h-11 w-11 shrink-0 items-center justify-center"
+          aria-label={item.done ? `${item.name} wieder öffnen` : `${item.name} abhaken`}
+          onClick={(e) => {
+            e.stopPropagation()
+            swipe.handleClick()
+          }}
+        >
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-full border-2"
+            style={{
+              borderColor: item.done ? 'var(--accent)' : colors.fg,
+              background: item.done ? 'var(--accent)' : colors.bg,
+              color: 'var(--accent-fg)',
+            }}
           >
-            <Icon path={ICON_PATHS.drag} size={16} />
-          </button>
-        )}
+            {item.done && <Icon path={ICON_PATHS.check} size={16} />}
+          </span>
+        </button>
         <ProductIconSlot
           iconKey={iconKey}
           size={22}
@@ -165,22 +167,53 @@ export function ItemTile({
           wrapStyle={{ color: colors.fg }}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
+          <button
+            type="button"
+            data-swipe-target
+            className="flex min-h-11 w-full items-center gap-1 text-left"
+            onClick={(e) => {
+              e.stopPropagation()
+              swipe.handleClick()
+            }}
+          >
             {item.favorite && (
               <span className="flex-none" style={{ color: colors.fg, opacity: 0.9 }}>
                 <Icon path={ICON_PATHS.star} size={11} />
               </span>
             )}
             <div
-              className="truncate text-[16px] font-bold leading-snug"
+              className="line-clamp-2 break-words text-[16px] font-bold leading-snug"
               style={{
-                color: colors.fg,
+                color: item.done ? 'var(--text-muted)' : 'var(--text)',
                 textDecoration: item.done ? 'line-through' : 'none',
                 opacity: item.done ? 0.65 : 1,
               }}
             >
-              {item.name}
+              {productDisplayName(item.name)}
             </div>
+          </button>
+          <div className="flex flex-wrap items-center justify-between gap-x-2">
+            <ItemAmountColumn
+              item={item}
+              showStepper={!!showStepper}
+              onAdjustAmount={onAdjustAmount}
+              onProduceWeightChange={onProduceWeightChange}
+              variant="row"
+            />
+            {dragHandleProps && (
+              <button
+                type="button"
+                className="tap-scale ml-auto flex h-11 w-11 shrink-0 touch-none select-none items-center justify-center"
+                style={{ color: 'var(--text-muted)' }}
+                aria-label={`${item.name} verschieben`}
+                onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
+                onPointerUp={dragHandleProps.onPointerUp}
+                onPointerCancel={dragHandleProps.onPointerUp}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Icon path={ICON_PATHS.drag} size={16} />
+              </button>
+            )}
           </div>
           {item.note && (
             <div className="mt-0.5 truncate text-[12px]" style={{ color: colors.fg, opacity: 0.75 }}>
@@ -188,17 +221,9 @@ export function ItemTile({
             </div>
           )}
         </div>
-        <ItemAmountColumn
-          item={item}
-          showStepper={!!showStepper}
-          onAdjustAmount={onAdjustAmount}
-          onProduceWeightChange={onProduceWeightChange}
-          variant="tile"
-          accentColor={colors.fg}
-        />
         <button
-          className="tap-scale flex h-7 w-7 flex-none items-center justify-center rounded-full"
-          style={{ color: colors.fg, opacity: 0.75 }}
+          className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
+          style={{ color: 'var(--text-muted)' }}
           onClick={(e) => {
             e.stopPropagation()
             setMenuOpen(true)

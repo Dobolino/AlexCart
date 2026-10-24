@@ -28,7 +28,7 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
         >
           <span className="truncate">{title}</span>
           {onTitleClick && (
-            <span className="mt-1 inline-flex rotate-90" style={{ color: 'var(--text-muted)' }}>
+            <span className="mt-1 inline-flex shrink-0 rotate-90" style={{ color: 'var(--text-muted)' }}>
               <Icon path={ICON_PATHS.chevron} size={18} />
             </span>
           )}

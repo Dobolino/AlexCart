@@ -10,7 +10,7 @@ import { getIconKey } from '@/utils/icon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { parseAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
-import { formatListItemDisplay } from '@/utils/listItemDisplay'
+import { formatListItemDisplay, productDisplayName } from '@/utils/listItemDisplay'
 import { formatMoney } from '@/utils/currency'
 import { hapticSuccess } from '@/utils/haptics'
 import { useItemSwipe } from '@/hooks/useItemSwipe'
@@ -149,7 +149,7 @@ export function ItemRow({
         onPointerDown={swipe.handlePointerDown}
         onPointerMove={swipe.handlePointerMove}
         onPointerUp={swipe.handlePointerUp}
-        onPointerCancel={swipe.handlePointerUp}
+        onPointerCancel={swipe.handlePointerCancel}
         onClick={swipe.handleClick}
       >
         {dragHandleProps && (
@@ -196,7 +196,7 @@ export function ItemRow({
                 textDecorationThickness: '2px',
               }}
             >
-              {item.name}
+              {productDisplayName(item.name)}
             </div>
           </div>
 

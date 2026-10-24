@@ -33,6 +33,7 @@ export function useItemSwipe({
   const dragXRef = useRef(0)
   const direction = useRef<'none' | 'left' | 'right'>('none')
   const suppressClickRef = useRef(false)
+  const activePointer = useRef<number | null>(null)
 
   const closeDelete = useCallback(() => {
     setDeleteOpen(false)
@@ -52,14 +53,16 @@ export function useItemSwipe({
 
   function handlePointerDown(e: React.PointerEvent) {
     if (blocked || deleteExiting) return
+    if ((e.target as Element).closest('button:not([data-swipe-target]), input, select, textarea, a')) return
+    activePointer.current = e.pointerId
+    suppressClickRef.current = false
     start.current = { x: e.clientX, y: e.clientY }
     direction.current = 'none'
     setDragging(true)
-    e.currentTarget.setPointerCapture(e.pointerId)
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (!dragging || blocked || deleteExiting) return
+    if (!dragging || blocked || deleteExiting || activePointer.current !== e.pointerId) return
     const dx = e.clientX - start.current.x
     const dy = e.clientY - start.current.y
 
@@ -67,6 +70,7 @@ export function useItemSwipe({
       if (Math.abs(dx) < DEADZONE && Math.abs(dy) < DEADZONE) return
       if (Math.abs(dy) > Math.abs(dx)) return
       direction.current = dx > 0 ? 'right' : 'left'
+      e.currentTarget.setPointerCapture(e.pointerId)
       if (direction.current === 'left') setDeleteOpen(false)
     }
 
@@ -86,6 +90,7 @@ export function useItemSwipe({
   function handlePointerUp() {
     if (!dragging || blocked) return
     setDragging(false)
+    activePointer.current = null
     const wasHorizontal = direction.current !== 'none'
     const offsetX = dragXRef.current
     if (wasHorizontal) suppressClickRef.current = true
@@ -113,7 +118,16 @@ export function useItemSwipe({
     direction.current = 'none'
   }
 
+  function handlePointerCancel() {
+    activePointer.current = null
+    direction.current = 'none'
+    setDragging(false)
+    dragXRef.current = 0
+    setDragX(0)
+  }
+
   function handleClick() {
+    if (blocked || deleteExiting) return
     if (suppressClickRef.current) {
       suppressClickRef.current = false
       return
@@ -135,6 +149,7 @@ export function useItemSwipe({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    handlePointerCancel,
     handleClick,
     confirmDelete,
     closeDelete,

@@ -77,7 +77,12 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
             <Icon path={ICON_PATHS.close} size={18} />
           </button>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        <div
+          className={`sheet-content flex min-h-0 flex-1 flex-col ${tall ? 'overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}
+          data-scrollable={!tall}
+        >
+          {children}
+        </div>
       </div>
     </dialog>,
     document.body

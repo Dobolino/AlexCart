@@ -39,7 +39,7 @@ export function ProduceWeightInput({ amount, onChange, compact = false }: Produc
         type="text"
         inputMode="decimal"
         className={`rounded-xl border-0 text-right font-semibold tabular-nums outline-none focus:ring-2 focus:ring-[var(--accent)] ${
-          compact ? 'w-[4.5rem] px-2 py-1.5 text-[14px]' : 'w-full px-3 py-2.5 text-[15px]'
+          compact ? 'min-h-11 w-[4.5rem] px-2 py-1.5 text-[16px]' : 'min-h-11 w-full px-3 py-2.5 text-[16px]'
         }`}
         style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
         placeholder="z. B. 347"
@@ -54,7 +54,10 @@ export function ProduceWeightInput({ amount, onChange, compact = false }: Produc
         }}
         aria-label="Gewicht in Gramm"
       />
-      <span className={`font-semibold ${compact ? 'text-[13px]' : 'text-[14px]'}`} style={{ color: 'var(--text-muted)' }}>
+      <span
+        className={`font-semibold ${compact ? 'text-[13px]' : 'text-[14px]'}`}
+        style={{ color: 'var(--text-muted)' }}
+      >
         g
       </span>
     </div>

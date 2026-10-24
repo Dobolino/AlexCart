@@ -69,3 +69,7 @@ function formatCompactNumber(n: number): string {
   const rounded = Math.round(n * 100) / 100
   return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',')
 }
+/** Keep recipe import annotations in the data while displaying the product itself. */
+export function productDisplayName(name: string): string {
+  return name.replace(/\s*\(Rezeptbedarf\b[^)]*\)\s*$/iu, '').trim() || name
+}

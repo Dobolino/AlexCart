@@ -28,7 +28,7 @@ Before generating or modifying code on a fresh session:
 | Framework | **Vite + React** (SPA, React Router) – kein Next.js |
 | Styling | Tailwind CSS, mobile-first, min. 44×44px touch targets, Light/Dark |
 | State & DB | **Zustand** + `persist` → **localStorage** (`alexshop-store`). `STORE_VERSION` bei Schema-Änderungen erhöhen + Migration in `migrate()` |
-| PWA | Vite PWA plugin, Service Worker, `autoUpdate`, iOS install prompt |
+| PWA | Vite PWA plugin, Service Worker, bestätigte Updates (`prompt`), iOS install prompt |
 | Tests | Vitest (`npm test`), Build (`npm run build`), Publish (`npm run publish:pages`) |
 
 > **Hinweis:** Die Spezifikation nennt IndexedDB/Dexie.js als Ziel – aktuell noch **localStorage**. Kein Dexie-Refactor ohne explizite Anforderung. Speicherort in Einstellungen als localStorage-Pfad anzeigen (`storageInfo.ts`).
@@ -134,7 +134,7 @@ interface ProductVariant {
 | JSON Backup Export/Import | ✅ |
 | Speicherort-Anzeige | ✅ |
 | Onboarding | ✅ |
-| Update-Banner bei neuer Version | ⚠️ autoUpdate, kein manueller Toggle |
+| Update-Banner bei neuer Version | ✅ `UpdateNotice`, Installation nach Bestätigung und außerhalb des Einkaufs |
 | Rubber-banding verhindern | ✅ (iOS viewport helpers) |
 
 ---
