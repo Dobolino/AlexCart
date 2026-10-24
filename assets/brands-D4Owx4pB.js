@@ -1,0 +1,1 @@
+function e(e,t){if(t)return e.find(e=>e.id===t)?.name}function t(t,n){return[e(n,t.brandId),t.name.trim()].filter(Boolean).join(` · `)||`Standard`}export{t};
