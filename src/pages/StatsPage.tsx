@@ -69,7 +69,8 @@ export function StatsPage() {
   const maxCategoryCount = categories[0]?.count ?? 1
   const maxTopCount = top[0]?.count ?? 1
   const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
-  const completionRate = stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
+  const completionRate =
+    stats.itemsAddedTotal > 0 ? Math.round((purchaseLog.length / stats.itemsAddedTotal) * 100) : 0
   const hasPriceData = pricedPurchaseCount(purchaseLog, currency) > 0
   const priceHistory = productPriceHistory(purchaseLog, currency)
   const spendWeeks = spendPerWeek(purchaseLog, 8, currency)
@@ -77,13 +78,14 @@ export function StatsPage() {
   const hasCompletedTrips = completedTrips.length > 0
   const tripWeeks = completedTripsPerWeek(completedTrips, 8)
   const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
+  const currencyTrips = completedTrips.filter((t) => (t.currency ?? 'CHF') === currency)
   const filteredTrips = calendarDate
-    ? completedTrips.filter((t) => timestampToDateKey(t.completedAt) === calendarDate)
-    : completedTrips
+    ? currencyTrips.filter((t) => timestampToDateKey(t.completedAt) === calendarDate)
+    : currencyTrips
   const filteredTripMonths = tripsByMonth(filteredTrips)
   const selectedTrip = completedTrips.find((t) => t.id === selectedTripId) ?? null
   const storeStats = avgBasketByStore(completedTrips, currency)
-  const promoSavings = promoSavingsInYear(purchaseLog, priceProfiles)
+  const promoSavings = promoSavingsInYear(purchaseLog, priceProfiles, undefined, currency)
 
   return (
     <>
@@ -116,17 +118,18 @@ export function StatsPage() {
         {hasCompletedTrips && (
           <>
             <TripCalendarSection
-              trips={completedTrips}
+              trips={currencyTrips}
               currency={currency}
               selectedDateKey={calendarDate}
-              onSelectDate={(dateKey) =>
-                setCalendarDate((prev) => (prev === dateKey ? null : dateKey))
-              }
+              onSelectDate={(dateKey) => setCalendarDate((prev) => (prev === dateKey ? null : dateKey))}
             />
             <div className="mb-4.5 grid grid-cols-3 gap-2.5">
               <StatTile value={completedTrips.length} label="Abgeschlossene Einkäufe" />
               <StatTile value={avgItemsPerCompletedTrip(completedTrips).toFixed(1)} label="Ø Artikel/Liste" />
-              <StatTile value={formatMoney(avgSpendPerCompletedTrip(completedTrips), currency)} label="Ø Wert/Liste" />
+              <StatTile
+                value={formatMoney(avgSpendPerCompletedTrip(completedTrips, currency), currency)}
+                label="Ø Wert/Liste"
+              />
             </div>
           </>
         )}
@@ -185,7 +188,11 @@ export function StatsPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[14px] font-semibold">
                           KW {isoWeekNumber(new Date(trip.completedAt))} ·{' '}
-                          {new Date(trip.completedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          {new Date(trip.completedAt).toLocaleDateString('de-DE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })}
                         </span>
                         <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
                           {trip.listName}
@@ -205,9 +212,18 @@ export function StatsPage() {
 
         {hasPriceData && (
           <div className="mb-4.5 grid grid-cols-3 gap-2.5">
-            <StatTile value={formatMoney(avgSpendPerTrip(purchaseLog, currency), currency)} label="Ø Ausgaben" />
-            <StatTile value={formatMoney(maxTripSpend(purchaseLog, currency), currency)} label="Teuerster Tag" />
-            <StatTile value={formatMoney(totalSpent(purchaseLog, currency), currency)} label="Gesamt erfasst" />
+            <StatTile
+              value={formatMoney(avgSpendPerTrip(purchaseLog, currency), currency)}
+              label="Ø Ausgaben"
+            />
+            <StatTile
+              value={formatMoney(maxTripSpend(purchaseLog, currency), currency)}
+              label="Teuerster Tag"
+            />
+            <StatTile
+              value={formatMoney(totalSpent(purchaseLog, currency), currency)}
+              label="Gesamt erfasst"
+            />
           </div>
         )}
 
@@ -273,17 +289,25 @@ export function StatsPage() {
                   {priceHistory.slice(0, 8).map((entry) => {
                     const perKg = productPricePerKg(priceProfiles, entry.name, entry.category, currency)
                     return (
-                      <div key={entry.name} className="mb-3 border-b pb-3 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
+                      <div
+                        key={entry.name}
+                        className="mb-3 border-b pb-3 last:mb-0 last:border-b-0"
+                        style={{ borderColor: 'var(--border)' }}
+                      >
                         <div className="mb-0.5 flex items-baseline justify-between gap-2">
                           <span className="text-[14px] font-bold">{entry.name}</span>
                           {perKg !== null && (
-                            <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: 'var(--accent)' }}>
+                            <span
+                              className="shrink-0 text-[12px] font-bold tabular-nums"
+                              style={{ color: 'var(--accent)' }}
+                            >
                               {formatMoney(pricePer100gFromKg(perKg), currency)}/100 g
                             </span>
                           )}
                         </div>
                         <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                          Zuletzt {formatMoney(entry.lastPrice, currency)} · Ø {formatMoney(entry.avgPrice, currency)} · {entry.count}× erfasst
+                          Zuletzt {formatMoney(entry.lastPrice, currency)} · Ø{' '}
+                          {formatMoney(entry.avgPrice, currency)} · {entry.count}× erfasst
                         </div>
                       </div>
                     )
@@ -306,7 +330,10 @@ export function StatsPage() {
                     <span style={{ color: 'var(--text-muted)' }}>{entry.count}×</span>
                   </div>
                   <div className="progress-track h-1.5">
-                    <div className="progress-fill" style={{ width: `${(entry.count / maxTopCount) * 100}%` }} />
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${(entry.count / maxTopCount) * 100}%` }}
+                    />
                   </div>
                 </div>
               ))}
@@ -356,7 +383,7 @@ export function StatsPage() {
       {selectedTrip && (
         <ReceiptSheet
           trip={selectedTrip}
-          currency={currency}
+          currency={selectedTrip.currency ?? 'CHF'}
           onClose={() => setSelectedTripId(null)}
           onUpdatePrice={(itemId, price) => updateCompletedTripItemPrice(selectedTrip.id, itemId, price)}
           onUpdateStore={(store) => updateCompletedTripStore(selectedTrip.id, store)}

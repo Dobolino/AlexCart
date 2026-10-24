@@ -1,3 +1,4 @@
+import { PantryIdeas } from '@/components/PantryIdeas'
 import { useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
@@ -54,12 +55,7 @@ export function PantryPage() {
 
   function handleAdd() {
     if (!name.trim()) return
-    addPantryItem(
-      name,
-      category,
-      joinAmount(amountValue, amountUnit),
-      joinAmount(minValue, minUnit)
-    )
+    addPantryItem(name, category, joinAmount(amountValue, amountUnit), joinAmount(minValue, minUnit))
     setName('')
     setAmountValue('')
     setMinValue('')
@@ -191,6 +187,7 @@ export function PantryPage() {
             </div>
           ))
         )}
+        <PantryIdeas />
       </main>
 
       {editing && <EditPantrySheet item={editing} onClose={() => setEditing(null)} />}

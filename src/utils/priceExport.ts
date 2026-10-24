@@ -5,13 +5,7 @@ import { categorySpendBreakdown, tripTotalSpent } from '@/utils/stats'
 import { avgBasketByStore } from '@/utils/storeStats'
 import { storeCountryFromCurrency } from '@/constants/stores'
 import { normalize } from '@/utils/text'
-import type {
-  CompletedTrip,
-  Currency,
-  GlobalBrand,
-  ProductPriceProfile,
-  PurchaseLogEntry,
-} from '@/types'
+import type { CompletedTrip, Currency, GlobalBrand, ProductPriceProfile, PurchaseLogEntry } from '@/types'
 
 export interface PriceExportPurchaseRow {
   /** Stabiler Schlüssel zum Diffen / Nachverfolgen von Änderungen. */
@@ -151,7 +145,8 @@ export function buildPriceExport(input: {
 
   purchases.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'de'))
 
-  const trips: PriceExportTripRow[] = [...input.completedTrips]
+  const trips: PriceExportTripRow[] = input.completedTrips
+    .filter((trip) => (trip.currency ?? 'CHF') === input.currency)
     .sort((a, b) => a.completedAt - b.completedAt)
     .map((trip) => {
       const date = tripDateKey(trip.completedAt)
@@ -229,7 +224,19 @@ function csvEscape(value: string | number | boolean): string {
 
 /** Flache Kaufzeilen als CSV – ideal für Tabellen und KI-Diagramme. */
 export function exportPriceCsv(payload: PriceExportPayload): string {
-  const header = ['key', 'id', 'date', 'name', 'category', 'price', 'currency', 'variant', 'brand', 'wasSale', 'store']
+  const header = [
+    'key',
+    'id',
+    'date',
+    'name',
+    'category',
+    'price',
+    'currency',
+    'variant',
+    'brand',
+    'wasSale',
+    'store',
+  ]
   const lines = [header.join(',')]
   for (const row of payload.purchases) {
     lines.push(

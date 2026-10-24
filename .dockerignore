@@ -1,0 +1,7 @@
+.git
+node_modules
+dist
+.local-data
+playwright-report
+test-results
+*.local

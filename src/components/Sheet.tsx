@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
@@ -7,45 +7,42 @@ import { useVisualViewportInset } from '@/hooks/useVisualViewportInset'
 interface SheetProps {
   onClose: () => void
   children: ReactNode
-  /** Volle Sheet-Höhe für dichte Inhalte, die intern scrollen (z. B. Preis-Sheet). */
   tall?: boolean
 }
 
+/** Native modal dialogs provide focus trapping, Escape and nested-dialog isolation. */
 export function Sheet({ onClose, children, tall = false }: SheetProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
   const { bottom, height } = useVisualViewportInset()
-
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow
+    const dialog = dialogRef.current!
+    const previous = document.activeElement as HTMLElement | null
+    const title = panelRef.current?.querySelector('h2')
+    if (title) {
+      title.id ||= titleId
+      dialog.setAttribute('aria-labelledby', title.id)
+    }
+    dialog.showModal()
+    const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = prevOverflow
+      dialog.close()
+      document.body.style.overflow = overflow
+      if (previous?.isConnected) previous.focus({ preventScroll: true })
     }
-  }, [])
-
-  // Fokussiertes Feld im scrollbaren Bereich sichtbar halten (z. B. Preis-Sheet).
-  useEffect(() => {
-    const panel = panelRef.current
-    if (!panel) return
-
-    function onFocusIn(e: FocusEvent) {
-      const target = e.target as HTMLElement
-      if (!target.matches('input, textarea, select')) return
-      requestAnimationFrame(() => {
-        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-      })
-    }
-
-    panel.addEventListener('focusin', onFocusIn)
-    return () => panel.removeEventListener('focusin', onFocusIn)
-  }, [])
-
+  }, [titleId])
   const maxPanelHeight = Math.min(height * (tall ? 0.96 : 0.92), height - 8)
-
   return createPortal(
-    <div
-      className="fixed inset-0 z-30 flex items-end"
-      style={{ background: 'rgba(0,0,0,0.4)', touchAction: 'none' }}
+    <dialog
+      ref={dialogRef}
+      className="sheet-dialog"
+      aria-label="Einkauf bearbeiten"
+      onCancel={(e) => {
+        e.preventDefault()
+        onClose()
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -69,20 +66,20 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative mb-3 flex h-9 shrink-0 items-center justify-center">
+        <div className="relative mb-3 flex h-11 shrink-0 items-center justify-center">
           <div className="h-1.5 w-9 rounded-full" style={{ background: 'var(--border)' }} />
           <button
-            className="tap-scale absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full"
+            className="tap-scale absolute right-0 flex h-11 w-11 items-center justify-center rounded-full"
             style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
             onClick={onClose}
             aria-label="Schließen"
           >
-            <Icon path={ICON_PATHS.close} size={16} />
+            <Icon path={ICON_PATHS.close} size={18} />
           </button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       </div>
-    </div>,
+    </dialog>,
     document.body
   )
 }

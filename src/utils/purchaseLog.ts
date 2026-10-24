@@ -28,9 +28,14 @@ export function todayPricedTotal(
   excludedIds: ReadonlySet<string> = new Set(),
   currency?: Currency
 ): number {
-  return Math.round(
-    todayPricedEntries(purchaseLog, today, excludedIds, currency).reduce((sum, e) => sum + (e.price ?? 0), 0) * 100
-  ) / 100
+  return (
+    Math.round(
+      todayPricedEntries(purchaseLog, today, excludedIds, currency).reduce(
+        (sum, e) => sum + (e.price ?? 0),
+        0
+      ) * 100
+    ) / 100
+  )
 }
 
 /** Summe der heute abgehakten Artikel auf einer bestimmten Liste. */
@@ -75,10 +80,7 @@ export function idsToExcludeTodayPricedCheckoffsForList(
   return purchaseLog
     .map((e, i) => ({ e, i }))
     .filter(
-      ({ e }) =>
-        e.date === today &&
-        (e.price ?? 0) > 0 &&
-        done.some((item) => matchesListItem(e, item))
+      ({ e }) => e.date === today && (e.price ?? 0) > 0 && done.some((item) => matchesListItem(e, item))
     )
     .map(({ e, i }) => purchaseLogEntryId(e, i))
 }
@@ -107,8 +109,10 @@ export function receiptItemsForSession(
     if (seen.has(id)) continue
     seen.add(id)
     const item = byId.get(id)
-    if (!item) continue
-    const entry = purchaseLog.find((e) => e.date === today && matchesListItem(e, item))
+    if (!item || !item.done) continue
+    const entry = item.purchaseLogId
+      ? purchaseLog.find((e) => e.id === item.purchaseLogId)
+      : [...purchaseLog].reverse().find((e) => e.date === today && matchesListItem(e, item))
     const price = entry?.price && entry.price > 0 ? entry.price : undefined
     out.push({ id: item.id, purchaseLogId: entry?.id, name: item.name, amount: item.amount, price })
   }
@@ -156,10 +160,7 @@ export function syncPurchaseLogForItemRename(
   return purchaseLog.map((entry) => {
     const linked =
       entry.itemId === itemId ||
-      (!entry.itemId &&
-        entry.date === today &&
-        entry.name === oldName &&
-        entry.category === oldCategory)
+      (!entry.itemId && entry.date === today && entry.name === oldName && entry.category === oldCategory)
     if (!linked) return entry
     return { ...entry, itemId, name: newName, category: newCategory }
   })

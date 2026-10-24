@@ -30,7 +30,13 @@ interface AddItemSheetProps {
 type Mode = 'search' | 'form' | 'import' | 'recipe'
 type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom'
 
-const EMPTY_FORM: ProductFormValues = { name: '', category: CATEGORIES[0], amountValue: '', unit: DEFAULT_UNIT, note: '' }
+const EMPTY_FORM: ProductFormValues = {
+  name: '',
+  category: CATEGORIES[0],
+  amountValue: '',
+  unit: DEFAULT_UNIT,
+  note: '',
+}
 
 export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddItemSheetProps) {
   const customProducts = useStore((s) => s.customProducts)
@@ -70,10 +76,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
   const results = useMemo(() => searchProducts(query, customProducts), [query, customProducts])
-  const lastPurchaseIndex = useMemo(
-    () => buildLastPurchaseIndex(completedTrips),
-    [completedTrips]
-  )
+  const lastPurchaseIndex = useMemo(() => buildLastPurchaseIndex(completedTrips), [completedTrips])
 
   function openConfirmFor(result: (typeof results)[number]) {
     const parsed = parseAmount(result.amount)
@@ -114,7 +117,9 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
       })
     }
 
-    const variantId = selectedBrandId ? ensureBrandVariant(form.name, form.category, selectedBrandId) : undefined
+    const variantId = selectedBrandId
+      ? ensureBrandVariant(form.name, form.category, selectedBrandId)
+      : undefined
     addItemToActiveList({ name: form.name, amount, category: form.category, note: form.note, variantId })
     setAddedCount((c) => c + 1)
     setQuery('')
@@ -197,7 +202,8 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
             key={m}
             className="flex-1 rounded-xl py-2 text-[12px] font-bold tap-scale"
             style={{
-              background: mode === m || (m === 'search' && mode === 'form') ? 'var(--surface)' : 'transparent',
+              background:
+                mode === m || (m === 'search' && mode === 'form') ? 'var(--surface)' : 'transparent',
               color: 'var(--text)',
             }}
             onClick={() => setMode(m)}
@@ -240,31 +246,56 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
               const color = getCategoryColor(r.category)
               const frequencyHint = lastPurchasedHintForName(r.name, lastPurchaseIndex)
               return (
-                <button
+                <div
                   key={r.customId || r.name}
-                  className="tap-scale flex w-full items-center gap-3 border-b px-1 py-3 text-left"
+                  className="flex items-center border-b"
                   style={{ borderColor: 'var(--border)' }}
-                  onClick={() => openConfirmFor(r)}
                 >
-                  <ProductIconSlot
-                    iconKey={iconKey}
-                    size={20}
-                    wrapClassName="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                    wrapStyle={{ background: color.bg, color: color.fg }}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">{r.name}</span>
-                    {frequencyHint && (
-                      <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {frequencyHint}
+                  <button
+                    className="tap-scale flex min-w-0 flex-1 items-center gap-3 border-b px-1 py-3 text-left"
+                    style={{ borderColor: 'var(--border)' }}
+                    onClick={() => {
+                      addItemToActiveList({
+                        name: r.name,
+                        category: r.category,
+                        amount: r.amount || `1 ${getDefaultUnit(getIconKey(r.name, r.category))}`,
+                        note: r.note,
+                      })
+                      onClose()
+                      onImported(`„${r.name}“ hinzugefügt`)
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      openConfirmFor(r)
+                    }}
+                  >
+                    <ProductIconSlot
+                      iconKey={iconKey}
+                      size={20}
+                      wrapClassName="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                      wrapStyle={{ background: color.bg, color: color.fg }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold">{r.name}</span>
+                      {frequencyHint && (
+                        <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          {frequencyHint}
+                        </span>
+                      )}
+                      <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        {r.category}
                       </span>
-                    )}
-                    <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      {r.category}
                     </span>
-                  </span>
-                  <Icon path={ICON_PATHS.plus} size={18} />
-                </button>
+                    <Icon path={ICON_PATHS.plus} size={18} />
+                  </button>
+                  <button
+                    className="h-11 w-11 shrink-0"
+                    aria-label={`${r.name}: Menge und Details`}
+                    onClick={() => openConfirmFor(r)}
+                  >
+                    <Icon path={ICON_PATHS.edit} size={18} />
+                  </button>
+                </div>
               )
             })}
             {query.trim() && (
@@ -294,11 +325,22 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
 
       {mode === 'form' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <h2 className="mb-3 text-lg font-bold">{formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}</h2>
+          <h2 className="mb-3 text-lg font-bold">
+            {formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}
+          </h2>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <ProductForm values={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} autoFocusName={formMode === 'new'} />
+            <ProductForm
+              values={form}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+              autoFocusName={formMode === 'new'}
+            />
             <div className="mt-3">
-              <BrandSelect brands={brands} value={selectedBrandId} onChange={setSelectedBrandId} onCreateBrand={ensureBrand} />
+              <BrandSelect
+                brands={brands}
+                value={selectedBrandId}
+                onChange={setSelectedBrandId}
+                onCreateBrand={ensureBrand}
+              />
             </div>
           </div>
           <div className="mt-4 flex shrink-0 gap-2.5">
@@ -402,7 +444,10 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
               style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
               open={showImportAiHelp}
             >
-              <summary className="cursor-pointer text-[13px] font-bold" style={{ color: 'var(--text-muted)' }}>
+              <summary
+                className="cursor-pointer text-[13px] font-bold"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Optional: JSON per KI erzeugen
               </summary>
               <p className="mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>

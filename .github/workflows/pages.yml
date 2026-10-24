@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -45,8 +45,17 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Build and publish to repo root (legacy Pages)
-        run: npm run publish:pages
+      - name: Build
+        run: npm run build
+
+      - name: Install browser for functional checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser and offline synchronization checks
+        run: npm run test:e2e
+
+      - name: Publish to repo root (legacy Pages)
+        run: node scripts/publish-legacy-pages.mjs
 
       - name: Commit built PWA for legacy GitHub Pages
         run: |

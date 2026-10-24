@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useSyncExternalStore } from 'react'
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -8,16 +8,28 @@ import { useTheme } from './hooks/useTheme'
 import { OnboardingSheet } from './components/OnboardingSheet'
 import { useEnsureStoreHydration } from './hooks/useStoreHydration'
 import { ListPage } from './pages/ListPage'
+import { storageStatus } from './store/storage'
+import { StorageNotice } from './components/StorageNotice'
+import { UpdateNotice } from './components/UpdateNotice'
 
+const PricesPage = lazy(() => import('./pages/PricesPage').then((m) => ({ default: m.PricesPage })))
+const JoinPage = lazy(() => import('./pages/JoinPage').then((m) => ({ default: m.JoinPage })))
 const PantryPage = lazy(() => import('./pages/PantryPage').then((m) => ({ default: m.PantryPage })))
-const CalculatorPage = lazy(() => import('./pages/CalculatorPage').then((m) => ({ default: m.CalculatorPage })))
+const CalculatorPage = lazy(() =>
+  import('./pages/CalculatorPage').then((m) => ({ default: m.CalculatorPage }))
+)
 const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
-const ShoppingModePage = lazy(() => import('./pages/ShoppingModePage').then((m) => ({ default: m.ShoppingModePage })))
+const ShoppingModePage = lazy(() =>
+  import('./pages/ShoppingModePage').then((m) => ({ default: m.ShoppingModePage }))
+)
 
 function RouteFallback() {
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+    <div
+      className="flex min-h-0 flex-1 items-center justify-center text-[14px] font-semibold"
+      style={{ color: 'var(--text-muted)' }}
+    >
       Laden…
     </div>
   )
@@ -38,6 +50,8 @@ function AnimatedRoutes() {
         <Suspense fallback={<RouteFallback />}>
           <Routes location={location}>
             <Route path="/" element={<ListPage />} />
+            <Route path="/prices" element={<PricesPage />} />
+            <Route path="/join" element={<JoinPage />} />
             <Route path="/shop" element={<ShoppingModePage />} />
             <Route path="/pantry" element={<PantryPage />} />
             <Route path="/calculator" element={<CalculatorPage />} />
@@ -53,16 +67,43 @@ function AnimatedRoutes() {
 function AppShell() {
   useTheme()
   useEnsureStoreHydration()
+  useEffect(() => {
+    let disposed = false
+    let cleanup: (() => void) | undefined
+    const start = () => {
+      try {
+        if (!localStorage.getItem('alexcart-shared-enabled')) return
+      } catch {
+        return
+      }
+      void import('./services/sync').then(async (m) => {
+        if (disposed) return
+        const stop = await m.startSync()
+        if (disposed) stop()
+        else cleanup = stop
+      })
+    }
+    const unsubscribe = useStore.persist.onFinishHydration(start)
+    if (useStore.persist.hasHydrated()) start()
+    return () => {
+      disposed = true
+      unsubscribe()
+      cleanup?.()
+    }
+  }, [])
   const location = useLocation()
   const hasSeenOnboarding = useStore((s) => s.settings.hasSeenOnboarding)
   const setHasSeenOnboarding = useStore((s) => s.setHasSeenOnboarding)
+  const storage = useSyncExternalStore(storageStatus.subscribe, storageStatus.getSnapshot)
   const hideNav = location.pathname === '/shop'
 
   return (
     <div className="app-shell">
+      <StorageNotice />
+      <UpdateNotice />
       <AnimatedRoutes />
       {!hideNav && <BottomNav />}
-      {!hasSeenOnboarding && <OnboardingSheet onDone={setHasSeenOnboarding} />}
+      {!hasSeenOnboarding && !storage.recovery && <OnboardingSheet onDone={setHasSeenOnboarding} />}
     </div>
   )
 }

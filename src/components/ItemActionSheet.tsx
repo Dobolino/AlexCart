@@ -9,6 +9,7 @@ interface ItemActionSheetProps {
   onEdit: () => void
   onAddToPantry: () => void
   onToggleFavorite: () => void
+  onUnavailable?: () => void
   onDelete: () => void
 }
 
@@ -35,11 +36,26 @@ function ActionRow({
   )
 }
 
-export function ItemActionSheet({ item, onClose, onEdit, onAddToPantry, onToggleFavorite, onDelete }: ItemActionSheetProps) {
+export function ItemActionSheet({
+  item,
+  onClose,
+  onEdit,
+  onAddToPantry,
+  onToggleFavorite,
+  onDelete,
+  onUnavailable,
+}: ItemActionSheetProps) {
   return (
     <Sheet onClose={onClose}>
       <h2 className="mb-3 truncate text-lg font-bold">{item.name}</h2>
       <div className="card-surface">
+        {onUnavailable && (
+          <ActionRow
+            icon={ICON_PATHS.close}
+            label={item.unavailable ? 'Wieder anzeigen' : 'Nicht gefunden · für später'}
+            onClick={onUnavailable}
+          />
+        )}
         <ActionRow icon={ICON_PATHS.edit} label="Bearbeiten" onClick={onEdit} />
         <ActionRow icon={ICON_PATHS.pantry} label="In Vorrat übernehmen" onClick={onAddToPantry} />
         <ActionRow

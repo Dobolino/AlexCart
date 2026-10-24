@@ -1,6 +1,10 @@
+import type { CatalogProduct, PriceObservation, FxSnapshot, RetailStore } from '@/types/catalog'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
+import { fingerprint } from '@/utils/fingerprint'
+import { observationFromPurchase } from './catalogPurchase'
+import { safeStorage } from './storage'
 import { BACKUP_VERSION } from '@/utils/backup'
 import { importFromJSON } from '@/utils/import'
 import { applyImportMode } from '@/utils/mergeList'
@@ -10,7 +14,11 @@ import { replenishPantryItem, decrementPantryAmount, prepareLowStockListAddition
 import { normalize } from '@/utils/text'
 import { todayKey, dateKeyToTimestamp, timestampToDateKey } from '@/utils/date'
 import { freshCalculatorEntries } from '@/utils/calculatorDay'
-import { idsToExcludeTodayPricedCheckoffs, idsToExcludeTodayPricedCheckoffsForList, syncPurchaseLogForItemRename } from '@/utils/purchaseLog'
+import {
+  idsToExcludeTodayPricedCheckoffs,
+  idsToExcludeTodayPricedCheckoffsForList,
+  syncPurchaseLogForItemRename,
+} from '@/utils/purchaseLog'
 import {
   buildProfilesFromPurchaseLog,
   ensureBrandVariant,
@@ -19,6 +27,7 @@ import {
   repriceRecordedPurchase,
   setPricesForCurrency,
   upsertPriceProfile,
+  refreshPurchaseProfiles,
 } from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
@@ -50,41 +59,19 @@ import type {
 const STORE_VERSION = BACKUP_VERSION
 const STORE_NAME = 'alexshop-store'
 
-/** localStorage kann auf iOS PWA hängen oder werfen – Fehler abfangen statt Boot-Loader. */
-const safeStorage = {
-  getItem: (name: string): string | null => {
-    try {
-      return localStorage.getItem(name)
-    } catch {
-      return null
-    }
-  },
-  setItem: (name: string, value: string): void => {
-    try {
-      localStorage.setItem(name, value)
-    } catch {
-      /* quota / private mode */
-    }
-  },
-  removeItem: (name: string): void => {
-    try {
-      localStorage.removeItem(name)
-    } catch {
-      /* ignore */
-    }
-  },
-}
-
 function defaultSettings(): AppSettings {
   return {
     theme: 'system',
-    listViewMode: 'tiles',
+    listViewMode: 'list',
     hasSeenOnboarding: false,
     askPriceOnCheckoff: false,
     weeklyBudget: 0,
     currency: 'CHF',
     shoppingAutoCollapse: true,
     customStores: [],
+    budgetsByCurrency: {},
+    apiUrl: '',
+    handedness: 'right',
   }
 }
 
@@ -119,10 +106,7 @@ function ensurePurchaseLogIds(log: PurchaseLogEntry[]): PurchaseLogEntry[] {
 }
 
 /** Versucht itemId aus bestehenden Listen nachzutragen (Migration). */
-function backfillPurchaseLogItemIds(
-  log: PurchaseLogEntry[],
-  lists: ShoppingList[]
-): PurchaseLogEntry[] {
+function backfillPurchaseLogItemIds(log: PurchaseLogEntry[], lists: ShoppingList[]): PurchaseLogEntry[] {
   const byNameCategory = new Map<string, ShoppingItem[]>()
   for (const list of lists) {
     for (const item of list.items) {
@@ -170,6 +154,20 @@ interface FilteredEntry {
 }
 
 interface AppState {
+  catalog: CatalogProduct[]
+  priceObservations: PriceObservation[]
+  retailStores: RetailStore[]
+  fxSnapshot: FxSnapshot | null
+  storeLayouts: Record<string, string[]>
+  upsertProduct: (product: CatalogProduct) => void
+  addPriceObservation: (observation: PriceObservation) => void
+  upsertRetailStore: (store: RetailStore) => void
+  setFxSnapshot: (fx: FxSnapshot) => void
+  setApiUrl: (url: string) => void
+  setHandedness: (value: 'left' | 'right') => void
+  setStoreLayout: (store: string, categories: string[]) => void
+  setShoppingStore: (store: string, country?: 'CH' | 'DE') => void
+  setItemUnavailable: (id: string, unavailable: boolean) => void
   lists: ShoppingList[]
   activeListId: string
   pantry: PantryItem[]
@@ -219,6 +217,8 @@ interface AppState {
     newListName?: string
     /** Einkaufsdatum (YYYY-MM-DD) – für Quittung und Preisprotokoll. */
     purchaseDate?: string
+    currency?: AppSettings['currency']
+    allowDuplicate?: boolean
     /** Bei target=existing: fehlende Bon-Artikel auch auf die Liste setzen. */
     addMissingItems?: boolean
     /** Bei target=trip: fehlende Bon-Artikel auch auf die Quittung setzen. */
@@ -232,8 +232,19 @@ interface AppState {
       wasSale?: boolean
     }>
   }) => { ok: boolean; error?: string; message: string }
-  addItemToActiveList: (item: { name: string; amount: string; category: string; note?: string; variantId?: string }) => void
-  updateItemInActiveList: (itemId: string, patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note' | 'variantId'>>) => void
+  addItemToActiveList: (item: {
+    name: string
+    amount: string
+    category: string
+    note?: string
+    variantId?: string
+    productId?: string
+    barcode?: string
+  }) => void
+  updateItemInActiveList: (
+    itemId: string,
+    patch: Partial<Pick<ShoppingItem, 'name' | 'amount' | 'category' | 'note' | 'variantId'>>
+  ) => void
   toggleItemDone: (itemId: string, priceOrData?: number | CheckoffPriceData) => void
   updatePurchaseLogPrice: (item: ShoppingItem, priceOrData: number | CheckoffPriceData) => void
   toggleItemFavorite: (itemId: string) => void
@@ -252,11 +263,19 @@ interface AppState {
   deleteList: (listId: string) => void
 
   addPantryItem: (name: string, category: string, amount?: string, minAmount?: string) => void
-  updatePantryItem: (id: string, patch: Partial<Pick<PantryItem, 'name' | 'category' | 'amount' | 'minAmount'>>) => void
+  updatePantryItem: (
+    id: string,
+    patch: Partial<Pick<PantryItem, 'name' | 'category' | 'amount' | 'minAmount' | 'expiresOn'>>
+  ) => void
   decrementPantryItem: (id: string) => boolean
   removePantryItem: (id: string) => void
 
-  addCustomProduct: (input: { name: string; category: string; amount: string; note?: string }) => CustomProduct
+  addCustomProduct: (input: {
+    name: string
+    category: string
+    amount: string
+    note?: string
+  }) => CustomProduct
   updateCustomProduct: (id: string, patch: Partial<Omit<CustomProduct, 'id' | 'createdAt'>>) => void
   removeCustomProduct: (id: string) => void
 
@@ -324,6 +343,61 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
+      catalog: [],
+      priceObservations: [],
+      retailStores: [],
+      fxSnapshot: null,
+      storeLayouts: {},
+      upsertProduct: (product) =>
+        set((state) => ({ catalog: [...state.catalog.filter((p) => p.id !== product.id), product] })),
+      addPriceObservation: (observation) =>
+        set((state) => ({
+          priceObservations: [...state.priceObservations.filter((p) => p.id !== observation.id), observation],
+        })),
+      upsertRetailStore: (store) =>
+        set((state) => ({ retailStores: [...state.retailStores.filter((s) => s.id !== store.id), store] })),
+      setFxSnapshot: (fxSnapshot) => set({ fxSnapshot }),
+      setApiUrl: (apiUrl) => set((state) => ({ settings: { ...state.settings, apiUrl } })),
+      setHandedness: (handedness) => set((state) => ({ settings: { ...state.settings, handedness } })),
+      setStoreLayout: (store, categories) =>
+        set((state) => ({ storeLayouts: { ...state.storeLayouts, [store]: [...new Set(categories)] } })),
+      setShoppingStore: (store, country) =>
+        set((state) => {
+          const currency = country
+            ? country === 'CH'
+              ? 'CHF'
+              : 'EUR'
+            : (state.shoppingSession?.currency ?? state.settings.currency)
+          if (
+            !state.shoppingSession ||
+            (state.shoppingSession.checkedItemIds.length && currency !== state.shoppingSession.currency)
+          )
+            return state
+          const storeId = `${country ?? (currency === 'CHF' ? 'CH' : 'DE')}:${store.toLocaleLowerCase('de')}`
+          return {
+            shoppingSession: { ...state.shoppingSession, store, storeId, currency },
+            retailStores: [
+              ...state.retailStores.filter((s) => s.id !== storeId),
+              {
+                id: storeId,
+                retailerId: storeId.split(':').slice(0, 2).join(':'),
+                name: store,
+                country: country ?? (currency === 'CHF' ? 'CH' : 'DE'),
+                currency,
+              },
+            ],
+          }
+        }),
+      setItemUnavailable: (id, unavailable) => {
+        const list = get().activeList()
+        set((state) => ({
+          lists: state.lists.map((l) =>
+            l.id !== list?.id
+              ? l
+              : { ...l, items: l.items.map((i) => (i.id === id ? { ...i, unavailable } : i)) }
+          ),
+        }))
+      },
       lists: [newList('Wocheneinkauf')],
       activeListId: '',
       pantry: defaultPantry(),
@@ -362,13 +436,13 @@ export const useStore = create<AppState>()(
 
         set((state) => ({
           lists: state.lists.map((l) =>
-            l.id === list.id
-              ? { ...l, weekLabel: result.weekLabel || l.weekLabel, items: mergedItems }
-              : l
+            l.id === list.id ? { ...l, weekLabel: result.weekLabel || l.weekLabel, items: mergedItems } : l
           ),
           filtered: [
             ...state.filtered.filter((f) => f.listId !== list.id),
-            ...(result.filtered && result.filtered.length ? [{ listId: list.id, items: result.filtered }] : []),
+            ...(result.filtered && result.filtered.length
+              ? [{ listId: list.id, items: result.filtered }]
+              : []),
           ],
           stats: {
             ...state.stats,
@@ -401,7 +475,11 @@ export const useStore = create<AppState>()(
         const openNames = new Set(list.items.filter((i) => !i.done).map((i) => normalize(i.name)))
         const toAdd = candidatesToItems(candidates.filter((c) => !openNames.has(normalize(c.name))))
         if (!toAdd.length) {
-          return { ok: false, error: 'Alle Artikel von letzter Woche sind bereits auf der Liste.', addedCount: 0 }
+          return {
+            ok: false,
+            error: 'Alle Artikel von letzter Woche sind bereits auf der Liste.',
+            addedCount: 0,
+          }
         }
 
         const openBefore = list.items.filter((i) => !i.done).length
@@ -435,6 +513,8 @@ export const useStore = create<AppState>()(
         tripId,
         newListName,
         purchaseDate,
+        currency: inputCurrency,
+        allowDuplicate,
         addMissingItems,
         addMissingTripItems,
         items,
@@ -442,7 +522,23 @@ export const useStore = create<AppState>()(
         if (!items.length) return { ok: false, error: 'Keine Artikel.', message: '' }
 
         const purchaseDay = purchaseDate?.trim() || todayKey()
-        const currency = get().settings.currency
+        const currency =
+          target === 'trip'
+            ? (get().completedTrips.find((t) => t.id === tripId)?.currency ?? 'CHF')
+            : (inputCurrency ?? get().settings.currency)
+        const importFingerprint = fingerprint([
+          normalize(store),
+          currency,
+          purchaseDay,
+          items.map((i) => [normalize(i.name), i.amount, i.price, i.unitPrice, !!i.wasSale]).sort(),
+        ])
+        if (
+          !allowDuplicate &&
+          target !== 'trip' &&
+          get().completedTrips.some((t) => t.importFingerprint === importFingerprint)
+        ) {
+          return { ok: false, error: 'Dieser Kassenbon wurde bereits importiert.', message: '' }
+        }
 
         // --- Bestehenden Kassenbon (Quittung) abgleichen ---
         if (target === 'trip') {
@@ -458,19 +554,15 @@ export const useStore = create<AppState>()(
           let priceProfiles = get().priceProfiles
           const purchaseLog = [...get().purchaseLog]
           const otherTripLogIds = new Set(
-            trips.filter((t) => t.id !== trip.id).flatMap((t) => t.items.map((i) => i.purchaseLogId).filter((id): id is string => !!id))
+            trips
+              .filter((t) => t.id !== trip.id)
+              .flatMap((t) => t.items.map((i) => i.purchaseLogId).filter((id): id is string => !!id))
           )
 
           const findTripMatch = (name: string) => {
             const key = normalize(name)
             const available = nextItems.filter((i) => !matchedIds.has(i.id))
-            return (
-              available.find((i) => normalize(i.name) === key) ||
-              available.find((i) => {
-                const n = normalize(i.name)
-                return n.includes(key) || key.includes(n)
-              })
-            )
+            return available.find((i) => normalize(i.name) === key)
           }
 
           for (const line of items) {
@@ -478,9 +570,13 @@ export const useStore = create<AppState>()(
             if (match) {
               matchedIds.add(match.id)
               const oldDate = timestampToDateKey(trip.completedAt)
-              const candidates = purchaseLog.filter((entry) =>
-                entry.date === oldDate && entry.name === match.name && entry.price === match.price &&
-                !!entry.id && !otherTripLogIds.has(entry.id)
+              const candidates = purchaseLog.filter(
+                (entry) =>
+                  entry.date === oldDate &&
+                  entry.name === match.name &&
+                  entry.price === match.price &&
+                  !!entry.id &&
+                  !otherTripLogIds.has(entry.id)
               )
               const logId = match.purchaseLogId ?? (candidates.length === 1 ? candidates[0]?.id : undefined)
               const logIndex = logId ? purchaseLog.findIndex((entry) => entry.id === logId) : -1
@@ -495,6 +591,7 @@ export const useStore = create<AppState>()(
                   date: purchaseDay,
                   price: line.price,
                   profilePrice: nextProfilePrice,
+                  wasSale: line.wasSale ?? oldEntry.wasSale,
                 }
               }
               nextItems = nextItems.map((i) =>
@@ -516,7 +613,13 @@ export const useStore = create<AppState>()(
                 variantName: store.trim() || trip.store || 'Standard',
               }
               const purchase = recordVariantPurchase(
-                priceProfiles, line.name, normalizeCategory(line.category), data, purchaseDay, uid, currency
+                priceProfiles,
+                line.name,
+                normalizeCategory(line.category),
+                data,
+                purchaseDay,
+                uid,
+                currency
               )
               priceProfiles = purchase.createdNewProfile
                 ? [...priceProfiles, purchase.profile]
@@ -554,6 +657,7 @@ export const useStore = create<AppState>()(
             completedAt: dateKeyToTimestamp(purchaseDay),
             store: store.trim() || trip.store,
             currency,
+            importFingerprint,
           }
           trips[tripIndex] = updatedTrip
 
@@ -567,7 +671,7 @@ export const useStore = create<AppState>()(
               }
             }
             return {
-              priceProfiles,
+              priceProfiles: refreshPurchaseProfiles(priceProfiles, purchaseLog, purchaseLog),
               purchaseLog,
               settings: nextSettings,
               completedTrips: trips,
@@ -594,15 +698,10 @@ export const useStore = create<AppState>()(
         let added = 0
 
         let list =
-          target === 'existing'
-            ? lists.find((l) => l.id === listId) ?? get().activeList()
-            : undefined
+          target === 'existing' ? (lists.find((l) => l.id === listId) ?? get().activeList()) : undefined
 
         if (target === 'new') {
-          const name =
-            newListName?.trim() ||
-            store.trim() ||
-            'Kassenbon'
+          const name = newListName?.trim() || store.trim() || 'Kassenbon'
           list = newList(name)
           lists = [...lists, list]
           activeListId = list.id
@@ -618,13 +717,7 @@ export const useStore = create<AppState>()(
           const current = (lists.find((l) => l.id === targetListId)?.items ?? list!.items).filter(
             (i) => !matchedItemIds.has(i.id)
           )
-          return (
-            current.find((i) => normalize(i.name) === key) ||
-            current.find((i) => {
-              const n = normalize(i.name)
-              return n.includes(key) || key.includes(n)
-            })
-          )
+          return current.find((i) => normalize(i.name) === key)
         }
 
         const shouldAddItems = target === 'new' || !!addMissingItems
@@ -636,7 +729,7 @@ export const useStore = create<AppState>()(
               amount: i.amount,
               category: i.category,
             }))
-            const importResult = importFromJSON(JSON.stringify({ items: payload }), get().pantry)
+            const importResult = importFromJSON(JSON.stringify({ items: payload }), [])
             if (!importResult.ok || !importResult.kept) {
               return { ok: false, error: importResult.error || 'Import fehlgeschlagen.', message: '' }
             }
@@ -662,24 +755,21 @@ export const useStore = create<AppState>()(
           const match = findMatch(line.name)
           if (match) {
             matchedItemIds.add(match.id)
-            const result = commitItemPurchase(
-              { purchaseLog, priceProfiles, lists, pantry },
-              match,
-              data,
-              {
-                listId: targetListId,
-                itemId: match.id,
-                markDone: match.done,
-                wasDone: match.done,
-                currency,
-                purchaseDate: purchaseDay,
-              }
-            )
+            const result = commitItemPurchase({ purchaseLog, priceProfiles, lists, pantry }, match, data, {
+              listId: targetListId,
+              itemId: match.id,
+              markDone: match.done,
+              wasDone: match.done,
+              currency,
+              purchaseDate: purchaseDay,
+            })
             purchaseLog = result.purchaseLog
             priceProfiles = result.priceProfiles
             lists = result.lists
             pantry = result.pantry
-            receiptLogIds.push([...purchaseLog].reverse().find((e) => e.itemId === match.id && e.date === purchaseDay)?.id)
+            receiptLogIds.push(
+              [...purchaseLog].reverse().find((e) => e.itemId === match.id && e.date === purchaseDay)?.id
+            )
             matched += 1
           } else {
             const purchase = recordVariantPurchase(
@@ -727,6 +817,7 @@ export const useStore = create<AppState>()(
           completedAt: dateKeyToTimestamp(purchaseDay),
           store: store.trim() || undefined,
           currency,
+          importFingerprint,
           items: tripItems,
         }
 
@@ -746,7 +837,7 @@ export const useStore = create<AppState>()(
             priceProfiles,
             purchaseLog,
             settings: nextSettings,
-            completedTrips: [trip, ...state.completedTrips].slice(0, 100),
+            completedTrips: [trip, ...state.completedTrips],
             stats: {
               ...state.stats,
               importsCount: state.stats.importsCount + 1,
@@ -776,6 +867,8 @@ export const useStore = create<AppState>()(
           category: normalizeCategory(item.category),
           note: item.note?.trim() || undefined,
           variantId: item.variantId || undefined,
+          productId: item.productId,
+          barcode: item.barcode,
           done: false,
           favorite: false,
           addedAt: Date.now(),
@@ -811,9 +904,13 @@ export const useStore = create<AppState>()(
                           ...i,
                           ...(patch.name !== undefined ? { name: patch.name.trim() || i.name } : {}),
                           ...(patch.amount !== undefined ? { amount: patch.amount.trim() } : {}),
-                          ...(patch.category !== undefined ? { category: normalizeCategory(patch.category) } : {}),
+                          ...(patch.category !== undefined
+                            ? { category: normalizeCategory(patch.category) }
+                            : {}),
                           ...(patch.note !== undefined ? { note: patch.note.trim() || undefined } : {}),
-                          ...(patch.variantId !== undefined ? { variantId: patch.variantId || undefined } : {}),
+                          ...(patch.variantId !== undefined
+                            ? { variantId: patch.variantId || undefined }
+                            : {}),
                         }
                   ),
                 }
@@ -850,33 +947,68 @@ export const useStore = create<AppState>()(
                 itemId,
                 markDone: true,
                 wasDone: item.done,
-                currency: state.settings.currency,
+                storeId: state.shoppingSession?.storeId,
+                currency:
+                  state.shoppingSession?.listId === list.id
+                    ? (state.shoppingSession.currency ?? state.settings.currency)
+                    : state.settings.currency,
               })
             } else {
+              const logId = uid()
+              const pantry = replenishPantryItem(state.pantry, item)
+              const stock = state.pantry.find((p) => normalize(p.name) === normalize(item.name))
               base = {
                 lists: state.lists.map((l) =>
                   l.id !== list.id
                     ? l
-                    : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: true } : i)) }
+                    : {
+                        ...l,
+                        items: l.items.map((i) =>
+                          i.id === itemId ? { ...i, done: true, purchaseLogId: logId } : i
+                        ),
+                      }
                 ),
                 purchaseLog: [
                   ...state.purchaseLog,
                   {
                     id: uid(),
                     itemId,
+                    productId: item.productId,
+                    storeId: state.shoppingSession?.storeId,
                     name: item.name,
                     category: item.category,
                     date: todayKey(),
-                    currency: state.settings.currency,
+                    currency:
+                      state.shoppingSession?.listId === list.id
+                        ? (state.shoppingSession.currency ?? state.settings.currency)
+                        : state.settings.currency,
+                    ...(stock && pantry !== state.pantry
+                      ? {
+                          pantryMovement: {
+                            pantryId: stock.id,
+                            amount: item.amount,
+                            before: stock.amount,
+                            after: pantry.find((p) => p.id === stock.id)?.amount,
+                          },
+                        }
+                      : {}),
                   },
                 ],
-                pantry: replenishPantryItem(state.pantry, item),
+                pantry,
               }
             }
           } else {
             base = undoTodayCheckoff(state, item, list.id, itemId)
           }
 
+          const oldLog = state.purchaseLog.filter((e) => e.itemId === itemId).slice(-1)[0]
+          const nextLog = base.purchaseLog?.filter((e) => e.itemId === itemId).slice(-1)[0]
+          const observation = nextLog ? observationFromPurchase(nextLog) : null
+          const replacedIds = new Set([oldLog?.id, nextLog?.id].filter(Boolean))
+          base.priceObservations = state.priceObservations.filter(
+            (p) => !p.purchaseLogId || !replacedIds.has(p.purchaseLogId)
+          )
+          if (observation) base.priceObservations.push(observation)
           // Nur in dieser Sitzung abgehakte Artikel merken – bestimmt später die Quittung.
           const session = state.shoppingSession
           if (session && session.listId === list.id) {
@@ -891,18 +1023,29 @@ export const useStore = create<AppState>()(
 
       updatePurchaseLogPrice: (item, priceOrData) => {
         const checkoff = parseCheckoffInput(priceOrData)
-        if (!checkoff) return
         const list = get().activeList()
-        if (!list) return
-        set((state) =>
-          commitItemPurchase(state, item, checkoff, {
+        if (!checkoff || !list) return
+        set((state) => {
+          const previous = state.purchaseLog.filter((e) => e.itemId === item.id).slice(-1)[0]
+          const next = commitItemPurchase(state, item, checkoff, {
             listId: list.id,
             itemId: item.id,
             markDone: true,
             wasDone: true,
-            currency: state.settings.currency,
+            currency: previous?.currency ?? state.settings.currency,
+            purchaseDate: previous?.date,
+            storeId: previous?.storeId ?? state.shoppingSession?.storeId,
           })
-        )
+          const log = next.purchaseLog.filter((e) => e.itemId === item.id).slice(-1)[0]
+          const observation = log ? observationFromPurchase(log) : null
+          return {
+            ...next,
+            priceObservations: [
+              ...state.priceObservations.filter((p) => p.purchaseLogId !== log?.id),
+              ...(observation ? [observation] : []),
+            ],
+          }
+        })
       },
 
       deleteItem: (itemId) => {
@@ -952,7 +1095,7 @@ export const useStore = create<AppState>()(
         const doneItems = list.items.filter((i) => i.done)
         if (doneItems.length !== orderedIds.length) return
         const byId = new Map(doneItems.map((i) => [i.id, i]))
-        if (!orderedIds.every((id) => byId.has(id))) return
+        if (new Set(orderedIds).size !== orderedIds.length || !orderedIds.every((id) => byId.has(id))) return
         const reorderedDone = orderedIds.map((id) => byId.get(id)!)
         let di = 0
         const newItems = list.items.map((item) => (item.done ? reorderedDone[di++]! : item))
@@ -972,13 +1115,16 @@ export const useStore = create<AppState>()(
       reorderItemsInCategory: (category, orderedIds) => {
         const list = get().activeList()
         if (!list) return
-        const groups = groupByCategory(list.items)
+        const groups = groupByCategory(list.items.filter((i) => !i.done))
         const group = groups.find((g) => g.category === category)
         if (!group || group.items.length !== orderedIds.length) return
         const byId = new Map(group.items.map((i) => [i.id, i]))
-        if (!orderedIds.every((id) => byId.has(id))) return
+        if (new Set(orderedIds).size !== orderedIds.length || !orderedIds.every((id) => byId.has(id))) return
         const reordered = orderedIds.map((id) => byId.get(id)!)
-        const newItems = groups.flatMap((g) => (g.category === category ? reordered : g.items))
+        let index = 0
+        const newItems = list.items.map((item) =>
+          !item.done && item.category === category ? reordered[index++]! : item
+        )
         set((state) => ({
           lists: state.lists.map((l) => (l.id !== list.id ? l : { ...l, items: newItems })),
         }))
@@ -1051,7 +1197,10 @@ export const useStore = create<AppState>()(
                   ...(patch.name !== undefined ? { name: patch.name.trim() || item.name } : {}),
                   ...(patch.category !== undefined ? { category: normalizeCategory(patch.category) } : {}),
                   ...(patch.amount !== undefined ? { amount: patch.amount.trim() || undefined } : {}),
-                  ...(patch.minAmount !== undefined ? { minAmount: patch.minAmount.trim() || undefined } : {}),
+                  ...(patch.minAmount !== undefined
+                    ? { minAmount: patch.minAmount.trim() || undefined }
+                    : {}),
+                  ...('expiresOn' in patch ? { expiresOn: patch.expiresOn } : {}),
                 }
           ),
         })),
@@ -1082,9 +1231,7 @@ export const useStore = create<AppState>()(
               favorite: false,
               addedAt: Date.now(),
             }
-            lists = lists.map((l) =>
-              l.id !== list.id ? l : { ...l, items: [...l.items, newItem] }
-            )
+            lists = lists.map((l) => (l.id !== list.id ? l : { ...l, items: [...l.items, newItem] }))
             addedToList = true
           }
         }
@@ -1205,10 +1352,22 @@ export const useStore = create<AppState>()(
         set((state) => ({
           settings: {
             ...state.settings,
-            weeklyBudget: Number.isFinite(weeklyBudget) && weeklyBudget > 0 ? Math.round(weeklyBudget * 100) / 100 : 0,
+            weeklyBudget:
+              Number.isFinite(weeklyBudget) && weeklyBudget > 0 ? Math.round(weeklyBudget * 100) / 100 : 0,
           },
         })),
-      setCurrency: (currency) => set((state) => ({ settings: { ...state.settings, currency } })),
+      setCurrency: (currency) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            currency,
+            budgetsByCurrency: {
+              ...state.settings.budgetsByCurrency,
+              [state.settings.currency]: state.settings.weeklyBudget,
+            },
+            weeklyBudget: state.settings.budgetsByCurrency?.[currency] ?? 0,
+          },
+        })),
       addCustomStore: (name) => {
         const trimmed = name.trim()
         if (!trimmed) return
@@ -1242,6 +1401,11 @@ export const useStore = create<AppState>()(
         set(() => {
           const list = newList('Wocheneinkauf')
           return {
+            catalog: [],
+            priceObservations: [],
+            retailStores: [],
+            fxSnapshot: null,
+            storeLayouts: {},
             lists: [list],
             activeListId: list.id,
             pantry: defaultPantry(),
@@ -1273,7 +1437,7 @@ export const useStore = create<AppState>()(
         set((state) => {
           const fresh = freshCalculatorEntries(state.calculatorEntries, state.calculatorDate)
           return {
-            calculatorEntries: [...fresh.entries, { id: uid(), amount }],
+            calculatorEntries: [...fresh.entries, { id: uid(), amount, currency: state.settings.currency }],
             calculatorDate: fresh.date,
           }
         })
@@ -1326,7 +1490,8 @@ export const useStore = create<AppState>()(
               listId: entry.listId,
               listName: entry.listName,
               completedAt: Date.now(),
-              currency: state.settings.currency,
+              currency: state.shoppingSession?.currency ?? state.settings.currency,
+              store: state.shoppingSession?.store,
               items: entry.items,
               ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
             },
@@ -1341,6 +1506,7 @@ export const useStore = create<AppState>()(
           shoppingSession: {
             listId,
             startedAt: Date.now(),
+            currency: get().settings.currency,
             totalPausedMs: 0,
             checkedItemIds: [],
           },
@@ -1364,6 +1530,7 @@ export const useStore = create<AppState>()(
         const pausedMs = Math.max(0, Date.now() - session.pausedAt)
         set({
           shoppingSession: {
+            ...session,
             listId: session.listId,
             startedAt: session.startedAt,
             totalPausedMs: session.totalPausedMs + pausedMs,
@@ -1375,20 +1542,51 @@ export const useStore = create<AppState>()(
       clearShoppingSession: () => set({ shoppingSession: null }),
 
       updateCompletedTripItemPrice: (tripId, itemId, price) =>
-        set((state) => ({
-          completedTrips: state.completedTrips.map((trip) =>
-            trip.id !== tripId
-              ? trip
+        set((state) => {
+          const trip = state.completedTrips.find((t) => t.id === tripId)
+          const item = trip?.items.find((i) => i.id === itemId)
+          if (!trip || !item) return state
+          const nextPrice =
+            price !== undefined && Number.isFinite(price) && price > 0
+              ? Math.round(price * 100) / 100
+              : undefined
+          const affected = state.purchaseLog.find((e) => e.id === item.purchaseLogId)
+          const ratio = affected?.profilePrice && affected.price ? affected.price / affected.profilePrice : 1
+          const purchaseLog = state.purchaseLog.map((entry) =>
+            entry !== affected
+              ? entry
               : {
-                  ...trip,
-                  items: trip.items.map((item) =>
-                    item.id !== itemId
-                      ? item
-                      : { ...item, price: price !== undefined && price > 0 ? price : undefined }
-                  ),
+                  ...entry,
+                  price: nextPrice,
+                  profilePrice: nextPrice === undefined ? undefined : nextPrice / ratio,
+                  pricePerKg:
+                    entry.pricePerKg === undefined
+                      ? undefined
+                      : nextPrice === undefined
+                        ? undefined
+                        : nextPrice / ratio,
                 }
-          ),
-        })),
+          )
+          return {
+            purchaseLog,
+            priceObservations: state.priceObservations.flatMap((observation) => {
+              if (!affected?.id || observation.purchaseLogId !== affected.id) return [observation]
+              const updated = purchaseLog.find((e) => e.id === affected.id)
+              const next = updated ? observationFromPurchase(updated) : null
+              return next ? [next] : []
+            }),
+            priceProfiles: refreshPurchaseProfiles(
+              state.priceProfiles,
+              purchaseLog,
+              affected ? [affected] : []
+            ),
+            completedTrips: state.completedTrips.map((t) =>
+              t.id !== tripId
+                ? t
+                : { ...t, items: t.items.map((i) => (i.id !== itemId ? i : { ...i, price: nextPrice })) }
+            ),
+          }
+        }),
 
       updateCompletedTripStore: (tripId, store) =>
         set((state) => ({
@@ -1402,13 +1600,21 @@ export const useStore = create<AppState>()(
           const trip = state.completedTrips.find((t) => t.id === tripId)
           if (!trip) return state
           const newTs = dateKeyToTimestamp(dateKey)
+          if (!Number.isFinite(newTs) || timestampToDateKey(newTs) !== dateKey) return state
           const logIds = new Set(trip.items.map((i) => i.purchaseLogId).filter((id): id is string => !!id))
+          const affected = state.purchaseLog.filter((entry) => entry.id && logIds.has(entry.id))
           const purchaseLog = state.purchaseLog.map((entry) => {
             if (!entry.id || !logIds.has(entry.id)) return entry
             return { ...entry, date: dateKey }
           })
           return {
             purchaseLog,
+            priceProfiles: refreshPurchaseProfiles(state.priceProfiles, purchaseLog, affected),
+            priceObservations: state.priceObservations.map((observation) =>
+              observation.purchaseLogId && logIds.has(observation.purchaseLogId)
+                ? { ...observation, observedAt: new Date(newTs).toISOString() }
+                : observation
+            ),
             completedTrips: state.completedTrips.map((t) =>
               t.id !== tripId ? t : { ...t, completedAt: newTs }
             ),
@@ -1423,9 +1629,7 @@ export const useStore = create<AppState>()(
       removeCompletedTripItem: (tripId, itemId) =>
         set((state) => ({
           completedTrips: state.completedTrips.map((trip) =>
-            trip.id !== tripId
-              ? trip
-              : { ...trip, items: trip.items.filter((item) => item.id !== itemId) }
+            trip.id !== tripId ? trip : { ...trip, items: trip.items.filter((item) => item.id !== itemId) }
           ),
         })),
     }),
@@ -1505,13 +1709,24 @@ export const useStore = create<AppState>()(
             // Frühe Kurzform dieser Version speicherte nur itemCount/totalSpent statt
             // Einzelposten - als eine Sammel-Zeile übernehmen, damit die Summe erhalten bleibt.
             state.completedTrips = (state.completedTrips ?? []).map((trip) => {
-              const legacy = trip as unknown as { items?: CompletedTripItem[]; itemCount?: number; totalSpent?: number }
+              const legacy = trip as unknown as {
+                items?: CompletedTripItem[]
+                itemCount?: number
+                totalSpent?: number
+              }
               if (Array.isArray(legacy.items)) return trip
               return {
                 ...trip,
                 items:
                   legacy.itemCount && legacy.itemCount > 0
-                    ? [{ id: uid(), name: 'Diverse Artikel', amount: '', price: legacy.totalSpent || undefined }]
+                    ? [
+                        {
+                          id: uid(),
+                          name: 'Diverse Artikel',
+                          amount: '',
+                          price: legacy.totalSpent || undefined,
+                        },
+                      ]
                     : [],
               }
             })
@@ -1574,6 +1789,18 @@ export const useStore = create<AppState>()(
               }))
             }
           }
+          if (version < 20) {
+            const originalCurrency = state.settings?.currency ?? 'CHF'
+            state.calculatorEntries = (state.calculatorEntries ?? []).map((e) => ({
+              ...e,
+              currency: e.currency ?? originalCurrency,
+            }))
+            state.settings = {
+              ...defaultSettings(),
+              ...state.settings,
+              budgetsByCurrency: { [originalCurrency]: state.settings?.weeklyBudget ?? 0 },
+            }
+          }
           if (version < 19) {
             state.settings = {
               ...defaultSettings(),
@@ -1588,6 +1815,11 @@ export const useStore = create<AppState>()(
         }
       },
       partialize: (state) => ({
+        catalog: state.catalog,
+        priceObservations: state.priceObservations,
+        retailStores: state.retailStores,
+        fxSnapshot: state.fxSnapshot,
+        storeLayouts: state.storeLayouts,
         lists: state.lists,
         activeListId: state.activeListId,
         pantry: state.pantry,
@@ -1609,15 +1841,25 @@ export const useStore = create<AppState>()(
           const persisted = (persistedState as Partial<AppState>) || {}
           const hasPersisted = persisted.lists && persisted.lists.length > 0
           if (hasPersisted) {
-            const calc = freshCalculatorEntries(
-              persisted.calculatorEntries ?? [],
-              persisted.calculatorDate
-            )
+            const calc = freshCalculatorEntries(persisted.calculatorEntries ?? [], persisted.calculatorDate)
             return {
               ...currentState,
               ...persisted,
               stats: { ...defaultStats(), ...persisted.stats },
               settings: { ...defaultSettings(), ...persisted.settings },
+              lists: persisted.lists!.map((l) => ({
+                ...l,
+                name: l.name ?? 'Einkaufsliste',
+                weekLabel: l.weekLabel ?? '',
+                createdAt: l.createdAt ?? Date.now(),
+              })),
+              shoppingSession: persisted.shoppingSession
+                ? {
+                    ...persisted.shoppingSession,
+                    currency: persisted.shoppingSession.currency ?? persisted.settings?.currency ?? 'CHF',
+                    checkedItemIds: persisted.shoppingSession.checkedItemIds ?? [],
+                  }
+                : null,
               activeListId: persisted.activeListId || persisted.lists![0].id,
               calculatorEntries: calc.entries,
               calculatorDate: calc.date,

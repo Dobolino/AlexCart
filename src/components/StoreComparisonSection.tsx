@@ -16,8 +16,11 @@ export function StoreComparisonSection({ stores, currency }: StoreComparisonSect
         className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
         style={{ color: 'var(--category-fg)' }}
       >
-        Filial-Vergleich
+        Ausgaben je Geschäft
       </div>
+      <p className="mb-2 px-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        Durchschnitt deiner erfassten Ausgaben. Unterschiedliche Warenkörbe erlauben keinen Preisvergleich.
+      </p>
       <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
         {stores.map((store) => (
           <div
@@ -29,10 +32,7 @@ export function StoreComparisonSection({ stores, currency }: StoreComparisonSect
               Ø {formatMoney(store.avgSpent, currency)}
             </span>
             <span className="mt-0.5 text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-              {store.tripCount === 1 ? '1 Einkauf' : `${store.tripCount} Einkäufe`}
-              {store.percentAboveCheapest === 0
-                ? ' · günstigste'
-                : ` · +${store.percentAboveCheapest.toLocaleString('de-CH')} %`}
+              {store.tripCount === 1 ? '1 Einkauf' : `${store.tripCount} Einkäufe`}· erfasste Bons
             </span>
           </div>
         ))}

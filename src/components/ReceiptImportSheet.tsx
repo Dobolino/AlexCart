@@ -28,7 +28,8 @@ function defaultNewListName(store: string): string {
 }
 
 export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps) {
-  const currency = useStore((s) => s.settings.currency)
+  const selectedCurrency = useStore((s) => s.settings.currency)
+  const [currency, setCurrency] = useState(selectedCurrency)
   const customStores = useStore((s) => s.settings.customStores ?? [])
   const lists = useStore((s) => s.lists)
   const completedTrips = useStore((s) => s.completedTrips)
@@ -41,9 +42,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
   const countryPresets = useMemo(() => storePresetsForCurrency(currency), [currency])
   const [store, setStore] = useState<string>(() => storePresetsForCurrency(currency)[0] ?? STORE_PRESETS[0])
   const [newStore, setNewStore] = useState('')
-  const [target, setTarget] = useState<ReceiptTarget>(() =>
-    completedTrips.length > 0 ? 'trip' : 'existing'
-  )
+  const [target, setTarget] = useState<ReceiptTarget>('new')
   const [listId, setListId] = useState<string>(activeListId || lists[0]?.id || '')
   const [tripId, setTripId] = useState<string>(completedTrips[0]?.id || '')
   const [newListName, setNewListName] = useState(() => storePresetsForCurrency(currency)[0] ?? 'Kassenbon')
@@ -65,10 +64,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     () => buildClaudeReceiptPrompt(store, customStores, currency),
     [store, customStores, currency]
   )
-  const total = useMemo(
-    () => Math.round(items.reduce((s, i) => s + i.price, 0) * 100) / 100,
-    [items]
-  )
+  const total = useMemo(() => Math.round(items.reduce((s, i) => s + i.price, 0) * 100) / 100, [items])
 
   // Ausgewählte Liste/Kassenbon/Filiale an geänderte Optionen anpassen - während des Renderns
   // statt in einem Effect (React-Muster "Zustand beim Ändern eines Werts anpassen").
@@ -113,6 +109,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     if (!trip) return
     if (trip.store?.trim()) setStore(trip.store.trim())
     setPurchaseDate(timestampToDateKey(trip.completedAt))
+    setCurrency(trip.currency ?? 'CHF')
   }
 
   function submitNewStore() {
@@ -135,6 +132,10 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
 
   async function handleFile(file: File | undefined) {
     if (!file) return
+    if (file.size > 25 * 1024 * 1024) {
+      setError('Datei ist zu groß (maximal 25 MB).')
+      return
+    }
     setError('')
     setShowAiHelp(false)
     setBusy(true)
@@ -202,7 +203,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  function apply() {
+  function apply(allowDuplicate = false) {
     if (!items.length) return
     if (target === 'existing' && !listId) {
       setError('Bitte eine bestehende Liste wählen.')
@@ -216,6 +217,8 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
     const result = applyReceiptImport({
       store,
       target,
+      allowDuplicate,
+      currency,
       listId: target === 'existing' ? listId : undefined,
       tripId: target === 'trip' ? tripId : undefined,
       newListName: target === 'new' ? newListName : undefined,
@@ -225,6 +228,16 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
       items,
     })
     if (!result.ok) {
+      if (
+        !allowDuplicate &&
+        result.error?.includes('bereits importiert') &&
+        window.confirm(
+          'Ein identischer Bon wurde bereits importiert. Ist dies tatsächlich ein weiterer Einkauf?'
+        )
+      ) {
+        apply(true)
+        return
+      }
       setError(result.error || 'Import fehlgeschlagen.')
       return
     }
@@ -245,6 +258,17 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
 
         {step === 'setup' && (
           <>
+            <label className="mb-3 block text-sm font-bold">
+              Währung des Kassenbons
+              <select
+                className="input mt-2 w-full"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value as Currency)}
+              >
+                <option value="CHF">CHF · Schweiz</option>
+                <option value="EUR">EUR · Deutschland</option>
+              </select>
+            </label>
             <SectionLabel>Kette / Filiale ({currency === 'EUR' ? 'Deutschland' : 'Schweiz'})</SectionLabel>
             <p className="mb-2 text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>
               Vorschläge folgen der Währung in den Einstellungen ({currency}). Eigene Ketten bleiben sichtbar.
@@ -327,7 +351,10 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
             <div className="mb-2 flex flex-col gap-1.5">
               <OptionCard
                 selected={target === 'trip'}
-                onClick={() => setTarget('trip')}
+                onClick={() => {
+                  setTarget('trip')
+                  selectTrip(tripId)
+                }}
                 title="Bestehenden Kassenbon abgleichen"
                 hint="Preise und Artikel auf einer vorhandenen Quittung aktualisieren"
               />
@@ -354,8 +381,12 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                   Welcher Kassenbon?
                 </div>
                 {!completedTrips.length ? (
-                  <p className="rounded-xl px-3.5 py-3 text-[13px]" style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}>
-                    Noch keine Quittungen. Lege zuerst einen neuen Kassenbon an oder schliesse einen Einkauf ab.
+                  <p
+                    className="rounded-xl px-3.5 py-3 text-[13px]"
+                    style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
+                  >
+                    Noch keine Quittungen. Lege zuerst einen neuen Kassenbon an oder schliesse einen Einkauf
+                    ab.
                   </p>
                 ) : (
                   <div className="flex max-h-[240px] flex-col gap-1.5 overflow-y-auto overscroll-contain pr-0.5">
@@ -381,7 +412,9 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                     checked={addMissingTripItems}
                     onChange={(e) => setAddMissingTripItems(e.target.checked)}
                   />
-                  <span style={{ color: 'var(--text)' }}>Fehlende Bon-Artikel auch auf die Quittung setzen</span>
+                  <span style={{ color: 'var(--text)' }}>
+                    Fehlende Bon-Artikel auch auf die Quittung setzen
+                  </span>
                 </label>
               </div>
             )}
@@ -495,7 +528,11 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
             <div className="mt-2 min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
               {error}
             </div>
-            <button className="btn-primary mt-2 w-full py-3.5 text-[15px]" onClick={() => goParse()} disabled={busy}>
+            <button
+              className="btn-primary mt-2 w-full py-3.5 text-[15px]"
+              onClick={() => goParse()}
+              disabled={busy}
+            >
               Artikel erkennen
             </button>
 
@@ -505,7 +542,10 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
                 style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
                 open={showAiHelp}
               >
-                <summary className="cursor-pointer text-[13px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                <summary
+                  className="cursor-pointer text-[13px] font-bold"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   Optional: KI-Hilfe (nur wenn die Erkennung scheitert)
                 </summary>
                 <p className="mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -573,7 +613,7 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
             <div className="min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
               {error}
             </div>
-            <button className="btn-primary mt-1 w-full py-3.5 text-[15px]" onClick={apply}>
+            <button className="btn-primary mt-1 w-full py-3.5 text-[15px]" onClick={() => apply()}>
               {target === 'new'
                 ? 'Neuen Kassenbon anlegen'
                 : target === 'trip'
@@ -589,7 +629,10 @@ export function ReceiptImportSheet({ onClose, onDone }: ReceiptImportSheetProps)
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-2 text-[12px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+    <div
+      className="mb-2 text-[12px] font-extrabold uppercase tracking-wide"
+      style={{ color: 'var(--category-fg)' }}
+    >
       {children}
     </div>
   )
@@ -607,7 +650,11 @@ function ReceiptReviewRow({
   return (
     <div
       className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-      style={{ background: 'var(--surface)', boxShadow: 'var(--shadow-card)', border: '1px solid var(--border)' }}
+      style={{
+        background: 'var(--surface)',
+        boxShadow: 'var(--shadow-card)',
+        border: '1px solid var(--border)',
+      }}
     >
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-bold">{item.name}</div>
@@ -616,7 +663,9 @@ function ReceiptReviewRow({
           {item.wasSale ? ' · Aktion' : ''}
         </div>
       </div>
-      <span className="flex-none text-[14px] font-extrabold tabular-nums">{formatMoney(item.price, currency)}</span>
+      <span className="flex-none text-[14px] font-extrabold tabular-nums">
+        {formatMoney(item.price, currency)}
+      </span>
       <button
         type="button"
         className="tap-scale flex h-11 w-11 items-center justify-center"

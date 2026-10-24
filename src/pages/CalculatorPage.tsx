@@ -10,7 +10,7 @@ import { centsToAmount } from '@/utils/numpadInput'
 import { todayPricedEntries } from '@/utils/purchaseLog'
 
 export function CalculatorPage() {
-  const entries = useStore((s) => s.calculatorEntries)
+  const allEntries = useStore((s) => s.calculatorEntries)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const addCalculatorEntry = useStore((s) => s.addCalculatorEntry)
@@ -21,6 +21,7 @@ export function CalculatorPage() {
   const ensureCalculatorDay = useStore((s) => s.ensureCalculatorDay)
   const currency = useStore((s) => s.settings.currency)
   const [cents, setCents] = useState(0)
+  const entries = allEntries.filter((e) => (e.currency ?? 'CHF') === currency)
 
   useEffect(() => {
     ensureCalculatorDay()
@@ -28,8 +29,8 @@ export function CalculatorPage() {
 
   const checkoffEntries = useMemo(() => {
     const hidden = new Set(excludedIds)
-    return todayPricedEntries(purchaseLog, todayKey(), hidden)
-  }, [purchaseLog, excludedIds])
+    return todayPricedEntries(purchaseLog, todayKey(), hidden, currency)
+  }, [purchaseLog, excludedIds, currency])
 
   const manualTotal = entries.reduce((sum, e) => sum + e.amount, 0)
   const checkoffTotal = checkoffEntries.reduce((sum, e) => sum + (e.price ?? 0), 0)
@@ -44,7 +45,12 @@ export function CalculatorPage() {
   }
 
   function handleResetAll() {
-    if (!window.confirm('Heutige Einkaufssumme zurücksetzen? Der Rechner wird geleert – die Statistik bleibt erhalten.')) return
+    if (
+      !window.confirm(
+        'Heutige Einkaufssumme zurücksetzen? Der Rechner wird geleert – die Statistik bleibt erhalten.'
+      )
+    )
+      return
     resetCalculatorSession()
     setCents(0)
   }
@@ -77,26 +83,34 @@ export function CalculatorPage() {
 
         <MoneyNumpad cents={cents} onChange={setCents} currency={currency} display="summary" />
 
-        <button className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]" onClick={handleAdd}>
+        <button
+          className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]"
+          onClick={handleAdd}
+        >
           <span className="inline-flex items-center gap-2">
             <Icon path={ICON_PATHS.plus} size={20} /> Manuell hinzufügen
           </span>
         </button>
         <p className="mb-4 px-1.5 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Preise beim Abhaken landen unter „Aus Liste abgehakt“. Nach dem Einkauf oben auf Zurücksetzen tippen.
+          Preise beim Abhaken landen unter „Aus Liste abgehakt“. Nach dem Einkauf oben auf Zurücksetzen
+          tippen.
         </p>
 
         {checkoffEntries.length > 0 && (
           <>
             <div className="mb-2 flex items-center justify-between px-1.5">
-              <div className="text-[13px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+              <div
+                className="text-[13px] font-extrabold uppercase tracking-wide"
+                style={{ color: 'var(--category-fg)' }}
+              >
                 Aus Liste abgehakt
               </div>
               <button
                 className="tap-scale text-[12px] font-bold"
                 style={{ color: 'var(--danger)' }}
                 onClick={() => {
-                  if (window.confirm('Abhak-Preise im Rechner ausblenden? Die Statistik bleibt erhalten.')) clearTodayCheckoffs()
+                  if (window.confirm('Abhak-Preise im Rechner ausblenden? Die Statistik bleibt erhalten.'))
+                    clearTodayCheckoffs()
                 }}
               >
                 Leeren

@@ -3,3 +3,7 @@ dist
 dev-dist
 *.local
 .DS_Store
+
+.local-data/
+playwright-report/
+test-results/

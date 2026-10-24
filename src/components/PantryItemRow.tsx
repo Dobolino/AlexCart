@@ -1,3 +1,4 @@
+import { todayKey } from '@/utils/date'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { isLowStock, canDecrementPantryAmount } from '@/utils/pantry'
@@ -22,16 +23,21 @@ export function PantryItemRow({ item, flash = false, onEdit, onRemove, onDecreme
       }`}
       style={{ borderColor: 'var(--border)' }}
     >
-      <button
-        type="button"
-        className="tap-scale min-w-0 flex-1 text-left"
-        onClick={onEdit}
-      >
+      <button type="button" className="tap-scale min-w-0 flex-1 text-left" onClick={onEdit}>
         <span className="block truncate text-[15px] font-semibold">{item.name}</span>
         <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {item.amount ? `Bestand: ${item.amount}` : 'Kein Bestand erfasst'}
           {item.minAmount ? ` · min ${item.minAmount}` : ''}
         </span>
+        {item.expiresOn && (
+          <span
+            className="mt-1 block text-xs font-semibold"
+            style={{ color: item.expiresOn <= todayKey() ? 'var(--danger)' : 'var(--text-muted)' }}
+          >
+            MHD {item.expiresOn}
+            {item.expiresOn <= todayKey() ? ' · vor Verwendung prüfen' : ''}
+          </span>
+        )}
       </button>
 
       {low && (

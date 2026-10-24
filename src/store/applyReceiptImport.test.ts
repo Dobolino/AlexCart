@@ -134,6 +134,7 @@ describe('applyReceiptImport', () => {
     const receipt = {
       store: 'Migros',
       purchaseDate: '2026-08-20',
+      allowDuplicate: true,
       items: [{ name: 'Milch', amount: '1 l', category: 'Milch & Käse', price: 1.5 }],
     }
     useStore.getState().applyReceiptImport({ ...receipt, target: 'new' })
@@ -156,6 +157,7 @@ describe('applyReceiptImport', () => {
       store: 'Migros',
       target: 'new' as const,
       purchaseDate: '2026-08-20',
+      allowDuplicate: true,
       items: [{ name: 'Milch', amount: '1 l', category: 'Milch & Käse', price: 1.5 }],
     }
     useStore.getState().applyReceiptImport(input)

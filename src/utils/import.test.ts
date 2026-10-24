@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { importFromJSON } from './import'
 
-const pantry = [{ id: '1', name: 'Salz', category: 'Sonstiges' }]
+const pantry = [{ id: '1', name: 'Salz', category: 'Sonstiges', amount: '100 g' }]
 
 describe('importFromJSON', () => {
   it('rejects invalid JSON', () => {
@@ -19,7 +19,7 @@ describe('importFromJSON', () => {
       items: [
         { name: 'Tomaten', amount: '300g', category: 'Früchte & Gemüse', note: 'reif' },
         { name: 'Tomaten', amount: '200g', category: 'Früchte & Gemüse' },
-        { name: 'Salz', amount: '1 Prise', category: 'Sonstiges' },
+        { name: 'Salz', amount: '1 g', category: 'Sonstiges' },
       ],
     })
     const result = importFromJSON(payload, pantry)

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { ServerSettings } from '@/components/ServerSettings'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { EditCustomProductSheet } from '@/components/EditCustomProductSheet'
@@ -9,7 +10,9 @@ import { getIconKey } from '@/utils/icon'
 import { ProductIcon } from '@/components/product-icons/ProductIcon'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { parseMoneyInput, currencySymbol } from '@/utils/currency'
-import { readBackupJSON, restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
+import { restoreBackupJSON, backupFilename, shareOrDownloadBackup } from '@/utils/backup'
+import { MAX_BACKUP_BYTES } from '@/utils/validation'
+import { currentBackupJSON } from '@/components/StorageNotice'
 import { getStorageInfo } from '@/utils/storageInfo'
 import { PriceProfilesSettingsSection } from '@/components/PriceProfilesSettingsSection'
 import { PriceExportSection } from '@/components/PriceExportSection'
@@ -58,7 +61,7 @@ export function SettingsPage() {
   const storageInfo = getStorageInfo()
 
   async function handleExportBackup() {
-    const json = readBackupJSON()
+    const json = currentBackupJSON()
     if (!json) {
       setBackupMessage('Keine Daten zum Sichern gefunden.')
       return
@@ -74,6 +77,10 @@ export function SettingsPage() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    if (file.size > MAX_BACKUP_BYTES) {
+      setBackupMessage('Sicherung ist zu groß (maximal 8 MB).')
+      return
+    }
     if (!window.confirm('Sicherung einspielen? Das ersetzt alle aktuellen Daten in dieser App.')) return
     const reader = new FileReader()
     reader.onload = () => {
@@ -156,276 +163,289 @@ export function SettingsPage() {
           </>
         ) : (
           <>
-        <div
-          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-          style={{ color: 'var(--category-fg)' }}
-        >
-          Design
-        </div>
-        <div className="glass-card mb-4.5 flex p-1.5">
-          {THEME_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className="tap-scale flex-1 rounded-xl py-2.5 text-[14px] font-bold"
-              style={{
-                background: theme === opt.value ? 'var(--accent)' : 'transparent',
-                color: theme === opt.value ? 'var(--accent-fg)' : 'var(--text)',
-              }}
-              onClick={() => setTheme(opt.value)}
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <div
-          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-          style={{ color: 'var(--category-fg)' }}
-        >
-          Einkauf
-        </div>
-        <div className="card-surface mb-4.5 px-3.5 py-3.5">
-          <span className="block text-[15px] font-semibold">Währung</span>
-          <span className="mb-3 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            Für Preise, Budget, Rechner und Filial-Vorschläge – CHF = Schweiz (Migros, Coop…), EUR = Deutschland (Marktkauf, Edeka…)
-          </span>
-          <div className="flex gap-2">
-            {CURRENCY_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                className="tap-scale flex-1 rounded-xl py-2.5 text-[13px] font-bold"
-                style={{
-                  background: currency === opt.value ? 'var(--accent-soft)' : 'var(--chip-bg)',
-                  color: currency === opt.value ? 'var(--accent)' : 'var(--text)',
-                  outline: currency === opt.value ? '2px solid var(--accent)' : 'none',
-                }}
-                onClick={() => setCurrency(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <label className="mt-4 flex items-center justify-between gap-3 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-            <span>
-              <span className="block text-[15px] font-semibold">Preis beim Abhaken</span>
-              <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                Preis direkt erfassen – sonst über den Toast nachträglich
-              </span>
-            </span>
-            <button
-              type="button"
-              className="tap-scale relative h-7 w-12 flex-none rounded-full transition-colors"
-              style={{ background: askPriceOnCheckoff ? 'var(--accent)' : 'var(--chip-bg)' }}
-              onClick={() => setAskPriceOnCheckoff(!askPriceOnCheckoff)}
-              aria-label="Preis beim Abhaken umschalten"
-              aria-pressed={askPriceOnCheckoff}
-            >
-              <span
-                className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform"
-                style={{ left: askPriceOnCheckoff ? '22px' : '2px' }}
-              />
-            </button>
-          </label>
-          <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-            <span className="block text-[15px] font-semibold">Wochenbudget</span>
-            <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              Ausgaben der aktuellen Kalenderwoche (Montag–Sonntag) im Listen-Header verfolgen
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[14px] font-bold" style={{ color: 'var(--text-muted)' }}>
-                {currencySymbol(currency)}
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                className="input flex-1 py-2 text-[15px]"
-                placeholder="z. B. 150"
-                value={budgetInput}
-                onChange={(e) => setBudgetInput(e.target.value)}
-                onBlur={saveBudgetInput}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveBudgetInput()
-                }}
-              />
+              Design
             </div>
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {BUDGET_PRESETS.map((amount) => (
+            <div className="glass-card mb-4.5 flex p-1.5">
+              {THEME_OPTIONS.map((opt) => (
                 <button
-                  key={amount}
-                  type="button"
-                  className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                  key={opt.value}
+                  className="tap-scale flex-1 rounded-xl py-2.5 text-[14px] font-bold"
                   style={{
-                    background: weeklyBudget === amount ? 'var(--accent-soft)' : 'var(--chip-bg)',
-                    color: weeklyBudget === amount ? 'var(--accent)' : 'var(--text)',
-                    outline: weeklyBudget === amount ? '2px solid var(--accent)' : 'none',
+                    background: theme === opt.value ? 'var(--accent)' : 'transparent',
+                    color: theme === opt.value ? 'var(--accent-fg)' : 'var(--text)',
                   }}
-                  onClick={() => {
-                    setWeeklyBudget(amount)
-                    setBudgetInput(String(amount))
-                  }}
+                  onClick={() => setTheme(opt.value)}
                 >
-                  {amount}
+                  {opt.label}
                 </button>
               ))}
-              {weeklyBudget > 0 && (
+            </div>
+
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Einkauf
+            </div>
+            <div className="card-surface mb-4.5 px-3.5 py-3.5">
+              <span className="block text-[15px] font-semibold">Währung</span>
+              <span className="mb-3 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                Preise, Budgets und Rechner bleiben je Währung getrennt. Historische Einkäufe behalten ihre
+                ursprüngliche Währung.
+              </span>
+              <div className="flex gap-2">
+                {CURRENCY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className="tap-scale flex-1 rounded-xl py-2.5 text-[13px] font-bold"
+                    style={{
+                      background: currency === opt.value ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                      color: currency === opt.value ? 'var(--accent)' : 'var(--text)',
+                      outline: currency === opt.value ? '2px solid var(--accent)' : 'none',
+                    }}
+                    onClick={() => {
+                      setCurrency(opt.value)
+                      const budget = useStore.getState().settings.weeklyBudget
+                      setBudgetInput(budget > 0 ? String(budget) : '')
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <label
+                className="mt-4 flex items-center justify-between gap-3 border-t pt-4"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span>
+                  <span className="block text-[15px] font-semibold">Preis beim Abhaken</span>
+                  <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                    Preis direkt erfassen – sonst über den Toast nachträglich
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="tap-scale relative h-7 w-12 flex-none rounded-full transition-colors"
+                  style={{ background: askPriceOnCheckoff ? 'var(--accent)' : 'var(--chip-bg)' }}
+                  onClick={() => setAskPriceOnCheckoff(!askPriceOnCheckoff)}
+                  aria-label="Preis beim Abhaken umschalten"
+                  aria-pressed={askPriceOnCheckoff}
+                >
+                  <span
+                    className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform"
+                    style={{ left: askPriceOnCheckoff ? '22px' : '2px' }}
+                  />
+                </button>
+              </label>
+              <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
+                <span className="block text-[15px] font-semibold">Wochenbudget</span>
+                <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  Ausgaben der aktuellen Kalenderwoche (Montag–Sonntag) im Listen-Header verfolgen
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                    {currencySymbol(currency)}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="input flex-1 py-2 text-[15px]"
+                    placeholder="z. B. 150"
+                    value={budgetInput}
+                    onChange={(e) => setBudgetInput(e.target.value)}
+                    onBlur={saveBudgetInput}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveBudgetInput()
+                    }}
+                  />
+                </div>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {BUDGET_PRESETS.map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                      style={{
+                        background: weeklyBudget === amount ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                        color: weeklyBudget === amount ? 'var(--accent)' : 'var(--text)',
+                        outline: weeklyBudget === amount ? '2px solid var(--accent)' : 'none',
+                      }}
+                      onClick={() => {
+                        setWeeklyBudget(amount)
+                        setBudgetInput(String(amount))
+                      }}
+                    >
+                      {amount}
+                    </button>
+                  ))}
+                  {weeklyBudget > 0 && (
+                    <button
+                      type="button"
+                      className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                      style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
+                      onClick={() => {
+                        setWeeklyBudget(0)
+                        setBudgetInput('')
+                      }}
+                    >
+                      Aus
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Eigene Produkte
+            </div>
+            {!customProducts.length ? (
+              <div className="card-surface mb-4.5">
+                <EmptyState
+                  icon={ICON_PATHS.cart}
+                  title="Noch keine eigenen Produkte"
+                  hint="Lege beim Hinzufügen eines Artikels ein neues Produkt an – es erscheint dann hier."
+                />
+              </div>
+            ) : (
+              <div className="card-surface mb-4.5">
+                {customProducts.map((p) => {
+                  const iconKey = getIconKey(p.name, p.category)
+                  const color = getCategoryColor(p.category)
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 border-b px-3.5 py-3"
+                      style={{ borderColor: 'var(--border)' }}
+                    >
+                      <span
+                        className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
+                        style={{ background: color.bg, color: color.fg }}
+                      >
+                        <ProductIcon iconKey={iconKey} size={20} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-semibold">{p.name}</span>
+                        <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          {p.category}
+                          {p.defaultAmount ? ` · ${p.defaultAmount}` : ''}
+                        </span>
+                      </span>
+                      <button
+                        className="tap-scale p-1.5"
+                        style={{ color: 'var(--text-muted)' }}
+                        onClick={() => setEditing(p)}
+                        aria-label={`${p.name} bearbeiten`}
+                      >
+                        <Icon path={ICON_PATHS.edit} size={18} />
+                      </button>
+                      <button
+                        className="tap-scale p-1.5"
+                        style={{ color: 'var(--danger)' }}
+                        onClick={() => removeCustomProduct(p.id)}
+                        aria-label={`${p.name} löschen`}
+                      >
+                        <Icon path={ICON_PATHS.trash} size={18} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <ServerSettings />
+            <div
+              className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
+              style={{ color: 'var(--category-fg)' }}
+            >
+              Daten
+            </div>
+            <div className="card-surface mb-3 px-3.5 py-3.5">
+              <span className="block text-[15px] font-semibold">Speicherort</span>
+              <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                Persönliche Daten liegen in diesem Browser. Nur ausdrücklich freigegebene Listen werden mit
+                deinem Server abgeglichen.
+              </span>
+              <div
+                className="mb-2 rounded-xl px-3 py-2.5 font-mono text-[11px] leading-relaxed break-all"
+                style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+              >
+                {storageInfo.storagePath}
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-2 text-[12px]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <span>Belegung: {storageInfo.sizeLabel}</span>
+                {storageInfo.legacyKeysPresent.length > 0 && (
+                  <span>· Legacy: {storageInfo.legacyKeysPresent.join(', ')}</span>
+                )}
+              </div>
+              <div className="mt-2.5 flex flex-wrap gap-2">
                 <button
                   type="button"
                   className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
-                  style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
-                  onClick={() => {
-                    setWeeklyBudget(0)
-                    setBudgetInput('')
-                  }}
+                  style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                  onClick={() => void copyStoragePath()}
                 >
-                  Aus
+                  {storageCopied ? 'Kopiert' : 'Pfad kopieren'}
                 </button>
-              )}
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Export-Dateiname: {storageInfo.exportFilenamePattern} (z. B. {backupFilename()})
+              </p>
             </div>
-          </div>
-        </div>
-
-        <div
-          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-          style={{ color: 'var(--category-fg)' }}
-        >
-          Eigene Produkte
-        </div>
-        {!customProducts.length ? (
-          <div className="card-surface mb-4.5">
-            <EmptyState
-              icon={ICON_PATHS.cart}
-              title="Noch keine eigenen Produkte"
-              hint="Lege beim Hinzufügen eines Artikels ein neues Produkt an – es erscheint dann hier."
+            <div className="card-surface mb-3 flex flex-col">
+              <button
+                className="tap-scale flex items-center gap-3 border-b px-3.5 py-3.5 text-left text-[14px] font-semibold"
+                style={{ borderColor: 'var(--border)' }}
+                onClick={handleExportBackup}
+              >
+                <Icon path={ICON_PATHS.share} size={18} />
+                Sicherung exportieren
+              </button>
+              <button
+                className="tap-scale flex items-center gap-3 px-3.5 py-3.5 text-left text-[14px] font-semibold"
+                onClick={handleImportClick}
+              >
+                <Icon path={ICON_PATHS.import} size={18} />
+                Sicherung einspielen
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={handleImportFile}
             />
-          </div>
-        ) : (
-          <div className="card-surface mb-4.5">
-            {customProducts.map((p) => {
-              const iconKey = getIconKey(p.name, p.category)
-              const color = getCategoryColor(p.category)
-              return (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-3 border-b px-3.5 py-3"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <span
-                    className="flex h-9 w-9 flex-none items-center justify-center rounded-full"
-                    style={{ background: color.bg, color: color.fg }}
-                  >
-                    <ProductIcon iconKey={iconKey} size={20} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">{p.name}</span>
-                    <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                      {p.category}
-                      {p.defaultAmount ? ` · ${p.defaultAmount}` : ''}
-                    </span>
-                  </span>
-                  <button
-                    className="tap-scale p-1.5"
-                    style={{ color: 'var(--text-muted)' }}
-                    onClick={() => setEditing(p)}
-                    aria-label={`${p.name} bearbeiten`}
-                  >
-                    <Icon path={ICON_PATHS.edit} size={18} />
-                  </button>
-                  <button
-                    className="tap-scale p-1.5"
-                    style={{ color: 'var(--danger)' }}
-                    onClick={() => removeCustomProduct(p.id)}
-                    aria-label={`${p.name} löschen`}
-                  >
-                    <Icon path={ICON_PATHS.trash} size={18} />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        <div
-          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-          style={{ color: 'var(--category-fg)' }}
-        >
-          Daten
-        </div>
-        <div className="card-surface mb-3 px-3.5 py-3.5">
-          <span className="block text-[15px] font-semibold">Speicherort</span>
-          <span className="mb-2 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            Die App speichert alles lokal im Browser – kein Server, kein echter Dateipfad auf dem Gerät.
-          </span>
-          <div
-            className="mb-2 rounded-xl px-3 py-2.5 font-mono text-[11px] leading-relaxed break-all"
-            style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
-          >
-            {storageInfo.storagePath}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            <span>Belegung: {storageInfo.sizeLabel}</span>
-            {storageInfo.legacyKeysPresent.length > 0 && (
-              <span>· Legacy: {storageInfo.legacyKeysPresent.join(', ')}</span>
+            {backupMessage && (
+              <p className="mb-3 px-1.5 text-[12px]" style={{ color: 'var(--danger)' }}>
+                {backupMessage}
+              </p>
             )}
-          </div>
-          <div className="mt-2.5 flex flex-wrap gap-2">
             <button
-              type="button"
-              className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
-              style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
-              onClick={() => void copyStoragePath()}
+              className="btn-soft w-full py-3.5 text-[14px]"
+              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              onClick={() => {
+                if (window.confirm('Wirklich alle Daten (Listen, Vorrat, Produkte, Statistik) löschen?')) {
+                  resetAll()
+                }
+              }}
             >
-              {storageCopied ? 'Kopiert' : 'Pfad kopieren'}
+              Alle Daten zurücksetzen
             </button>
-          </div>
-          <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            Export-Dateiname: {storageInfo.exportFilenamePattern} (z. B. {backupFilename()})
-          </p>
-        </div>
-        <div className="card-surface mb-3 flex flex-col">
-          <button
-            className="tap-scale flex items-center gap-3 border-b px-3.5 py-3.5 text-left text-[14px] font-semibold"
-            style={{ borderColor: 'var(--border)' }}
-            onClick={handleExportBackup}
-          >
-            <Icon path={ICON_PATHS.share} size={18} />
-            Sicherung exportieren
-          </button>
-          <button
-            className="tap-scale flex items-center gap-3 px-3.5 py-3.5 text-left text-[14px] font-semibold"
-            onClick={handleImportClick}
-          >
-            <Icon path={ICON_PATHS.import} size={18} />
-            Sicherung einspielen
-          </button>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json"
-          className="hidden"
-          onChange={handleImportFile}
-        />
-        {backupMessage && (
-          <p className="mb-3 px-1.5 text-[12px]" style={{ color: 'var(--danger)' }}>
-            {backupMessage}
-          </p>
-        )}
-        <button
-          className="btn-soft w-full py-3.5 text-[14px]"
-          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-          onClick={() => {
-            if (window.confirm('Wirklich alle Daten (Listen, Vorrat, Produkte, Statistik) löschen?')) {
-              resetAll()
-            }
-          }}
-        >
-          Alle Daten zurücksetzen
-        </button>
 
-        <p className="mt-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          AlexShop · alle Daten bleiben lokal auf deinem Gerät gespeichert
-        </p>
+            <p className="mt-6 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              AlexShop · lokal nutzbar, Listen optional gemeinsam
+            </p>
           </>
         )}
       </main>

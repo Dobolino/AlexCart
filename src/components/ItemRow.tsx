@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon } from './Icon'
 import { ProductIconSlot } from './ProductIconSlot'
@@ -58,7 +58,7 @@ export function ItemRow({
   anyDragging = false,
   isDragOver,
 }: ItemRowProps) {
-  const [exiting, setExiting] = useState(false)
+  const togglePending = useRef(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const iconKey = getIconKey(item.name, item.category)
@@ -70,13 +70,13 @@ export function ItemRow({
   const hasPrice = estimatedPrice != null && estimatedPrice > 0
 
   function handleToggle() {
-    if (item.done) {
-      onToggle(item.id)
-      return
-    }
-    hapticSuccess()
-    setExiting(true)
-    setTimeout(() => onToggle(item.id), EXIT_ANIMATION_MS)
+    if (togglePending.current) return
+    togglePending.current = true
+    if (!item.done) hapticSuccess()
+    onToggle(item.id)
+    window.setTimeout(() => {
+      togglePending.current = false
+    }, EXIT_ANIMATION_MS)
   }
 
   const swipe = useItemSwipe({
@@ -137,13 +137,12 @@ export function ItemRow({
                 pointerEvents: 'none',
               }
             : {
-                transform: exiting ? 'translateX(96px)' : `translateX(${swipe.dragX}px)`,
-                transition: swipe.dragging || swipe.deleteExiting || exiting
-                  ? exiting
-                    ? 'transform 0.28s var(--ease-spring), opacity 0.28s ease'
-                    : 'none'
-                  : 'transform 0.22s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
-                opacity: exiting || swipe.deleteExiting ? 0 : 1,
+                transform: `translateX(${swipe.dragX}px)`,
+                transition:
+                  swipe.dragging || swipe.deleteExiting
+                    ? 'none'
+                    : 'transform 0.22s var(--ease-spring), opacity 0.32s ease, background-color 0.2s ease',
+                opacity: swipe.deleteExiting ? 0 : 1,
                 touchAction: 'pan-y',
               }),
         }}
@@ -155,7 +154,7 @@ export function ItemRow({
       >
         {dragHandleProps && (
           <button
-            className="tap-scale flex h-8 w-5 flex-none touch-none select-none items-center justify-center opacity-35"
+            className="tap-scale flex h-11 w-7 flex-none touch-none select-none items-center justify-center opacity-35"
             style={{ color: 'var(--text-muted)', WebkitUserSelect: 'none', userSelect: 'none' }}
             aria-label="Verschieben"
             onPointerDown={(e) => dragHandleProps.onPointerDown(e, item.id)}
@@ -208,7 +207,7 @@ export function ItemRow({
             {showStepper || showProduceWeight ? (
               <ItemAmountColumn
                 item={item}
-                showStepper={!!showStepper}
+                showStepper={false}
                 onAdjustAmount={onAdjustAmount}
                 onProduceWeightChange={onProduceWeightChange}
                 variant="row"
@@ -248,7 +247,7 @@ export function ItemRow({
         </button>
 
         <button
-          className="tap-scale flex h-8 w-8 flex-none items-center justify-center rounded-full"
+          className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
           style={{ color: 'var(--text-muted)' }}
           onClick={(e) => {
             e.stopPropagation()

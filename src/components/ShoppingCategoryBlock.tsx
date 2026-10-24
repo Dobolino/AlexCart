@@ -54,7 +54,10 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
           >
             {category}
           </span>
-          <span className="flex-none text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          <span
+            className="flex-none text-[12px] font-semibold tabular-nums"
+            style={{ color: 'var(--text-muted)' }}
+          >
             {openLabel}
           </span>
         </button>
@@ -71,7 +74,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex min-h-[72px] items-center gap-2 rounded-2xl px-3 py-3 shadow-sm"
+                  className="grid min-h-[72px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 rounded-2xl px-3 py-3 shadow-sm"
                   style={{ background: 'var(--surface)' }}
                 >
                   <button
@@ -88,21 +91,28 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                     className="tap-scale min-w-0 flex-1 text-left"
                     onClick={() => onCheck(item)}
                   >
-                    <span className="block truncate text-[18px] font-bold leading-tight">{item.name}</span>
+                    <span className="block break-words text-[18px] font-bold leading-tight">{item.name}</span>
                     {item.note && (
-                      <span className="mt-0.5 block truncate text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                      <span
+                        className="mt-0.5 block truncate text-[13px]"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
                         {item.note}
                       </span>
                     )}
                   </button>
-                  {shouldUseExactProduceWeight(item.category, item.amount) ? (
-                    item.amount ? <AmountBadge amount={item.amount} prominent /> : null
-                  ) : (
-                    <ItemAmountColumn item={item} showStepper onAdjustAmount={onAdjustAmount} />
-                  )}
+                  <div className="col-start-2 row-start-2">
+                    {shouldUseExactProduceWeight(item.category, item.amount) ? (
+                      item.amount ? (
+                        <AmountBadge amount={item.amount} prominent />
+                      ) : null
+                    ) : (
+                      <ItemAmountColumn item={item} showStepper onAdjustAmount={onAdjustAmount} />
+                    )}
+                  </div>
                   <button
                     type="button"
-                    className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
+                    className="tap-scale col-start-3 row-start-1 flex h-11 w-11 flex-none items-center justify-center rounded-full"
                     style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
                     onClick={() => onOpenMenu(item)}
                     aria-label={`${item.name}: Optionen`}

@@ -41,7 +41,7 @@ export function ItemAmountColumn({
   const textColor = isTile ? accentColor : 'var(--text-muted)'
   const stepBg = isTile ? 'rgba(255,255,255,0.22)' : 'var(--chip-bg)'
   const stepFg = isTile ? accentColor : 'var(--text)'
-  const btnSize = isTile ? 'h-6 w-6' : 'h-7 w-7'
+  const btnSize = isTile ? 'h-11 w-11' : 'h-11 w-11'
   const iconSize = isTile ? 12 : 13
 
   if (showStepper) {

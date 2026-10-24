@@ -21,9 +21,12 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
         paddingRight: 'calc(16px + var(--safe-right))',
       }}
     >
-      <Title className="tap-scale text-left" onClick={onTitleClick}>
-        <h1 className="font-display flex items-center gap-1.5 text-[28px] font-extrabold leading-tight tracking-tight" style={{ color: 'var(--text)' }}>
-          <span>{title}</span>
+      <Title className="tap-scale min-w-0 flex-1 text-left" onClick={onTitleClick}>
+        <h1
+          className="font-display flex items-center gap-1.5 text-[28px] font-extrabold leading-tight tracking-tight"
+          style={{ color: 'var(--text)' }}
+        >
+          <span className="truncate">{title}</span>
           {onTitleClick && (
             <span className="mt-1 inline-flex rotate-90" style={{ color: 'var(--text-muted)' }}>
               <Icon path={ICON_PATHS.chevron} size={18} />
@@ -36,7 +39,7 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
           </div>
         )}
       </Title>
-      {right}
+      {right && <div className="flex shrink-0 items-center">{right}</div>}
     </header>
   )
 }

@@ -128,11 +128,12 @@ export function ItemTile({
               }
             : {
                 transform: exiting ? 'translateX(96px)' : `translateX(${swipe.dragX}px)`,
-                transition: swipe.dragging || swipe.deleteExiting || exiting
-                  ? exiting
-                    ? 'transform 0.28s var(--ease-spring), opacity 0.28s ease'
-                    : 'none'
-                  : 'transform 0.22s var(--ease-spring), opacity 0.32s ease',
+                transition:
+                  swipe.dragging || swipe.deleteExiting || exiting
+                    ? exiting
+                      ? 'transform 0.28s var(--ease-spring), opacity 0.28s ease'
+                      : 'none'
+                    : 'transform 0.22s var(--ease-spring), opacity 0.32s ease',
                 opacity: exiting || swipe.deleteExiting ? 0 : 1,
                 touchAction: 'pan-y',
                 borderRadius: '12px',
@@ -160,7 +161,7 @@ export function ItemTile({
         <ProductIconSlot
           iconKey={iconKey}
           size={22}
-          wrapClassName="flex h-8 w-8 flex-none items-center justify-center"
+          wrapClassName="flex h-11 w-11 flex-none items-center justify-center"
           wrapStyle={{ color: colors.fg }}
         />
         <div className="min-w-0 flex-1">

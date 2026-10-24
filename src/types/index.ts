@@ -16,9 +16,13 @@ export interface AppSettings {
   shoppingAutoCollapse: boolean
   /** Vom Nutzer hinzugefügte Supermarkt-/Einkaufsketten (zusätzlich zu den Presets). */
   customStores: string[]
+  budgetsByCurrency?: Partial<Record<Currency, number>>
+  apiUrl?: string
+  handedness?: 'left' | 'right'
 }
 
 export interface ShoppingItem {
+  purchaseLogId?: string
   id: string
   name: string
   amount: string
@@ -29,6 +33,9 @@ export interface ShoppingItem {
   favorite?: boolean
   /** Bevorzugte Variante für Kostenschätzung. */
   variantId?: string
+  productId?: string
+  barcode?: string
+  unavailable?: boolean
 }
 
 export interface ShoppingList {
@@ -47,9 +54,12 @@ export interface PantryItem {
   amount?: string
   /** Mindestbestand – darunter wird Nachkauf vorgeschlagen. */
   minAmount?: string
+  expiresOn?: string
 }
 
 export interface PurchaseLogEntry {
+  productId?: string
+  storeId?: string
   /** Wird beim Abhaken gesetzt; ältere Einträge erhalten eine ID bei der Migration. */
   id?: string
   /** Verknüpft den Eintrag mit einem Listen-Artikel – wichtig bei Umbenennung und Duplikaten. */
@@ -61,6 +71,9 @@ export interface PurchaseLogEntry {
   price?: number
   /** Preiswert, der in das Variantenprofil eingeflossen ist (z. B. Stückpreis). */
   profilePrice?: number
+  pricePerKg?: number
+  referenceUnitPrice?: number
+  pantryMovement?: { pantryId: string; amount: string; before?: string; after?: string }
   /** Währung des erfassten Preises – Schätzung nutzt nur die aktive Währung. */
   currency?: Currency
   variantId?: string
@@ -80,6 +93,8 @@ export interface VariantCurrencyPrices {
   lastPurchaseWasSale: boolean
   avgSalePrice?: number
   salePurchaseCount: number
+  normalTotal?: number
+  saleTotal?: number
 }
 
 /** Einzelne Produktvariante (Marke, Bio, Grösse …). */
@@ -165,6 +180,7 @@ export interface ImportResult {
 
 export interface CalculatorEntry {
   id: string
+  currency?: Currency
   amount: number
 }
 
@@ -210,10 +226,14 @@ export interface CompletedTrip {
   currency?: Currency
   /** Aktive Einkaufszeit in ms (ohne Pausen). */
   durationMs?: number
+  importFingerprint?: string
 }
 
 /** Laufende Einkaufssession im Einkaufsmodus (Timer + Pause). */
 export interface ShoppingSession {
+  storeId?: string
+  currency?: Currency
+  store?: string
   listId: string
   startedAt: number
   pausedAt?: number

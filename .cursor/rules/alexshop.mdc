@@ -50,13 +50,13 @@ Before generating or modifying code on a fresh session:
 |---------|--------|
 | Smart Add (Autocomplete, Kategorien, Mengen, Notizen) | ✅ |
 | Rezept-Parser (Text → Artikel) | ✅ |
-| Rezept Review-Screen (Split links/rechts vor Commit) | ❌ geplant |
+| Rezept Review-Screen (Split links/rechts vor Commit) | ✅ |
 | Kategorien, List/Tile-Ansicht, mehrere Listen | ✅ |
 | Inline +/- Mengen-Stepper | ✅ (nicht bei Obst/Gemüse-Gewicht) |
 | Swipe löschen + Undo-Toast | ✅ |
 | Long-press Quick Actions (Edit, Fav, Pantry) | ✅ |
 | „Letzte Woche wiederholen“ | ✅ |
-| Frequenz-Hinweise („vor X Tagen gekauft“) | ❌ geplant |
+| Frequenz-Hinweise („vor X Tagen gekauft“) | ✅ |
 
 ## 2. Supercharged Shopping Mode (In-Store UX)
 
@@ -114,7 +114,7 @@ interface ProductVariant {
 | Low-Stock Vorschläge | ✅ |
 | Auto-Nachfüllen beim Abhaken | ✅ |
 | Manuell „-1 verbraucht“ | ✅ (`decrementPantryItem`, `PantryItemRow`) |
-| Ablauf/Resttage-Prognose | ❌ geplant |
+| MHD erfassen / Resttage-Prognose | MHD vorhanden; Prognose optional |
 
 ## 5. Analytics & Insights
 
@@ -171,3 +171,10 @@ interface ProductVariant {
 | Quittungen | `src/components/ReceiptSheet.tsx` |
 | Statistik | `src/pages/StatsPage.tsx` |
 | Einstellungen | `src/pages/SettingsPage.tsx`, `PriceProfilesSettingsSection.tsx` |
+
+
+## Erweiterte Architektur
+
+Node 24 LTS; optionales Backend unter `server/` mit SQLite. Gemeinsame Listen synchronisieren einzelne Vorgänge über `src/services/sync.ts`. Produktkatalog und Preisbeobachtungen sind in `src/types/catalog.ts` definiert; externe Caches und die Offline-Warteschlange liegen in IndexedDB. Persönliche Listen und Preis-/Vorratsdaten bleiben lokal. Währungen niemals nur umetikettieren. Änderungen an Kaufdaten müssen Preisprofile und verknüpfte Quittungen konsistent halten.
+
+Prüfen: `npm run typecheck`, `npm run lint`, `npm test -- --maxWorkers=4`, `npm run build`, `npm run test:e2e`. E2E benötigt Chromium (oder `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`). Keine echten Benutzer-Datenbanken für Tests verwenden.

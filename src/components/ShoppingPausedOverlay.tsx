@@ -1,34 +1,22 @@
+import { Sheet } from './Sheet'
+
 interface ShoppingPausedOverlayProps {
   onResume: () => void
   onExit: () => void
 }
-
 export function ShoppingPausedOverlay({ onResume, onExit }: ShoppingPausedOverlayProps) {
   return (
-    <div
-      className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6"
-      style={{ background: 'rgba(0, 0, 0, 0.42)' }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Einkauf pausiert"
-    >
-      <p className="mb-5 text-center text-[18px] font-bold text-white">Einkauf pausiert</p>
-      <button
-        type="button"
-        className="tap-scale flex min-h-[52px] min-w-[11rem] items-center justify-center gap-2 rounded-full px-8 py-3.5 text-[16px] font-extrabold shadow-lg"
-        style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
-        onClick={onResume}
-      >
-        <span aria-hidden>▶️</span>
+    <Sheet onClose={onExit}>
+      <h2 className="mb-4 text-xl font-bold">Einkauf pausiert</h2>
+      <p className="mb-4 text-sm">
+        Deine Artikel und dieser Einkauf bleiben erhalten. Der Timer läuft während der Pause nicht weiter.
+      </p>
+      <button className="btn-primary mb-3 min-h-12" onClick={onResume}>
         Fortsetzen
       </button>
-      <button
-        type="button"
-        className="tap-scale mt-4 min-h-[44px] px-6 text-[14px] font-bold text-white/80"
-        onClick={onExit}
-      >
-        Einkauf beenden
+      <button className="btn-soft min-h-12" onClick={onExit}>
+        Zur Liste
       </button>
-    </div>
+    </Sheet>
   )
 }

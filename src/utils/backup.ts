@@ -1,5 +1,6 @@
+import { parseBackup, STORAGE_VERSION } from './validation'
 export const BACKUP_STORAGE_KEY = 'alexshop-store'
-export const BACKUP_VERSION = 19
+export const BACKUP_VERSION = STORAGE_VERSION
 
 export function readBackupJSON(): string | null {
   return localStorage.getItem(BACKUP_STORAGE_KEY)
@@ -13,40 +14,27 @@ export interface RestoreResult {
 /** Validiert eine Sicherungsdatei (muss die zustand-persist-Form {state, version} haben)
  *  und schreibt sie bei Erfolg direkt in den localStorage-Slot der App. */
 export function restoreBackupJSON(json: string): RestoreResult {
-  let parsed: unknown
   try {
-    parsed = JSON.parse(json)
+    const parsed = parseBackup(json)
+    const previous = localStorage.getItem(BACKUP_STORAGE_KEY)
+    if (previous) {
+      let valid = false
+      try {
+        parseBackup(previous)
+        valid = true
+      } catch {
+        /* damaged input is retained by the recovery path */
+      }
+      if (valid) localStorage.setItem(`${BACKUP_STORAGE_KEY}.previous`, previous)
+    }
+    localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(parsed))
+    return { ok: true }
   } catch {
-    return { ok: false, error: 'Ungültiges JSON.' }
+    return {
+      ok: false,
+      error: 'Sicherung ungültig, zu groß oder nicht speicherbar. Die bisherigen Daten bleiben erhalten.',
+    }
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('state' in parsed) ||
-    !('version' in parsed) ||
-    typeof parsed.version !== 'number' ||
-    !Number.isInteger(parsed.version) ||
-    parsed.version < 0 ||
-    parsed.version > BACKUP_VERSION ||
-    typeof parsed.state !== 'object' ||
-    parsed.state === null ||
-    !('lists' in parsed.state) ||
-    !Array.isArray(parsed.state.lists) ||
-    parsed.state.lists.length === 0 ||
-    !parsed.state.lists.every((list: unknown) =>
-      typeof list === 'object' && list !== null &&
-      'id' in list && typeof list.id === 'string' &&
-      'items' in list && Array.isArray(list.items)
-    )
-  ) {
-    return { ok: false, error: 'Das sieht nicht nach einer AlexShop-Sicherung aus.' }
-  }
-  try {
-    localStorage.setItem(BACKUP_STORAGE_KEY, json)
-  } catch {
-    return { ok: false, error: 'Sicherung konnte nicht gespeichert werden.' }
-  }
-  return { ok: true }
 }
 
 export function backupFilename(): string {

@@ -9,7 +9,8 @@ import type {
 } from '@/types'
 import { todayKey } from '@/utils/date'
 import { uid } from '@/utils/id'
-import { replenishPantryItem } from '@/utils/pantry'
+import { replenishPantryItem, matchesPantryName } from '@/utils/pantry'
+import { subtractQuantity } from '@/utils/quantity'
 import {
   findPriceProfile,
   findVariant,
@@ -17,6 +18,8 @@ import {
   repriceRecordedPurchase,
   revertLastPurchaseOnVariant,
   upsertPriceProfile,
+  pricesForCurrency,
+  refreshPurchaseProfiles,
 } from '@/utils/priceProfiles'
 
 type PurchaseState = {
@@ -29,9 +32,14 @@ type PurchaseState = {
 export function parseCheckoffInput(input?: number | CheckoffPriceData): CheckoffPriceData | undefined {
   if (input === undefined) return undefined
   if (typeof input === 'number') {
-    return input > 0 ? { price: input, wasSale: false } : undefined
+    return Number.isFinite(input) && input > 0 ? { price: input, wasSale: false } : undefined
   }
-  if (input.price > 0) return { ...input, wasSale: !!input.wasSale }
+  if (
+    Number.isFinite(input.price) &&
+    input.price > 0 &&
+    [input.unitPrice, input.pricePerKg].every((n) => n === undefined || (Number.isFinite(n) && n > 0))
+  )
+    return { ...input, wasSale: !!input.wasSale }
   return undefined
 }
 
@@ -65,31 +73,53 @@ export function commitItemPurchase(
   state: PurchaseState,
   item: ShoppingItem,
   data: CheckoffPriceData,
-  opts: { listId: string; itemId: string; markDone: boolean; wasDone: boolean; currency?: Currency; purchaseDate?: string }
+  opts: {
+    listId: string
+    itemId: string
+    markDone: boolean
+    wasDone: boolean
+    currency?: Currency
+    purchaseDate?: string
+    storeId?: string
+  }
 ): PurchaseState {
   const today = opts.purchaseDate ?? todayKey()
   const currency = opts.currency ?? 'CHF'
   const purchaseLog = [...state.purchaseLog]
   const logIdx = findTodayLogIndex(purchaseLog, item, today)
   const previous = logIdx >= 0 ? purchaseLog[logIdx] : undefined
-  const sameVariant = previous?.variantId &&
-    previous.name === item.name && previous.category === item.category &&
+  const sameVariant =
+    previous?.variantId &&
+    previous.name === item.name &&
+    previous.category === item.category &&
     (previous.currency ?? 'CHF') === currency &&
     (!data.variantId || data.variantId === previous.variantId) &&
     (!data.variantName || data.variantName === previous.variantName) &&
     !!data.wasSale === !!previous.wasSale &&
-    !!findPriceProfile(state.priceProfiles, previous.name, previous.category)?.variants.some((v) => v.id === previous.variantId)
+    !!findPriceProfile(state.priceProfiles, previous.name, previous.category)?.variants.some(
+      (v) => v.id === previous.variantId
+    )
   let priceProfiles = state.priceProfiles
   let variantId: string
   let variantName: string
   if (previous && sameVariant) {
-    priceProfiles = repriceRecordedPurchase(priceProfiles, previous, data.pricePerKg ?? data.unitPrice ?? data.price)
+    priceProfiles = repriceRecordedPurchase(
+      priceProfiles,
+      previous,
+      data.pricePerKg ?? data.unitPrice ?? data.price
+    )
     variantId = previous.variantId!
     variantName = previous.variantName ?? data.variantName ?? item.name
   } else {
     if (previous) priceProfiles = revertProfilesForLogEntry(priceProfiles, previous)
     const purchase = recordVariantPurchase(
-      priceProfiles, item.name, item.category, data, today, uid, currency
+      priceProfiles,
+      item.name,
+      item.category,
+      data,
+      today,
+      uid,
+      currency
     )
     priceProfiles = purchase.createdNewProfile
       ? [...priceProfiles, purchase.profile]
@@ -101,6 +131,8 @@ export function commitItemPurchase(
     id: logIdx >= 0 ? purchaseLog[logIdx]!.id || uid() : uid(),
     itemId: opts.itemId,
     name: item.name,
+    productId: item.productId,
+    storeId: opts.storeId ?? previous?.storeId,
     category: item.category,
     date: today,
     price: data.price,
@@ -109,6 +141,16 @@ export function commitItemPurchase(
     variantId,
     variantName,
     wasSale: !!data.wasSale,
+    pricePerKg: data.pricePerKg,
+    referenceUnitPrice:
+      previous?.referenceUnitPrice ??
+      (() => {
+        const variant = findPriceProfile(state.priceProfiles, item.name, item.category)?.variants.find(
+          (v) => v.id === variantId
+        )
+        return variant ? pricesForCurrency(variant, currency).lastPrice : undefined
+      })(),
+    pantryMovement: previous?.pantryMovement,
   }
   if (logIdx >= 0) purchaseLog[logIdx] = entry
   else purchaseLog.push(entry)
@@ -119,16 +161,29 @@ export function commitItemPurchase(
       : {
           ...l,
           items: l.items.map((i) =>
-            i.id === opts.itemId ? { ...i, done: opts.markDone, variantId } : i
+            i.id === opts.itemId ? { ...i, done: opts.markDone, variantId, purchaseLogId: entry.id } : i
           ),
         }
   )
 
+  const pantry = opts.markDone && !opts.wasDone ? replenishPantryItem(state.pantry, item) : state.pantry
+  const stockIndex = state.pantry.findIndex((p) => matchesPantryName(p.name, item.name))
+  if (stockIndex >= 0 && pantry !== state.pantry) {
+    entry.pantryMovement = {
+      pantryId: state.pantry[stockIndex]!.id,
+      amount: item.amount,
+      before: state.pantry[stockIndex]!.amount,
+      after: pantry[stockIndex]!.amount,
+    }
+  }
   return {
     purchaseLog,
-    priceProfiles,
+    priceProfiles: refreshPurchaseProfiles(priceProfiles, purchaseLog, [
+      entry,
+      ...(previous ? [previous] : []),
+    ]),
     lists,
-    pantry: opts.markDone && !opts.wasDone ? replenishPantryItem(state.pantry, item) : state.pantry,
+    pantry,
   }
 }
 
@@ -139,19 +194,41 @@ export function undoTodayCheckoff(
   itemId: string
 ): PurchaseState {
   const today = todayKey()
-  const logIdx = findTodayLogIndex(state.purchaseLog, item, today)
+  const linkedIndex = item.purchaseLogId
+    ? state.purchaseLog.findIndex((e) => e.id === item.purchaseLogId)
+    : -1
+  const logIdx = linkedIndex >= 0 ? linkedIndex : findTodayLogIndex(state.purchaseLog, item, today)
   let priceProfiles = state.priceProfiles
   let purchaseLog = state.purchaseLog
 
+  let pantry = state.pantry
   if (logIdx >= 0) {
     const entry = purchaseLog[logIdx]!
-    priceProfiles = revertProfilesForLogEntry(priceProfiles, entry)
     purchaseLog = purchaseLog.filter((_, i) => i !== logIdx)
+    priceProfiles = refreshPurchaseProfiles(priceProfiles, purchaseLog, [entry])
+    const movement = entry.pantryMovement
+    if (movement)
+      pantry = pantry.map((p) =>
+        p.id !== movement.pantryId
+          ? p
+          : {
+              ...p,
+              amount:
+                p.amount === movement.after
+                  ? movement.before
+                  : (subtractQuantity(p.amount ?? '', movement.amount) ?? p.amount),
+            }
+      )
   }
 
   const lists = state.lists.map((l) =>
-    l.id !== listId ? l : { ...l, items: l.items.map((i) => (i.id === itemId ? { ...i, done: false } : i)) }
+    l.id !== listId
+      ? l
+      : {
+          ...l,
+          items: l.items.map((i) => (i.id === itemId ? { ...i, done: false, purchaseLogId: undefined } : i)),
+        }
   )
 
-  return { purchaseLog, priceProfiles, lists, pantry: state.pantry }
+  return { purchaseLog, priceProfiles, lists, pantry }
 }

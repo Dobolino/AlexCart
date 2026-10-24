@@ -49,9 +49,7 @@ export function avgBasketByStore(trips: CompletedTrip[], currency?: Currency): S
     .map((stat) => ({
       ...stat,
       percentAboveCheapest:
-        cheapestAvg > 0
-          ? Math.round(((stat.avgSpent - cheapestAvg) / cheapestAvg) * 1000) / 10
-          : 0,
+        cheapestAvg > 0 ? Math.round(((stat.avgSpent - cheapestAvg) / cheapestAvg) * 1000) / 10 : 0,
     }))
     .sort(
       (a, b) =>
@@ -62,10 +60,7 @@ export function avgBasketByStore(trips: CompletedTrip[], currency?: Currency): S
 }
 
 /** Ersparnis eines Aktions-Einkaufs gegenüber dem letzten Normalpreis der Variante. */
-export function savingsForSaleEntry(
-  entry: PurchaseLogEntry,
-  profiles: ProductPriceProfile[]
-): number {
+export function savingsForSaleEntry(entry: PurchaseLogEntry, profiles: ProductPriceProfile[]): number {
   if (!entry.wasSale || !entry.price || entry.price <= 0) return 0
 
   const profile = findPriceProfile(profiles, entry.name, entry.category)
@@ -82,21 +77,28 @@ export function savingsForSaleEntry(
   if (!variant) return 0
 
   const prices = pricesForCurrency(variant, currency)
-  const reference = prices.lastPrice ?? prices.avgPrice
-  if (!reference || reference <= entry.price) return 0
-
-  return roundMoney(reference - entry.price)
+  const reference = entry.referenceUnitPrice ?? prices.lastPrice ?? prices.avgPrice
+  const profilePrice = entry.profilePrice ?? entry.price
+  if (!reference || reference <= profilePrice || profilePrice <= 0) return 0
+  return roundMoney((reference - profilePrice) * (entry.price / profilePrice))
 }
 
 /** Kumulierte Promo-Ersparnis in einem Kalenderjahr. */
 export function promoSavingsInYear(
   log: PurchaseLogEntry[],
   profiles: ProductPriceProfile[],
-  year = new Date().getFullYear()
+  year = new Date().getFullYear(),
+  currency?: Currency
 ): number {
   let total = 0
   for (const entry of log) {
-    if (!entry.wasSale || !entry.price || entry.price <= 0) continue
+    if (
+      !entry.wasSale ||
+      !entry.price ||
+      entry.price <= 0 ||
+      (currency && (entry.currency ?? 'CHF') !== currency)
+    )
+      continue
     const entryYear = Number(entry.date.slice(0, 4))
     if (!Number.isFinite(entryYear) || entryYear !== year) continue
     total += savingsForSaleEntry(entry, profiles)

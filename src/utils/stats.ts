@@ -122,13 +122,19 @@ function spendByDay(log: PurchaseLogEntry[], currency?: Currency): Map<string, n
 
 export function totalSpent(log: PurchaseLogEntry[], currency?: Currency): number {
   return log.reduce(
-    (sum, entry) => sum + ((!currency || (entry.currency ?? 'CHF') === currency) && entry.price && entry.price > 0 ? entry.price : 0),
+    (sum, entry) =>
+      sum +
+      ((!currency || (entry.currency ?? 'CHF') === currency) && entry.price && entry.price > 0
+        ? entry.price
+        : 0),
     0
   )
 }
 
 export function pricedPurchaseCount(log: PurchaseLogEntry[], currency?: Currency): number {
-  return log.filter((entry) => entry.price && entry.price > 0 && (!currency || (entry.currency ?? 'CHF') === currency)).length
+  return log.filter(
+    (entry) => entry.price && entry.price > 0 && (!currency || (entry.currency ?? 'CHF') === currency)
+  ).length
 }
 
 /** Ø Ausgaben pro Einkaufstag (nur Tage mit erfassten Preisen). */
@@ -152,7 +158,8 @@ export function tripTotalSpent(trip: CompletedTrip): number {
 }
 
 /** Ø Ausgaben pro vollständig abgeschlossener Einkaufsliste (nicht pro Einzelartikel). */
-export function avgSpendPerCompletedTrip(trips: CompletedTrip[]): number {
+export function avgSpendPerCompletedTrip(allTrips: CompletedTrip[], currency?: Currency): number {
+  const trips = currency ? allTrips.filter((t) => (t.currency ?? 'CHF') === currency) : allTrips
   if (!trips.length) return 0
   return trips.reduce((sum, t) => sum + tripTotalSpent(t), 0) / trips.length
 }
@@ -196,7 +203,10 @@ export function tripsByMonth(trips: CompletedTrip[]): TripMonthGroup[] {
     .map(([key, groupTrips]) => {
       const sorted = [...groupTrips].sort((a, b) => b.completedAt - a.completedAt)
       const [year, month] = key.split('-').map(Number)
-      const label = new Date(year!, month! - 1, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      const label = new Date(year!, month! - 1, 1).toLocaleDateString('de-DE', {
+        month: 'long',
+        year: 'numeric',
+      })
       const subtotal = Math.round(sorted.reduce((sum, t) => sum + tripTotalSpent(t), 0) * 100) / 100
       return { key, label, subtotal, trips: sorted }
     })

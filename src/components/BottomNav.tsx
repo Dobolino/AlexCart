@@ -6,6 +6,7 @@ import { ICON_PATHS } from '@/constants/icons'
 const TABS = [
   { to: '/', label: 'Liste', icon: 'cart' },
   { to: '/pantry', label: 'Vorrat', icon: 'pantry' },
+  { to: '/prices', label: 'Preise', icon: 'sort' },
   { to: '/calculator', label: 'Rechner', icon: 'calculator' },
   { to: '/stats', label: 'Stats', icon: 'chart' },
   { to: '/settings', label: 'Optionen', icon: 'settings' },
@@ -17,12 +18,7 @@ export function BottomNav() {
     <FloatingPortal>
       <nav className="nav-liquid" aria-label="Hauptnavigation">
         {TABS.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.to === '/'}
-            className="nav-liquid-tab tap-scale"
-          >
+          <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className="nav-liquid-tab tap-scale">
             {({ isActive }) => (
               <>
                 <span className={`nav-liquid-icon ${isActive ? 'nav-liquid-icon-active' : ''}`}>

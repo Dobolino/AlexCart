@@ -23,6 +23,7 @@ export function EditPantrySheet({ item, onClose }: EditPantrySheetProps) {
   const minParsed = parseAmount(item.minAmount)
   const fallbackUnit = getDefaultUnit(getIconKey(item.name, item.category), item.category)
 
+  const [expiresOn, setExpiresOn] = useState(item.expiresOn ?? '')
   const [name, setName] = useState(item.name)
   const [category, setCategory] = useState(item.category)
   const [amountValue, setAmountValue] = useState(currentParsed ? String(currentParsed.value) : '')
@@ -34,6 +35,7 @@ export function EditPantrySheet({ item, onClose }: EditPantrySheetProps) {
     if (!name.trim()) return
     updatePantryItem(item.id, {
       name: name.trim(),
+      expiresOn: expiresOn || undefined,
       category,
       amount: joinAmount(amountValue, amountUnit),
       minAmount: joinAmount(minValue, minUnit),
@@ -131,6 +133,15 @@ export function EditPantrySheet({ item, onClose }: EditPantrySheetProps) {
         </label>
       </div>
 
+      <label className="mb-3 block text-sm font-bold">
+        Mindestens haltbar bis (optional)
+        <input
+          className="input mt-2 w-full"
+          type="date"
+          value={expiresOn}
+          onChange={(e) => setExpiresOn(e.target.value)}
+        />
+      </label>
       {isLowStock(previewItem) && (
         <p className="mb-3 text-[13px] font-semibold" style={{ color: 'var(--danger)' }}>
           Unter Mindestbestand – wird auf der Einkaufsliste vorgeschlagen.

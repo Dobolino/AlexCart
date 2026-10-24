@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
@@ -14,19 +14,24 @@ import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
-import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
-import { AddItemSheet } from '@/components/AddItemSheet'
+const BarcodeScannerSheet = lazy(() =>
+  import('@/components/BarcodeScannerSheet').then((m) => ({ default: m.BarcodeScannerSheet }))
+)
+const StoreLayoutSheet = lazy(() =>
+  import('@/components/StoreLayoutSheet').then((m) => ({ default: m.StoreLayoutSheet }))
+)
+const CheckoffPriceSheet = lazy(() =>
+  import('@/components/CheckoffPriceSheet').then((m) => ({ default: m.CheckoffPriceSheet }))
+)
+import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
+import { ShoppingClock } from '@/components/ShoppingClock'
 import { EditItemSheet } from '@/components/EditItemSheet'
 import { ItemActionSheet } from '@/components/ItemActionSheet'
 import { ShoppingCategoryBlock } from '@/components/ShoppingCategoryBlock'
 import { ShoppingProgressBar } from '@/components/ShoppingProgressBar'
 import { ShoppingPausedOverlay } from '@/components/ShoppingPausedOverlay'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
-import {
-  activeShoppingDurationMs,
-  formatShoppingDuration,
-  isShoppingPaused,
-} from '@/utils/shoppingDuration'
+import { activeShoppingDurationMs, isShoppingPaused } from '@/utils/shoppingDuration'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
 /** Trennzeichen für den Kategorie-Key (kommt in Kategorienamen nicht vor). */
@@ -36,6 +41,7 @@ export function ShoppingModePage() {
   const navigate = useNavigate()
   const list = useStore((s) => s.activeList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
+  const updatePurchaseLogPrice = useStore((s) => s.updatePurchaseLogPrice)
   const updateItemInActiveList = useStore((s) => s.updateItemInActiveList)
   const deleteItem = useStore((s) => s.deleteItem)
   const restoreItem = useStore((s) => s.restoreItem)
@@ -52,15 +58,22 @@ export function ShoppingModePage() {
   const pauseShopping = useStore((s) => s.pauseShopping)
   const resumeShopping = useStore((s) => s.resumeShopping)
   const clearShoppingSession = useStore((s) => s.clearShoppingSession)
-  const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
+  const selectedBudget = useStore((s) => s.settings.weeklyBudget)
+  const currencyBudgets = useStore((s) => s.settings.budgetsByCurrency)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
   const autoCollapse = useStore((s) => s.settings.shoppingAutoCollapse)
   const setShoppingAutoCollapse = useStore((s) => s.setShoppingAutoCollapse)
   const toggleItemFavorite = useStore((s) => s.toggleItemFavorite)
   const addPantryItem = useStore((s) => s.addPantryItem)
-  const currency = useStore((s) => s.settings.currency)
+  const selectedCurrency = useStore((s) => s.settings.currency)
+  const currency =
+    shoppingSession?.listId === list?.id ? (shoppingSession?.currency ?? selectedCurrency) : selectedCurrency
+  const weeklyBudget = currency === selectedCurrency ? selectedBudget : (currencyBudgets?.[currency] ?? 0)
   const [lastChecked, setLastChecked] = useState<{ id: string; price?: number } | null>(null)
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [layoutOpen, setLayoutOpen] = useState(false)
+  const storeLayouts = useStore((s) => s.storeLayouts)
   const [addOpen, setAddOpen] = useState(false)
   const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null)
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null)
@@ -69,28 +82,23 @@ export function ShoppingModePage() {
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollTargetRef = useRef<HTMLDivElement | null>(null)
-  const [clock, setClock] = useState(() => Date.now())
 
-  const sessionForList =
-    list && shoppingSession?.listId === list.id ? shoppingSession : null
+  const sessionForList = list && shoppingSession?.listId === list.id ? shoppingSession : null
   const isPaused = isShoppingPaused(sessionForList)
 
   const wakeLockActive = useWakeLock(!isPaused)
 
+  useEffect(
+    () => () => {
+      if (undoTimer.current) clearTimeout(undoTimer.current)
+      if (deleteTimer.current) clearTimeout(deleteTimer.current)
+    },
+    []
+  )
+  const listId = list?.id
   useEffect(() => {
-    if (!list) return
-    startShoppingSession(list.id)
-  }, [list?.id, startShoppingSession])
-
-  useEffect(() => {
-    if (!sessionForList || isPaused) return
-    const id = window.setInterval(() => setClock(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [sessionForList, isPaused])
-
-  const activeDurationMs = sessionForList
-    ? activeShoppingDurationMs(sessionForList, clock)
-    : 0
+    if (listId) startShoppingSession(listId)
+  }, [listId, startShoppingSession])
 
   const tripTotal = useMemo(() => {
     if (!list) return 0
@@ -109,9 +117,20 @@ export function ShoppingModePage() {
     [tripTotal, openEstimate.total]
   )
 
-  const doneCount = useMemo(() => list?.items.filter((i) => i.done).length ?? 0, [list])
+  const doneCount = useMemo(
+    () => list?.items.filter((i) => i.done && sessionForList?.checkedItemIds.includes(i.id)).length ?? 0,
+    [list, sessionForList?.checkedItemIds]
+  )
   const totalCount = openItems.length + doneCount
-  const groups = useMemo(() => groupByCategory(openItems), [openItems])
+  const groups = useMemo(() => {
+    const grouped = groupByCategory(openItems.filter((i) => !i.unavailable))
+    const order = storeLayouts[`${currency}:${sessionForList?.store ?? ''}`] ?? []
+    return grouped.sort((a, b) => {
+      const ai = order.indexOf(a.category),
+        bi = order.indexOf(b.category)
+      return (ai < 0 ? 1000 : ai) - (bi < 0 ? 1000 : bi)
+    })
+  }, [openItems, storeLayouts, currency, sessionForList?.store])
   const categoryNames = useMemo(() => groups.map((g) => g.category), [groups])
 
   // Aufgeklappte Kategorie nachführen, wenn sich die offenen Kategorien ändern (z. B. letzte
@@ -144,7 +163,9 @@ export function ShoppingModePage() {
 
   if (!list) return null
 
-  const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
+  const calculatorTotal = calculatorEntries
+    .filter((e) => (e.currency ?? 'CHF') === currency)
+    .reduce((sum, e) => sum + e.amount, 0)
   const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog, undefined, currency), calculatorTotal)
   const budget = weeklyBudget > 0 ? budgetProgress(budgetSpend, weeklyBudget) : null
   const showTripTotal = tripTotal > 0
@@ -153,7 +174,7 @@ export function ShoppingModePage() {
   function armUndo(next: { id: string; price?: number }) {
     setLastChecked(next)
     if (undoTimer.current) clearTimeout(undoTimer.current)
-    undoTimer.current = setTimeout(() => setLastChecked(null), 4000)
+    undoTimer.current = setTimeout(() => setLastChecked(null), 10000)
   }
 
   function handleToggleCategory(category: string) {
@@ -173,7 +194,8 @@ export function ShoppingModePage() {
   function handlePriceSave(data: CheckoffPriceData) {
     if (!priceSheetItem) return
     hapticSuccess()
-    toggleItemDone(priceSheetItem.id, data)
+    if (priceSheetItem.done) updatePurchaseLogPrice(priceSheetItem, data)
+    else toggleItemDone(priceSheetItem.id, data)
     armUndo({ id: priceSheetItem.id, price: data.price })
     setPriceSheetItem(null)
   }
@@ -181,7 +203,7 @@ export function ShoppingModePage() {
   function handlePriceSkip() {
     if (!priceSheetItem) return
     hapticSuccess()
-    toggleItemDone(priceSheetItem.id)
+    if (!priceSheetItem.done) toggleItemDone(priceSheetItem.id)
     armUndo({ id: priceSheetItem.id })
     setPriceSheetItem(null)
   }
@@ -198,15 +220,18 @@ export function ShoppingModePage() {
   }
 
   function handleExitShopping() {
-    clearShoppingSession()
+    pauseShopping()
     navigate('/')
   }
 
   function handleFinishShopping() {
+    if (
+      openItems.length &&
+      !window.confirm(`${openItems.length} Artikel bleiben auf der Liste. Einkauf trotzdem abschließen?`)
+    )
+      return
     if (list && doneCount > 0) {
-      const durationMs = sessionForList
-        ? activeShoppingDurationMs(sessionForList)
-        : undefined
+      const durationMs = sessionForList ? activeShoppingDurationMs(sessionForList) : undefined
       logCompletedTrip({
         listId: list.id,
         listName: list.name,
@@ -260,7 +285,7 @@ export function ShoppingModePage() {
           className="tap-scale flex h-11 w-11 items-center justify-center rounded-full"
           style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
           onClick={handleExitShopping}
-          aria-label="Einkaufsmodus beenden"
+          aria-label="Zur Liste"
         >
           <Icon path={ICON_PATHS.close} size={20} />
         </button>
@@ -268,7 +293,12 @@ export function ShoppingModePage() {
           <div className="truncate text-[17px] font-extrabold">{list.name}</div>
           <div className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {doneCount} von {totalCount || doneCount} erledigt
-            {sessionForList ? ` · ${formatShoppingDuration(activeDurationMs)}` : ''}
+            {sessionForList && (
+              <>
+                {' '}
+                · <ShoppingClock session={sessionForList} />
+              </>
+            )}
             {showProjectedTotal
               ? ` · ${tripTotal > 0 ? formatMoney(tripTotal, currency) + ' / ' : ''}${formatMoney(projectedTotal, currency)} geschätzt`
               : ''}
@@ -306,7 +336,10 @@ export function ShoppingModePage() {
               Leeren
             </button>
           ) : (
-            <div className="flex h-11 w-11 items-center justify-center" title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}>
+            <div
+              className="flex h-11 w-11 items-center justify-center"
+              title={wakeLockActive ? 'Bildschirm bleibt an' : undefined}
+            >
               {wakeLockActive && (
                 <span style={{ color: 'var(--text-muted)' }} aria-label="Bildschirm bleibt an">
                   <Icon path={ICON_PATHS.sun} size={16} />
@@ -317,6 +350,13 @@ export function ShoppingModePage() {
         </div>
       </header>
 
+      <button
+        className="mx-3 my-2 min-h-11 rounded-xl px-3 text-left text-sm font-bold"
+        style={{ background: 'var(--surface)' }}
+        onClick={() => setLayoutOpen(true)}
+      >
+        {sessionForList?.store || 'Geschäft & Laufweg wählen'} · Laufweg bearbeiten
+      </button>
       {(showTripTotal || showProjectedTotal) && (
         <div
           className="mx-4 mb-2 flex items-center justify-between rounded-2xl px-4 py-3"
@@ -347,7 +387,7 @@ export function ShoppingModePage() {
         />
       )}
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-8">
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-40">
         {!openItems.length ? (
           <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
             <div className="mb-3 text-5xl">🎉</div>
@@ -432,33 +472,62 @@ export function ShoppingModePage() {
             ))}
           </>
         )}
+        {openItems.some((i) => i.unavailable) && (
+          <section className="mt-4 rounded-2xl p-3" style={{ background: 'var(--surface)' }}>
+            <h2 className="font-bold">Für später · nicht gefunden</h2>
+            {openItems
+              .filter((i) => i.unavailable)
+              .map((i) => (
+                <button
+                  className="flex min-h-12 w-full items-center justify-between text-left text-sm"
+                  key={i.id}
+                  onClick={() => useStore.getState().setItemUnavailable(i.id, false)}
+                >
+                  <span>{i.name}</span>
+                  <span>Wieder anzeigen</span>
+                </button>
+              ))}
+          </section>
+        )}
       </main>
 
-      {openItems.length > 0 && (
-        <FloatingPortal>
+      <FloatingPortal>
+        {lastChecked && (
           <div
-            className="glass fixed left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full py-1.5 pl-4 pr-1"
-            style={{
-              bottom: 'calc(12px + var(--safe-bottom))',
-            }}
+            role="status"
+            className="glass fixed bottom-[calc(88px+var(--safe-bottom))] left-3 right-3 z-20 flex items-center justify-between rounded-2xl px-4 py-2"
           >
-            {!lastChecked && (
-              <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-                Tippen zum Abhaken
-              </span>
-            )}
+            <span className="text-[13px]">Artikel abgehakt</span>
+            <button className="min-h-11 px-3 font-bold" onClick={handleUndo}>
+              Rückgängig
+            </button>
             <button
-              type="button"
-              className="tap-scale flex h-8 w-8 flex-none items-center justify-center rounded-full"
-              style={{ background: 'var(--chip-bg)', color: 'var(--text-muted)' }}
-              onClick={() => setAddOpen(true)}
-              aria-label="Extra-Artikel hinzufügen"
+              className="min-h-11 px-3"
+              onClick={() => {
+                const item = list.items.find((i) => i.id === lastChecked.id)
+                if (item) setPriceSheetItem(item)
+              }}
             >
-              <Icon path={ICON_PATHS.plus} size={16} />
+              Preis
             </button>
           </div>
-        </FloatingPortal>
-      )}
+        )}
+        <div className="glass shopping-actions">
+          <button
+            className="btn-primary"
+            onClick={() => setAddOpen(true)}
+            aria-label="Extra-Artikel hinzufügen"
+          >
+            + Artikel
+          </button>
+          <button className="btn-soft" onClick={() => setScannerOpen(true)}>
+            Scannen
+          </button>
+          <button className="btn-soft" onClick={handleFinishShopping}>
+            Abschließen
+          </button>
+        </div>
+      </FloatingPortal>
 
       {deletedItem && (
         <FloatingPortal>
@@ -482,14 +551,26 @@ export function ShoppingModePage() {
         </FloatingPortal>
       )}
 
-      {addOpen && (
-        <AddItemSheet onClose={() => setAddOpen(false)} onImported={() => hapticSuccess()} />
+      {scannerOpen && (
+        <Suspense fallback={null}>
+          <BarcodeScannerSheet onClose={() => setScannerOpen(false)} />
+        </Suspense>
       )}
+      {layoutOpen && (
+        <Suspense fallback={null}>
+          <StoreLayoutSheet onClose={() => setLayoutOpen(false)} />
+        </Suspense>
+      )}
+      {addOpen && <ShoppingQuickAddSheet onClose={() => setAddOpen(false)} onAdded={() => hapticSuccess()} />}
 
       {menuItem && (
         <ItemActionSheet
           item={menuItem}
           onClose={() => setMenuItem(null)}
+          onUnavailable={() => {
+            useStore.getState().setItemUnavailable(menuItem.id, !menuItem.unavailable)
+            setMenuItem(null)
+          }}
           onEdit={() => {
             setEditingItem(menuItem)
             setMenuItem(null)
@@ -512,20 +593,22 @@ export function ShoppingModePage() {
       {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
 
       {priceSheetItem && (
-        <CheckoffPriceSheet
-          item={priceSheetItem}
-          profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
-          brands={brands}
-          currency={currency}
-          onClose={() => setPriceSheetItem(null)}
-          onSave={handlePriceSave}
-          onSkip={handlePriceSkip}
-          onAmountChange={(amount) => {
-            updateItemInActiveList(priceSheetItem.id, { amount })
-            setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
-          }}
-          highlightOptions
-        />
+        <Suspense fallback={null}>
+          <CheckoffPriceSheet
+            item={priceSheetItem}
+            profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
+            brands={brands}
+            currency={currency}
+            onClose={() => setPriceSheetItem(null)}
+            onSave={handlePriceSave}
+            onSkip={handlePriceSkip}
+            onAmountChange={(amount) => {
+              updateItemInActiveList(priceSheetItem.id, { amount })
+              setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
+            }}
+            highlightOptions
+          />
+        </Suspense>
       )}
 
       {isPaused && <ShoppingPausedOverlay onResume={resumeShopping} onExit={handleExitShopping} />}

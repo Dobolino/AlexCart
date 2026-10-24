@@ -1,4 +1,5 @@
 import { normalize } from './text'
+import { baseQuantity } from './quantity'
 import { parseAmount, combineAmounts, joinAmount, formatNumber, stepForUnit } from './amount'
 import type { PantryItem, ShoppingItem, ShoppingList } from '@/types'
 
@@ -6,7 +7,7 @@ export function matchesPantryName(shoppingName: string, pantryName: string): boo
   const a = normalize(shoppingName)
   const b = normalize(pantryName)
   if (!a || !b) return false
-  return a === b || a.includes(b) || b.includes(a)
+  return a === b
 }
 
 export function findPantryItem(name: string, pantry: PantryItem[]): PantryItem | undefined {
@@ -20,6 +21,9 @@ export function isLowStock(item: PantryItem): boolean {
 
   const current = parseAmount(item.amount || '')
   if (!current) return true
+  const a = baseQuantity(item.amount ?? ''),
+    b = baseQuantity(item.minAmount)
+  if (a && b && a.unit === b.unit) return a.value < b.value
   if (current.unit.toLowerCase() !== min.unit.toLowerCase()) return true
   return current.value < min.value
 }
@@ -27,6 +31,17 @@ export function isLowStock(item: PantryItem): boolean {
 export function replenishAmount(current: string | undefined, purchased: string): string {
   if (!purchased.trim()) return current?.trim() || ''
   if (!current?.trim()) return purchased.trim()
+  const a = baseQuantity(current),
+    b = baseQuantity(purchased)
+  if (a && b && a.unit === b.unit) {
+    const parsed = parseAmount(current)!
+    const scale = ['l', 'kg'].includes(parsed.unit.toLowerCase())
+      ? 1000
+      : parsed.unit.toLowerCase() === 'cl'
+        ? 10
+        : 1
+    return joinAmount(formatNumber((a.value + b.value) / scale), parsed.unit)
+  }
   return combineAmounts(current, purchased)
 }
 

@@ -21,8 +21,10 @@ const list: ShoppingList = {
 }
 
 describe('matchesPantryName', () => {
-  it('matches exact and partial names', () => {
-    expect(matchesPantryName('Vollmilch', 'Milch')).toBe(true)
+  it('matches only exact normalized product names', () => {
+    expect(matchesPantryName('Vollmilch', 'Milch')).toBe(false)
+    expect(matchesPantryName(' Milch ', 'milch')).toBe(true)
+    expect(matchesPantryName('Reiswaffeln', 'Reis')).toBe(false)
     expect(matchesPantryName('Reis', 'Zucker')).toBe(false)
   })
 })
@@ -75,7 +77,9 @@ describe('buildLowStockSuggestions', () => {
 
 describe('replenishPantryItem', () => {
   it('updates matching pantry stock when an item is purchased', () => {
-    const pantry: PantryItem[] = [{ id: '1', name: 'Milch', category: 'Milch & Käse', amount: '0.5 l', minAmount: '1 l' }]
+    const pantry: PantryItem[] = [
+      { id: '1', name: 'Milch', category: 'Milch & Käse', amount: '0.5 l', minAmount: '1 l' },
+    ]
     const updated = replenishPantryItem(pantry, {
       id: 's1',
       name: 'Milch',

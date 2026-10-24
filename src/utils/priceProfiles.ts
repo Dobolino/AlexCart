@@ -7,6 +7,7 @@ import {
   estimatedPieceGrams,
 } from './producePrice'
 import { normalize } from '@/utils/text'
+import Decimal from 'decimal.js'
 import type {
   CheckoffPriceData,
   Currency,
@@ -114,7 +115,12 @@ export function createEmptyVariant(name: string, id: string): ProductVariant {
   }
 }
 
-export function createPriceProfile(itemName: string, category: string, id: string, now = Date.now()): ProductPriceProfile {
+export function createPriceProfile(
+  itemName: string,
+  category: string,
+  id: string,
+  now = Date.now()
+): ProductPriceProfile {
   const trimmed = itemName.trim()
   return {
     id,
@@ -163,12 +169,20 @@ export function applyPurchaseToVariant(
 
   if (wasSale) {
     next.lastSalePrice = price
+    next.saleTotal = new Decimal(current.saleTotal ?? (current.avgSalePrice ?? 0) * current.salePurchaseCount)
+      .plus(price)
+      .toNumber()
     next.avgSalePrice = nextSaleAverage(current, price)
     next.salePurchaseCount = current.salePurchaseCount + 1
     return setPricesForCurrency(variant, currency, next)
   }
 
   next.lastPrice = price
+  next.normalTotal = new Decimal(
+    current.normalTotal ?? (current.avgPrice ?? 0) * (current.purchaseCount - current.salePurchaseCount)
+  )
+    .plus(price)
+    .toNumber()
   next.avgPrice = nextNormalAverage(current, price)
   return setPricesForCurrency(variant, currency, next)
 }
@@ -211,7 +225,11 @@ export interface ResolvedVariantPurchase {
   createdNewProfile: boolean
 }
 
-function withVariantMeta(variant: ProductVariant, data: CheckoffPriceData, currency: Currency): ProductVariant {
+function withVariantMeta(
+  variant: ProductVariant,
+  data: CheckoffPriceData,
+  currency: Currency
+): ProductVariant {
   let next = { ...variant }
   if (data.brandId) next.brandId = data.brandId
   if (data.pricePerKg !== undefined) {
@@ -251,8 +269,12 @@ export function recordVariantPurchase(
   let variant: ProductVariant | undefined
   let createdNewVariant = false
 
-  if (data.variantId) {
-    const idx = profileCopy.variants.findIndex((v) => v.id === data.variantId)
+  if (data.variantId || data.variantName) {
+    const idx = profileCopy.variants.findIndex((v) =>
+      data.variantId
+        ? v.id === data.variantId
+        : normalize(v.name) === normalize(data.variantName!) && v.brandId === data.brandId
+    )
     if (idx >= 0) {
       variant = withVariantMeta(
         applyPurchaseToVariant(profileCopy.variants[idx]!, profilePrice, date, wasSale, currency),
@@ -288,7 +310,63 @@ export function recordVariantPurchase(
   }
 }
 
-export function upsertPriceProfile(profiles: ProductPriceProfile[], updated: ProductPriceProfile): ProductPriceProfile[] {
+/** Rebuild affected aggregates from remaining observations after undo/correction. */
+export function refreshPurchaseProfiles(
+  profiles: ProductPriceProfile[],
+  log: PurchaseLogEntry[],
+  affected: Array<{ variantId?: string; currency?: Currency }>
+): ProductPriceProfile[] {
+  const keys = new Set(
+    affected.filter((e) => e.variantId).map((e) => `${e.variantId}:${e.currency ?? 'CHF'}`)
+  )
+  return profiles.map((profile) => {
+    if (!profile.variants.some((v) => [...keys].some((key) => key.startsWith(`${v.id}:`)))) return profile
+    return {
+      ...profile,
+      variants: profile.variants.map((variant) => {
+        let next = variant
+        for (const currency of ['CHF', 'EUR'] as const) {
+          if (!keys.has(`${variant.id}:${currency}`)) continue
+          const entries = log
+            .filter(
+              (e) => e.variantId === variant.id && (e.currency ?? 'CHF') === currency && (e.price ?? 0) > 0
+            )
+            .sort((a, b) => a.date.localeCompare(b.date))
+          const normal = entries.filter((e) => !e.wasSale)
+          const sales = entries.filter((e) => e.wasSale)
+          const sum = (items: PurchaseLogEntry[]) =>
+            items.reduce((total, e) => total.plus(e.profilePrice ?? e.price!), new Decimal(0)).toNumber()
+          const last = entries.slice(-1)[0]
+          const lastNormal = normal.slice(-1)[0]
+          const lastSale = sales.slice(-1)[0]
+          const original = pricesForCurrency(variant, currency)
+          next = setPricesForCurrency(next, currency, {
+            purchaseCount: entries.length,
+            salePurchaseCount: sales.length,
+            lastPurchaseWasSale: !!last?.wasSale,
+            lastPurchaseDate: last?.date,
+            lastPrice: lastNormal?.profilePrice ?? lastNormal?.price,
+            lastSalePrice: lastSale?.profilePrice ?? lastSale?.price,
+            avgPrice: normal.length ? roundMoney(sum(normal) / normal.length) : undefined,
+            avgSalePrice: sales.length ? roundMoney(sum(sales) / sales.length) : undefined,
+            normalTotal: sum(normal),
+            saleTotal: sum(sales),
+            pricePerKg:
+              entries.filter((e) => e.pricePerKg !== undefined).slice(-1)[0]?.pricePerKg ??
+              (entries.length ? original.pricePerKg : undefined),
+          })
+        }
+        return next
+      }),
+      updatedAt: Date.now(),
+    }
+  })
+}
+
+export function upsertPriceProfile(
+  profiles: ProductPriceProfile[],
+  updated: ProductPriceProfile
+): ProductPriceProfile[] {
   const idx = profiles.findIndex((p) => p.id === updated.id)
   if (idx < 0) return [...profiles, updated]
   const next = [...profiles]
@@ -314,14 +392,25 @@ export function repriceRecordedPurchase(
   if (count <= 0) return profiles
   const oldAverage = isSale ? prices.avgSalePrice : prices.avgPrice
   const oldProfilePrice = entry.profilePrice ?? entry.price
-  const average = oldAverage === undefined ? newPrice : roundMoney((oldAverage * count - oldProfilePrice + newPrice) / count)
+  const average =
+    oldAverage === undefined
+      ? newPrice
+      : roundMoney((oldAverage * count - oldProfilePrice + newPrice) / count)
   const nextPrices = isSale
-    ? { ...prices, avgSalePrice: average, lastSalePrice: prices.lastSalePrice === oldProfilePrice ? newPrice : prices.lastSalePrice }
-    : { ...prices, avgPrice: average, lastPrice: prices.lastPrice === oldProfilePrice ? newPrice : prices.lastPrice }
+    ? {
+        ...prices,
+        avgSalePrice: average,
+        lastSalePrice: prices.lastSalePrice === oldProfilePrice ? newPrice : prices.lastSalePrice,
+      }
+    : {
+        ...prices,
+        avgPrice: average,
+        lastPrice: prices.lastPrice === oldProfilePrice ? newPrice : prices.lastPrice,
+      }
   const updatedVariant = setPricesForCurrency(variant, currency, nextPrices)
   return upsertPriceProfile(profiles, {
     ...profile,
-    variants: profile.variants.map((v) => v.id === variant.id ? updatedVariant : v),
+    variants: profile.variants.map((v) => (v.id === variant.id ? updatedVariant : v)),
     updatedAt: Date.now(),
   })
 }
@@ -429,7 +518,8 @@ export function estimateItemPrice(
     const mode = defaultProducePricingMode(item.name, item.category, item.amount, prices)
     if (mode === 'weight') {
       const perKg = prices.pricePerKg ?? prices.lastPrice ?? prices.avgPrice
-      const grams = weightGramsFromAmount(item.amount) ?? estimatedPieceGrams(item.name, item.category, item.amount)
+      const grams =
+        weightGramsFromAmount(item.amount) ?? estimatedPieceGrams(item.name, item.category, item.amount)
       if (grams && perKg) return roundMoney(perKg * (grams / 1000))
       if (perKg) return perKg
       return null
@@ -504,7 +594,13 @@ export function buildProfilesFromPurchaseLog(
 
     const idx = profile.variants.findIndex((v) => v.id === variant!.id)
     const currency = entry.currency ?? 'CHF'
-    profile.variants[idx] = applyPurchaseToVariant(variant, entry.price, entry.date, !!entry.wasSale, currency)
+    profile.variants[idx] = applyPurchaseToVariant(
+      variant,
+      entry.price,
+      entry.date,
+      !!entry.wasSale,
+      currency
+    )
     profile.preferredVariantId = variant.id
     profile.updatedAt = Date.now()
   }

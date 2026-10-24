@@ -120,7 +120,7 @@ describe('priceExport', () => {
       purchaseLog: eurLog,
       priceProfiles: profiles,
       brands,
-      completedTrips: trips,
+      completedTrips: trips.map((trip) => ({ ...trip, currency: 'EUR' })),
       currency: 'EUR',
     })
     const csv = exportPriceCsv(payload)
@@ -131,6 +131,11 @@ describe('priceExport', () => {
     expect(payload.country).toBe('DE')
     expect(payload.trips.length).toBe(2)
     expect(lines).toHaveLength(4)
+  })
+
+  it('does not label Swiss receipts as euro receipts', () => {
+    const payload = buildPriceExport({ purchaseLog: [], priceProfiles: [], brands: [], completedTrips: [...trips, { ...trips[0]!, id: 'eur-trip', currency: 'EUR' }], currency: 'EUR' })
+    expect(payload.trips.map((trip) => trip.id)).toEqual(['eur-trip'])
   })
 
   it('excludes purchases recorded in a different currency', () => {

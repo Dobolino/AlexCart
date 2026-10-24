@@ -1,13 +1,23 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
-import { buildShareText } from '@/utils/shareText'
 import { CategorySection } from '@/components/CategorySection'
 import { ProductIconSlot } from '@/components/ProductIconSlot'
-import { AddItemSheet } from '@/components/AddItemSheet'
+const SyncIndicator = lazy(() =>
+  import('@/components/SyncIndicator').then((m) => ({ default: m.SyncIndicator }))
+)
+const ShareListSheet = lazy(() =>
+  import('@/components/ShareListSheet').then((m) => ({ default: m.ShareListSheet }))
+)
+const BarcodeScannerSheet = lazy(() =>
+  import('@/components/BarcodeScannerSheet').then((m) => ({ default: m.BarcodeScannerSheet }))
+)
+const AddItemSheet = lazy(() =>
+  import('@/components/AddItemSheet').then((m) => ({ default: m.AddItemSheet }))
+)
 import { EditItemSheet } from '@/components/EditItemSheet'
 import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
 import { EmptyState } from '@/components/EmptyState'
@@ -20,8 +30,12 @@ import { LowStockSection } from '@/components/LowStockSection'
 import { RecurringSection } from '@/components/RecurringSection'
 import { FloatingPortal } from '@/components/FloatingPortal'
 import { getIconKey } from '@/utils/icon'
-import { CheckoffPriceSheet } from '@/components/CheckoffPriceSheet'
-import { ReceiptImportSheet } from '@/components/ReceiptImportSheet'
+const CheckoffPriceSheet = lazy(() =>
+  import('@/components/CheckoffPriceSheet').then((m) => ({ default: m.CheckoffPriceSheet }))
+)
+const ReceiptImportSheet = lazy(() =>
+  import('@/components/ReceiptImportSheet').then((m) => ({ default: m.ReceiptImportSheet }))
+)
 import { BudgetBar } from '@/components/BudgetBar'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { formatMoney } from '@/utils/currency'
@@ -62,6 +76,15 @@ export function ListPage() {
   const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const currency = useStore((s) => s.settings.currency)
 
+  const [shareOpen, setShareOpen] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  let sharedEnabled = false
+  try {
+    sharedEnabled = !!localStorage.getItem('alexcart-shared-enabled')
+  } catch {
+    /* local mode */
+  }
+  const handedness = useStore((s) => s.settings.handedness)
   const [addOpen, setAddOpen] = useState(false)
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -79,7 +102,9 @@ export function ListPage() {
   const doneItems = list.items.filter((i) => i.done)
   const groups = groupByCategory(activeItems)
 
-  const calculatorTotal = calculatorEntries.reduce((sum, e) => sum + e.amount, 0)
+  const calculatorTotal = calculatorEntries
+    .filter((e) => (e.currency ?? 'CHF') === currency)
+    .reduce((sum, e) => sum + e.amount, 0)
   const hasCalculatorTotal = calculatorEntries.length > 0
   const weekSpend = currentWeekSpend(purchaseLog, undefined, currency)
   const budgetSpend = totalBudgetSpend(weekSpend, calculatorTotal)
@@ -101,7 +126,11 @@ export function ListPage() {
   if (doneItems.length > 0) summaryParts.push(`${doneItems.length} erledigt`)
   const listSubtitle = summaryParts.join(' • ')
 
-  function showToast(message: string, action?: ToastState['action'], secondaryAction?: ToastState['secondaryAction']) {
+  function showToast(
+    message: string,
+    action?: ToastState['action'],
+    secondaryAction?: ToastState['secondaryAction']
+  ) {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast({ message, action, secondaryAction })
     toastTimer.current = setTimeout(() => setToast(null), action || secondaryAction ? 5000 : 1800)
@@ -112,9 +141,7 @@ export function ListPage() {
     showToast(
       `„${item.name}" erledigt${priceHint}`,
       { label: 'Rückgängig', onClick: () => toggleItemDone(item.id) },
-      withPrice === undefined
-        ? { label: 'Preis', onClick: () => openPriceSheetLater(item) }
-        : undefined
+      withPrice === undefined ? { label: 'Preis', onClick: () => openPriceSheetLater(item) } : undefined
     )
   }
 
@@ -185,23 +212,6 @@ export function ListPage() {
     updateItemInActiveList(item.id, { amount })
   }
 
-  async function handleShareList() {
-    const text = buildShareText(list!)
-    const nav = navigator as Navigator & { share?: (data: { title?: string; text?: string }) => Promise<void> }
-    if (nav.share) {
-      try {
-        await nav.share({ title: list!.name, text })
-      } catch {
-        // Nutzer hat abgebrochen - kein Fehler
-      }
-      return
-    }
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(text)
-      showToast('Liste in Zwischenablage kopiert')
-    }
-  }
-
   return (
     <>
       <PageHeader
@@ -212,7 +222,7 @@ export function ListPage() {
           <div className="flex items-center gap-1">
             {activeItems.length > 0 && (
               <button
-                className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full shadow-sm"
+                className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full shadow-sm"
                 style={{ color: 'var(--accent-fg)', background: 'var(--accent)' }}
                 onClick={() => navigate('/shop')}
                 aria-label="Einkaufsmodus starten"
@@ -221,31 +231,16 @@ export function ListPage() {
               </button>
             )}
             <button
-              className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
-              style={{
-                color: listViewMode === 'tiles' ? 'var(--accent)' : 'var(--text-muted)',
-                background: listViewMode === 'tiles' ? 'var(--accent-soft)' : 'transparent',
-              }}
-              onClick={() => setListViewMode('tiles')}
-              aria-label="Kachel-Ansicht"
+              className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
+              onClick={() => setListViewMode(listViewMode === 'list' ? 'tiles' : 'list')}
+              aria-label={listViewMode === 'list' ? 'Kachel-Ansicht' : 'Listen-Ansicht'}
             >
-              <Icon path={ICON_PATHS.grid} size={18} />
+              <Icon path={listViewMode === 'list' ? ICON_PATHS.grid : ICON_PATHS.list} size={18} />
             </button>
             <button
-              className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
-              style={{
-                color: listViewMode === 'list' ? 'var(--accent)' : 'var(--text-muted)',
-                background: listViewMode === 'list' ? 'var(--accent-soft)' : 'transparent',
-              }}
-              onClick={() => setListViewMode('list')}
-              aria-label="Listen-Ansicht"
-            >
-              <Icon path={ICON_PATHS.layoutList} size={18} />
-            </button>
-            <button
-              className="tap-scale flex h-9 w-9 flex-none items-center justify-center rounded-full"
+              className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
               style={{ color: 'var(--text-muted)' }}
-              onClick={handleShareList}
+              onClick={() => setShareOpen(true)}
               aria-label="Liste teilen"
             >
               <Icon path={ICON_PATHS.share} size={19} />
@@ -257,6 +252,11 @@ export function ListPage() {
         <p className="px-4 pb-1 text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
           Tipp: Titel antippen für weitere Listen
         </p>
+      )}
+      {sharedEnabled && (
+        <Suspense fallback={null}>
+          <SyncIndicator listId={list.id} onOpen={() => setShareOpen(true)} />
+        </Suspense>
       )}
       {budget && <BudgetBar progress={budget} currency={currency} />}
       <InstallPrompt />
@@ -289,7 +289,10 @@ export function ListPage() {
               title="Noch keine Einkaufsliste"
               hint="Füge unten Artikel hinzu oder importiere deinen Wochenplan."
               action={
-                <button className="btn-primary tap-scale mt-1 rounded-full px-6 py-3 text-[14px]" onClick={() => setAddOpen(true)}>
+                <button
+                  className="btn-primary tap-scale mt-1 rounded-full px-6 py-3 text-[14px]"
+                  onClick={() => setAddOpen(true)}
+                >
                   Artikel hinzufügen
                 </button>
               }
@@ -334,7 +337,11 @@ export function ListPage() {
               <>
                 <div
                   className="tap-scale mt-1 flex cursor-pointer items-center justify-between rounded-[14px] px-4 py-3.5 text-[14px] font-bold"
-                  style={{ color: 'var(--text-muted)', background: 'var(--surface)', boxShadow: 'var(--shadow-card)' }}
+                  style={{
+                    color: 'var(--text-muted)',
+                    background: 'var(--surface)',
+                    boxShadow: 'var(--shadow-card)',
+                  }}
                   onClick={() => setDoneOpen((o) => !o)}
                 >
                   <span>Erledigt</span>
@@ -357,18 +364,18 @@ export function ListPage() {
                       </button>
                     </div>
                     <CategorySection
-                    category="Erledigt"
-                    items={doneItems}
-                    viewMode={listViewMode}
-                    priceProfiles={priceProfiles}
-                    currency={currency}
-                    onReorder={reorderDoneItems}
-                    onToggle={handleToggle}
-                    onDelete={handleDelete}
-                    onEdit={setEditingItem}
-                    onAddToPantry={handleAddToPantry}
-                    onToggleFavorite={toggleItemFavorite}
-                    onAdjustAmount={handleAdjustAmount}
+                      category="Erledigt"
+                      items={doneItems}
+                      viewMode={listViewMode}
+                      priceProfiles={priceProfiles}
+                      currency={currency}
+                      onReorder={reorderDoneItems}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                      onEdit={setEditingItem}
+                      onAddToPantry={handleAddToPantry}
+                      onToggleFavorite={toggleItemFavorite}
+                      onAdjustAmount={handleAdjustAmount}
                     />
                   </>
                 )}
@@ -382,7 +389,9 @@ export function ListPage() {
         <button
           className="btn-primary tap-scale fixed z-20 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg"
           style={{
-            right: 'calc(18px + var(--safe-right))',
+            ...(handedness === 'left'
+              ? { left: 'calc(18px + var(--safe-left))' }
+              : { right: 'calc(18px + var(--safe-right))' }),
             bottom: 'calc(var(--nav-scroll-padding) + 8px)',
           }}
           onClick={() => setAddOpen(true)}
@@ -392,128 +401,150 @@ export function ListPage() {
         </button>
       </FloatingPortal>
 
-      {addOpen && (
-        <AddItemSheet
-          onClose={() => setAddOpen(false)}
-          onImported={showToast}
-          onOpenReceiptImport={() => setReceiptOpen(true)}
-        />
-      )}
-      {receiptOpen && (
-        <ReceiptImportSheet onClose={() => setReceiptOpen(false)} onDone={showToast} />
-      )}
-      {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
-      {switcherOpen && (
-        <ListSwitcherSheet
-          onClose={() => setSwitcherOpen(false)}
-          onRepeated={(count) => showToast(`${count} Artikel von letzter Woche hinzugefügt`)}
-          onDuplicated={(name) => showToast(`„${name}“ erstellt`)}
-          onExported={() => showToast('Liste exportiert')}
-        />
-      )}
-      {filteredOpen && (
-        <Sheet onClose={() => setFilteredOpen(false)}>
-          <h2 className="mb-1 text-lg font-bold">Aus Vorrat gefiltert</h2>
-          <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            Diese Artikel stehen auf deiner Vorrats-Liste und wurden automatisch entfernt. Bei Bedarf einzeln
-            zurückholen.
-          </p>
-          <div className="card-surface">
-            {filteredItems.map((item) => {
-              const iconKey = getIconKey(item.name, item.category)
-              return (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-3 border-b px-3.5 py-3.5"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2.5 text-[15px] font-semibold">
-                    <ProductIconSlot iconKey={iconKey} size={20} />
-                    <span className="truncate">{item.name}</span>
-                  </span>
-                  {item.amount && (
-                    <span className="flex-none text-[12px] font-medium tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                      {item.amount}
-                    </span>
-                  )}
-                  <button
-                    className="tap-scale flex-none"
-                    onClick={() => {
-                      restoreFilteredItem(item.id)
-                      if (filteredItems.length <= 1) setFilteredOpen(false)
-                    }}
-                  >
-                    <Icon path={ICON_PATHS.plus} size={20} />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-          <button
-            className="btn-soft mt-3 w-full py-3 text-[13px]"
-            onClick={() => {
-              clearFilteredNote()
-              setFilteredOpen(false)
-            }}
-          >
-            Hinweis verwerfen
-          </button>
-        </Sheet>
-      )}
-
-      {priceSheetItem && (
-        <CheckoffPriceSheet
-          item={priceSheetItem}
-          profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
-          brands={brands}
-          currency={currency}
-          onClose={() => setPriceSheetItem(null)}
-          onSave={handlePriceSave}
-          onSkip={handlePriceSkip}
-          onAmountChange={(amount) => {
-            updateItemInActiveList(priceSheetItem.id, { amount })
-            setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
+      <FloatingPortal>
+        <button
+          className="btn-soft fixed z-20 min-h-11 rounded-full px-4 font-bold"
+          style={{
+            bottom: 'calc(var(--nav-scroll-padding) + 72px)',
+            ...(handedness === 'left' ? { left: 18 } : { right: 18 }),
           }}
-        />
-      )}
+          onClick={() => setScannerOpen(true)}
+        >
+          Scannen
+        </button>
+      </FloatingPortal>
+      <Suspense fallback={null}>
+        {shareOpen && <ShareListSheet onClose={() => setShareOpen(false)} />}
+        {scannerOpen && (
+          <BarcodeScannerSheet
+            onClose={() => setScannerOpen(false)}
+            onAdded={(name) => showToast(`„${name}“ hinzugefügt`)}
+          />
+        )}
+        {addOpen && (
+          <AddItemSheet
+            onClose={() => setAddOpen(false)}
+            onImported={showToast}
+            onOpenReceiptImport={() => setReceiptOpen(true)}
+          />
+        )}
+        {receiptOpen && <ReceiptImportSheet onClose={() => setReceiptOpen(false)} onDone={showToast} />}
+        {editingItem && <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />}
+        {switcherOpen && (
+          <ListSwitcherSheet
+            onClose={() => setSwitcherOpen(false)}
+            onRepeated={(count) => showToast(`${count} Artikel von letzter Woche hinzugefügt`)}
+            onDuplicated={(name) => showToast(`„${name}“ erstellt`)}
+            onExported={() => showToast('Liste exportiert')}
+          />
+        )}
+        {filteredOpen && (
+          <Sheet onClose={() => setFilteredOpen(false)}>
+            <h2 className="mb-1 text-lg font-bold">Aus Vorrat gefiltert</h2>
+            <p className="mb-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              Diese Artikel stehen auf deiner Vorrats-Liste und wurden automatisch entfernt. Bei Bedarf
+              einzeln zurückholen.
+            </p>
+            <div className="card-surface">
+              {filteredItems.map((item) => {
+                const iconKey = getIconKey(item.name, item.category)
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 border-b px-3.5 py-3.5"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-2.5 text-[15px] font-semibold">
+                      <ProductIconSlot iconKey={iconKey} size={20} />
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    {item.amount && (
+                      <span
+                        className="flex-none text-[12px] font-medium tabular-nums"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        {item.amount}
+                      </span>
+                    )}
+                    <button
+                      className="tap-scale flex-none"
+                      onClick={() => {
+                        restoreFilteredItem(item.id)
+                        if (filteredItems.length <= 1) setFilteredOpen(false)
+                      }}
+                    >
+                      <Icon path={ICON_PATHS.plus} size={20} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              className="btn-soft mt-3 w-full py-3 text-[13px]"
+              onClick={() => {
+                clearFilteredNote()
+                setFilteredOpen(false)
+              }}
+            >
+              Hinweis verwerfen
+            </button>
+          </Sheet>
+        )}
 
-      {toast && (
-        <FloatingPortal>
-          <div
-            className="glass fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-2.5 pl-4 pr-2 text-[13px] font-semibold"
-            style={{
-              color: 'var(--text)',
-              bottom: 'calc(var(--nav-scroll-padding) + 72px)',
+        {priceSheetItem && (
+          <CheckoffPriceSheet
+            item={priceSheetItem}
+            profile={findPriceProfile(priceProfiles, priceSheetItem.name, priceSheetItem.category) ?? null}
+            brands={brands}
+            currency={currency}
+            onClose={() => setPriceSheetItem(null)}
+            onSave={handlePriceSave}
+            onSkip={handlePriceSkip}
+            onAmountChange={(amount) => {
+              updateItemInActiveList(priceSheetItem.id, { amount })
+              setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
             }}
-          >
-            <span className="min-w-0 truncate">{toast.message}</span>
-            {toast.secondaryAction && (
-              <button
-                className="tap-scale flex-none rounded-full px-3 py-1.5 text-[13px] font-bold"
-                style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
-                onClick={() => {
-                  toast.secondaryAction!.onClick()
-                  setToast(null)
-                }}
-              >
-                {toast.secondaryAction.label}
-              </button>
-            )}
-            {toast.action && (
-              <button
-                className="tap-scale flex-none rounded-full px-3 py-1.5 text-[13px] font-bold"
-                style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
-                onClick={() => {
-                  toast.action!.onClick()
-                  setToast(null)
-                }}
-              >
-                {toast.action.label}
-              </button>
-            )}
-          </div>
-        </FloatingPortal>
-      )}
+          />
+        )}
+
+        {toast && (
+          <FloatingPortal>
+            <div
+              className="glass fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-2.5 pl-4 pr-2 text-[13px] font-semibold"
+              style={{
+                color: 'var(--text)',
+                bottom: 'calc(var(--nav-scroll-padding) + 72px)',
+              }}
+            >
+              <span className="min-w-0 truncate">{toast.message}</span>
+              {toast.secondaryAction && (
+                <button
+                  className="tap-scale flex-none rounded-full px-3 py-1.5 text-[13px] font-bold"
+                  style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                  onClick={() => {
+                    toast.secondaryAction!.onClick()
+                    setToast(null)
+                  }}
+                >
+                  {toast.secondaryAction.label}
+                </button>
+              )}
+              {toast.action && (
+                <button
+                  className="tap-scale flex-none rounded-full px-3 py-1.5 text-[13px] font-bold"
+                  style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+                  onClick={() => {
+                    toast.action!.onClick()
+                    setToast(null)
+                  }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
+            </div>
+          </FloatingPortal>
+        )}
+      </Suspense>
     </>
   )
 }

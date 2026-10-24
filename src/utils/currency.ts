@@ -21,7 +21,8 @@ export function currencySymbol(currency: Currency): string {
 export function parseMoneyInput(input: string): number | null {
   const trimmed = input.trim()
   if (!trimmed) return null
-  const value = parseFloat(trimmed.replace(',', '.'))
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(trimmed)) return null
+  const value = Number(trimmed.replace(',', '.'))
   if (!Number.isFinite(value) || value <= 0) return null
   return Math.round(value * 100) / 100
 }
