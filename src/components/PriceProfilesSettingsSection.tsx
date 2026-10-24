@@ -3,12 +3,11 @@ import { useStore } from '@/store/useStore'
 import { EmptyState } from '@/components/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/Sheet'
+import { BrandSelect } from '@/components/BrandSelect'
 import { ICON_PATHS } from '@/constants/icons'
 import { formatVariantLabel } from '@/utils/brands'
 import { isProduceCategory } from '@/utils/producePrice'
 import { formatMoney, parseMoneyInput, currencySymbol } from '@/utils/currency'
-import { HOUSE_BRAND_PRESETS } from '@/constants/houseBrands'
-import { isBrandNameTaken } from '@/utils/houseBrands'
 import { pricesForCurrency } from '@/utils/priceProfiles'
 import type { Currency, GlobalBrand, ProductPriceProfile, ProductVariant } from '@/types'
 
@@ -17,7 +16,6 @@ export function PriceProfilesSettingsSection() {
   const priceProfiles = useStore((s) => s.priceProfiles)
   const currency = useStore((s) => s.settings.currency)
   const addBrand = useStore((s) => s.addBrand)
-  const addHouseBrandPresets = useStore((s) => s.addHouseBrandPresets)
   const updateBrand = useStore((s) => s.updateBrand)
   const removeBrand = useStore((s) => s.removeBrand)
   const updatePriceProfileVariant = useStore((s) => s.updatePriceProfileVariant)
@@ -30,11 +28,6 @@ export function PriceProfilesSettingsSection() {
   const sortedProfiles = useMemo(
     () => [...priceProfiles].sort((a, b) => a.itemName.localeCompare(b.itemName, 'de')),
     [priceProfiles]
-  )
-
-  const missingHouseBrands = useMemo(
-    () => HOUSE_BRAND_PRESETS.filter((name) => !isBrandNameTaken(brands, name)),
-    [brands]
   )
 
   function submitNewBrand() {
@@ -63,50 +56,20 @@ export function PriceProfilesSettingsSection() {
           Marken gelten für alle Produkte – beim Abhaken, in Varianten und in der Kostenschätzung.
         </p>
 
-        <div className="mb-3">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
-            Hausmarken
-          </div>
-          <p className="mb-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            Schnellauswahl für gängige Eigenmarken – z. B. M Classic, Prix Garantie, Gut &amp; Günstig.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {HOUSE_BRAND_PRESETS.map((name) => {
-              const active = isBrandNameTaken(brands, name)
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
-                  style={{
-                    background: active ? 'var(--accent-soft)' : 'var(--chip-bg)',
-                    color: active ? 'var(--accent)' : 'var(--text)',
-                    outline: active ? '2px solid var(--accent)' : 'none',
-                  }}
-                  onClick={() => {
-                    if (!active) addBrand(name)
-                  }}
-                  aria-pressed={active}
-                  disabled={active}
-                >
-                  {active ? `✓ ${name}` : `+ ${name}`}
-                </button>
-              )
-            })}
-          </div>
-          {missingHouseBrands.length > 0 && (
-            <button
-              type="button"
-              className="tap-scale mt-2 text-[12px] font-bold"
-              style={{ color: 'var(--accent)' }}
-              onClick={() => addHouseBrandPresets()}
-            >
-              Alle Hausmarken hinzufügen ({missingHouseBrands.length})
-            </button>
-          )}
+        <div className="mb-4">
+          <BrandSelect
+            brands={brands}
+            value=""
+            onChange={() => {}}
+            onCreateBrand={(name) => useStore.getState().ensureBrand(name)}
+            manage
+            label="Länder, Supermärkte & Marken"
+          />
         </div>
-
-        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--category-fg)' }}>
+        <div
+          className="mb-1.5 text-[11px] font-bold uppercase tracking-wide"
+          style={{ color: 'var(--category-fg)' }}
+        >
           Eigene Marken
         </div>
         <div className="mb-3 flex gap-2">
@@ -120,7 +83,11 @@ export function PriceProfilesSettingsSection() {
               if (e.key === 'Enter') submitNewBrand()
             }}
           />
-          <button type="button" className="btn-primary shrink-0 px-4 py-2 text-[13px]" onClick={submitNewBrand}>
+          <button
+            type="button"
+            className="btn-primary shrink-0 px-4 py-2 text-[13px]"
+            onClick={submitNewBrand}
+          >
             Hinzufügen
           </button>
         </div>
@@ -194,9 +161,7 @@ export function PriceProfilesSettingsSection() {
               brands={brands}
               currency={currency}
               expanded={expandedProfileId === profile.id}
-              onToggle={() =>
-                setExpandedProfileId((id) => (id === profile.id ? null : profile.id))
-              }
+              onToggle={() => setExpandedProfileId((id) => (id === profile.id ? null : profile.id))}
               onUpdateVariant={updatePriceProfileVariant}
             />
           ))}
@@ -221,10 +186,22 @@ function BrandRow({
       style={{ borderColor: 'var(--border)' }}
     >
       <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{brand.name}</span>
-      <button type="button" className="tap-scale p-1.5" style={{ color: 'var(--text-muted)' }} onClick={onStartEdit} aria-label={`${brand.name} bearbeiten`}>
+      <button
+        type="button"
+        className="tap-scale p-1.5"
+        style={{ color: 'var(--text-muted)' }}
+        onClick={onStartEdit}
+        aria-label={`${brand.name} bearbeiten`}
+      >
         <Icon path={ICON_PATHS.edit} size={16} />
       </button>
-      <button type="button" className="tap-scale p-1.5" style={{ color: 'var(--danger)' }} onClick={onRemove} aria-label={`${brand.name} löschen`}>
+      <button
+        type="button"
+        className="tap-scale p-1.5"
+        style={{ color: 'var(--danger)' }}
+        onClick={onRemove}
+        aria-label={`${brand.name} löschen`}
+      >
         <Icon path={ICON_PATHS.trash} size={16} />
       </button>
     </div>
@@ -244,7 +221,11 @@ function ProfileBlock({
   currency: Currency
   expanded: boolean
   onToggle: () => void
-  onUpdateVariant: (profileId: string, variantId: string, patch: Partial<Pick<ProductVariant, 'name' | 'brandId' | 'lastPrice' | 'pricePerKg'>>) => void
+  onUpdateVariant: (
+    profileId: string,
+    variantId: string,
+    patch: Partial<Pick<ProductVariant, 'name' | 'brandId' | 'lastPrice' | 'pricePerKg'>>
+  ) => void
 }) {
   const produce = isProduceCategory(profile.category)
 
@@ -300,7 +281,11 @@ function VariantEditor({
   brands: GlobalBrand[]
   currency: Currency
   produce: boolean
-  onUpdate: (profileId: string, variantId: string, patch: Partial<Pick<ProductVariant, 'name' | 'brandId' | 'lastPrice' | 'pricePerKg'>>) => void
+  onUpdate: (
+    profileId: string,
+    variantId: string,
+    patch: Partial<Pick<ProductVariant, 'name' | 'brandId' | 'lastPrice' | 'pricePerKg'>>
+  ) => void
 }) {
   const prices = pricesForCurrency(variant, currency)
   const seed = String(produce ? (prices.pricePerKg ?? prices.lastPrice ?? '') : (prices.lastPrice ?? ''))

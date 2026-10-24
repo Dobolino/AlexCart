@@ -2,6 +2,9 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { PageHeader } from '@/components/PageHeader'
 import { Sheet } from '@/components/Sheet'
+import { MarketSelector } from '@/components/MarketSelector'
+import { RETAILERS, retailSelection, retailCurrency } from '@/data/retailCatalog'
+import { PriceExportSection } from '@/components/PriceExportSection'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { compareProductPrices, compareBasket, minorMoney } from '@/utils/priceComparison'
@@ -11,7 +14,6 @@ import { todayKey } from '@/utils/date'
 import { uid } from '@/utils/id'
 import { fetchFx, fetchOpenPrices } from '@/services/products'
 import type { CatalogProduct } from '@/types/catalog'
-import type { Currency } from '@/types'
 
 const Scanner = lazy(() =>
   import('@/components/BarcodeScannerSheet').then((m) => ({ default: m.BarcodeScannerSheet }))
@@ -24,15 +26,23 @@ export function PricesPage() {
   const configured = useStore((s) => s.settings.apiUrl ?? '')
   const fx = useStore((s) => s.fxSnapshot)
   const list = useStore((s) => s.activeList())
+  const [exportOpen, setExportOpen] = useState(false)
+  const purchaseLog = useStore((s) => s.purchaseLog),
+    profiles = useStore((s) => s.priceProfiles),
+    brands = useStore((s) => s.brands),
+    trips = useStore((s) => s.completedTrips)
   const [selected, setSelected] = useState(products[0]?.id ?? '')
   const [scan, setScan] = useState(false)
   const [creating, setCreating] = useState(false)
   const [creationError, setCreationError] = useState('')
   const [name, setName] = useState('')
   const [pack, setPack] = useState(products[0]?.netQuantity ? quantityText(products[0].netQuantity) : '1 l')
-  const [shop, setShop] = useState('Coop')
-  const [country, setCountry] = useState<'CH' | 'DE'>('CH')
-  const [inputCurrency, setInputCurrency] = useState<Currency>('CHF')
+  const [priceMarket, setPriceMarket] = useState(() => retailSelection(useStore.getState().settings))
+  const [shop, setShop] = useState('')
+  const country = priceMarket.country
+  const inputCurrency = retailCurrency(country)
+  const priceRetailer = RETAILERS.find((r) => r.id === priceMarket.retailerId)!
+  const storeName = `${priceRetailer.name}${shop.trim() ? ` ${shop.trim()}` : ''}`
   const [price, setPrice] = useState('')
   const [date, setDate] = useState(todayKey)
   const [loyalty, setLoyalty] = useState(false)
@@ -63,16 +73,16 @@ export function PricesPage() {
   }
   function savePrice() {
     const parsed = parseMoneyInput(price)
-    if (!product || !parsed || !shop.trim() || !date) {
+    if (!product || !parsed || !date) {
       setMessage('Bitte Produkt, Geschäft, Datum und einen gültigen Preis angeben.')
       return
     }
-    const storeId = `${country}:${shop.trim().toLocaleLowerCase('de')}`
+    const storeId = `${country}:${storeName.toLocaleLowerCase('de')}`
     const state = useStore.getState()
     state.upsertRetailStore({
       id: storeId,
-      retailerId: `${country}:${shop.trim().split(' ')[0]!.toLowerCase()}`,
-      name: shop.trim(),
+      retailerId: priceRetailer.id,
+      name: storeName,
       country,
       currency: inputCurrency,
     })
@@ -91,7 +101,19 @@ export function PricesPage() {
   }
   return (
     <>
-      <PageHeader title="Preisvergleich" subtitle="Deine Produkte · Schweiz & Deutschland" />
+      <PageHeader
+        title="Preisvergleich"
+        subtitle="Deine Produkte · Schweiz & Deutschland"
+        right={
+          <button
+            className="tap-scale flex h-11 w-11 items-center justify-center rounded-full"
+            aria-label="Preise exportieren"
+            onClick={() => setExportOpen(true)}
+          >
+            <Icon path={ICON_PATHS.share} size={20} />
+          </button>
+        }
+      />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
         <div className="mb-3 flex gap-2">
           <button className="btn-primary min-h-12 flex-1" onClick={() => setCreating(true)}>
@@ -258,38 +280,27 @@ export function PricesPage() {
             </div>
             <details className="card-surface mb-4 p-4" open={!rows.length}>
               <summary className="min-h-11 font-bold">Eigenen Packungspreis erfassen</summary>
+              <MarketSelector
+                value={priceMarket}
+                onChange={(next) => {
+                  if (next.country !== priceMarket.country) setPrice('')
+                  setPriceMarket(next)
+                  setShop('')
+                  useStore.getState().setRetailSelection(next)
+                }}
+              />
               <label className="my-2 block text-sm">
-                Geschäft / Filiale
-                <input className="input mt-1 w-full" value={shop} onChange={(e) => setShop(e.target.value)} />
+                Filiale (optional)
+                <input
+                  className="input mt-1 w-full"
+                  value={shop}
+                  placeholder="z. B. Bahnhof"
+                  onChange={(e) => setShop(e.target.value)}
+                />
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-sm">
-                  Land
-                  <select
-                    className="input mt-1 w-full"
-                    value={country}
-                    onChange={(e) => {
-                      const c = e.target.value as 'CH' | 'DE'
-                      setCountry(c)
-                      setInputCurrency(c === 'CH' ? 'CHF' : 'EUR')
-                    }}
-                  >
-                    <option value="CH">Schweiz</option>
-                    <option value="DE">Deutschland</option>
-                  </select>
-                </label>
-                <label className="text-sm">
-                  Originalwährung
-                  <select
-                    className="input mt-1 w-full"
-                    value={inputCurrency}
-                    onChange={(e) => setInputCurrency(e.target.value as Currency)}
-                  >
-                    <option>CHF</option>
-                    <option>EUR</option>
-                  </select>
-                </label>
-              </div>
+              <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Originalpreis in {inputCurrency} · {storeName}
+              </p>
               <label className="my-2 block text-sm">
                 Preis pro Packung
                 <input
@@ -391,6 +402,19 @@ export function PricesPage() {
           </p>
         </details>
       </main>
+      {exportOpen && (
+        <Sheet onClose={() => setExportOpen(false)} tall>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <PriceExportSection
+              purchaseLog={purchaseLog}
+              priceProfiles={profiles}
+              brands={brands}
+              completedTrips={trips}
+              currency={currency}
+            />
+          </div>
+        </Sheet>
+      )}
       {creating && (
         <Sheet onClose={() => setCreating(false)}>
           <h2 className="text-xl font-bold">Produkt erfassen</h2>

@@ -53,6 +53,38 @@ describe('persisted settings compatibility', () => {
 })
 
 describe('purchase integrity', () => {
+  it('resumes a paused shopping session once without losing progress or counting the pause twice', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-10-24T10:00:00'))
+      const actions = useStore.getState()
+      actions.startShoppingSession('l')
+      actions.toggleItemDone('a')
+      vi.advanceTimersByTime(1000)
+      actions.pauseShopping()
+      vi.advanceTimersByTime(60000)
+      actions.resumeShopping()
+      expect(useStore.getState().shoppingSession).toMatchObject({
+        pausedAt: undefined,
+        totalPausedMs: 60000,
+        checkedItemIds: ['a'],
+      })
+      actions.resumeShopping()
+      expect(useStore.getState().shoppingSession?.totalPausedMs).toBe(60000)
+      actions.pauseShopping()
+      vi.advanceTimersByTime(1000)
+      actions.resumeShopping()
+      expect(useStore.getState().shoppingSession?.totalPausedMs).toBe(61000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('links an unpriced checkoff to its real purchase log entry', () => {
+    useStore.getState().toggleItemDone('a')
+    const state = useStore.getState()
+    expect(state.lists[0]?.items[0]?.purchaseLogId).toBe(state.purchaseLog[0]?.id)
+    expect(state.purchaseLog[0]?.amount).toBe('1 l')
+  })
   it('reverses only the purchased inventory, preserving consumption between check and undo', () => {
     const s = useStore.getState()
     s.toggleItemDone('a')

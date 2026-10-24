@@ -83,17 +83,19 @@ export function CalculatorPage() {
           <span className="text-[28px] font-extrabold tabular-nums">{formatMoney(total, currency)}</span>
         </div>
 
-        <MoneyNumpad cents={cents} onChange={setCents} currency={currency} display="summary" />
+        <section className="calculator-pad mb-3">
+          <MoneyNumpad cents={cents} onChange={setCents} currency={currency} display="summary" />
 
-        <button
-          className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]"
-          onClick={handleAdd}
-          disabled={cents === 0}
-        >
-          <span className="inline-flex items-center gap-2">
-            <Icon path={ICON_PATHS.plus} size={20} /> Manuell hinzufügen
-          </span>
-        </button>
+          <button
+            className="btn-primary tap-scale mb-2 w-full rounded-2xl py-4 text-[17px]"
+            onClick={handleAdd}
+            disabled={cents === 0}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Icon path={ICON_PATHS.plus} size={20} /> Manuell hinzufügen
+            </span>
+          </button>
+        </section>
         <p className="mb-4 px-1.5 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
           Erfasste Artikelpreise werden automatisch mitgezählt.
         </p>

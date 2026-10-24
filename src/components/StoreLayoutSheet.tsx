@@ -1,114 +1,100 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
+import { MarketSelector } from './MarketSelector'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
-import { storePresetsForCurrency } from '@/constants/stores'
+import { RETAILERS, retailSelection, retailCurrency, type RetailSelection } from '@/data/retailCatalog'
 
 export function StoreLayoutSheet({ onClose }: { onClose: () => void }) {
   const session = useStore((s) => s.shoppingSession)
-  const currency = useStore((s) => s.settings.currency)
+  const settings = useStore((s) => s.settings)
   const layouts = useStore((s) => s.storeLayouts)
-  const [country, setCountry] = useState<'CH' | 'DE'>(session?.currency === 'EUR' ? 'DE' : 'CH')
-  const [error, setError] = useState('')
-  const [store, setStore] = useState(session?.store ?? '')
-  const key = `${country === 'CH' ? 'CHF' : 'EUR'}:${store.trim()}`
-  const saved = layouts[key] ?? []
-  const [order, setOrder] = useState<string[]>([...saved, ...CATEGORIES.filter((c) => !saved.includes(c))])
-  function selectStore(value: string) {
-    setStore(value)
-    const existing = layouts[`${session?.currency ?? currency}:${value.trim()}`] ?? []
-    setOrder([...existing, ...CATEGORIES.filter((c) => !existing.includes(c))])
+  const [choice, setChoice] = useState(() => retailSelection(settings, session?.store))
+  const retailer = RETAILERS.find((r) => r.id === choice.retailerId)!
+  const [branch, setBranch] = useState(
+    session?.store?.startsWith(retailer.name) ? session.store.slice(retailer.name.length).trim() : ''
+  )
+  const store = `${retailer.name}${branch.trim() ? ` ${branch.trim()}` : ''}`
+  const layoutKey = `${retailCurrency(choice.country)}:${store}`
+  const initial = layouts[layoutKey] ?? []
+  const [order, setOrder] = useState([...initial, ...CATEGORIES.filter((c) => !initial.includes(c))])
+  const locked = !!session?.checkedItemIds.length
+  function choose(next: RetailSelection) {
+    setChoice(next)
+    setBranch('')
+    const name = RETAILERS.find((r) => r.id === next.retailerId)!.name
+    const saved = layouts[`${retailCurrency(next.country)}:${name}`] ?? []
+    setOrder([...saved, ...CATEGORIES.filter((c) => !saved.includes(c))])
+  }
+  function changeBranch(value: string) {
+    setBranch(value)
+    const key = `${retailCurrency(choice.country)}:${retailer.name}${value.trim() ? ` ${value.trim()}` : ''}`
+    const saved = layouts[key] ?? []
+    setOrder([...saved, ...CATEGORIES.filter((c) => !saved.includes(c))])
   }
   return (
     <Sheet onClose={onClose} tall>
-      <h2 className="mb-3 text-xl font-bold">Geschäft & Laufweg</h2>
-      <label className="text-sm font-semibold">
-        Einkaufsland
-        <select
-          className="input my-2 w-full"
-          value={country}
-          onChange={(e) => setCountry(e.target.value as 'CH' | 'DE')}
-        >
-          <option value="CH">Schweiz · CHF</option>
-          <option value="DE">Deutschland · EUR</option>
-        </select>
-      </label>
-      <label className="text-sm font-semibold">
-        Geschäft oder Filiale
-        <input
-          className="input my-2 w-full"
-          list="shopping-stores"
-          placeholder="z. B. Coop Bahnhof"
-          value={store}
-          onChange={(e) => selectStore(e.target.value)}
-        />
-      </label>
-      <datalist id="shopping-stores">
-        {storePresetsForCurrency(session?.currency ?? currency).map((s) => (
-          <option key={s} value={s} />
-        ))}
-      </datalist>
-      <p className="mb-3 text-sm">
-        Ordne die Abteilungen einmal passend zum Laden. Die Reihenfolge bleibt für diese Filiale gespeichert.
-      </p>
+      <h2 className="mb-3 text-xl font-bold">Dein Supermarkt</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {order.map((category, index) => (
-          <div
-            key={category}
-            className="flex items-center gap-2 border-b py-1"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <span className="min-w-0 flex-1 text-sm">{category}</span>
-            <button
-              className="btn-soft h-11 w-11"
-              disabled={index === 0}
-              aria-label={`${category} nach oben`}
-              onClick={() =>
-                setOrder((items) => {
-                  const next = [...items]
-                  ;[next[index - 1], next[index]] = [next[index]!, next[index - 1]!]
-                  return next
-                })
-              }
+        <MarketSelector value={choice} onChange={choose} lockCountry={locked} />
+        {locked && (
+          <p className="my-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Geschäft und Land bleiben für diesen begonnenen Einkauf erhalten. Für einen Wechsel zuerst den
+            Einkauf abschließen.
+          </p>
+        )}
+        <label className="my-3 block text-sm font-semibold">
+          Filiale (optional)
+          <input
+            className="input mt-1 w-full"
+            value={branch}
+            onChange={(e) => changeBranch(e.target.value)}
+            placeholder="z. B. Bahnhof"
+          />
+        </label>
+        <details className="card-surface my-3 p-3">
+          <summary className="min-h-11 cursor-pointer text-sm font-bold">Laufweg bearbeiten</summary>
+          <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Reihenfolge der Abteilungen für {store}.
+          </p>
+          {order.map((category, index) => (
+            <div
+              key={category}
+              className="flex items-center gap-2 border-b py-1"
+              style={{ borderColor: 'var(--border)' }}
             >
-              ↑
-            </button>
-            <button
-              className="btn-soft h-11 w-11"
-              disabled={index === order.length - 1}
-              aria-label={`${category} nach unten`}
-              onClick={() =>
-                setOrder((items) => {
-                  const next = [...items]
-                  ;[next[index + 1], next[index]] = [next[index]!, next[index + 1]!]
-                  return next
-                })
-              }
-            >
-              ↓
-            </button>
-          </div>
-        ))}
+              <span className="min-w-0 flex-1 text-sm">{category}</span>
+              {[-1, 1].map((delta) => (
+                <button
+                  key={delta}
+                  className="btn-soft h-11 w-11 shrink-0"
+                  disabled={index + delta < 0 || index + delta >= order.length}
+                  aria-label={`${category} nach ${delta < 0 ? 'oben' : 'unten'}`}
+                  onClick={() =>
+                    setOrder((items) => {
+                      const next = [...items]
+                      ;[next[index], next[index + delta]] = [next[index + delta]!, next[index]!]
+                      return next
+                    })
+                  }
+                >
+                  {delta < 0 ? '↑' : '↓'}
+                </button>
+              ))}
+            </div>
+          ))}
+        </details>
       </div>
-      {error && (
-        <p role="alert" className="my-2 text-sm">
-          {error}
-        </p>
-      )}
       <button
-        className="btn-primary mt-3 min-h-12"
-        disabled={!store.trim()}
+        className="btn-primary mt-3 min-h-12 shrink-0"
         onClick={() => {
-          if (session?.checkedItemIds.length && (country === 'CH' ? 'CHF' : 'EUR') !== session.currency) {
-            setError('Bitte den aktuellen Einkauf abschließen, bevor du die Währung wechselst.')
-            return
-          }
-          useStore.getState().setShoppingStore(store.trim(), country)
-          useStore.getState().setStoreLayout(key, order)
+          useStore.getState().setRetailSelection(choice)
+          useStore.getState().setShoppingStore(store, choice.country)
+          useStore.getState().setStoreLayout(layoutKey, order)
           onClose()
         }}
       >
-        Laufweg speichern
+        Geschäft übernehmen
       </button>
     </Sheet>
   )

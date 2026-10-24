@@ -5,6 +5,14 @@ import { ItemAmountColumn } from './ItemAmountColumn'
 import { ProduceWeightInput } from './ProduceWeightInput'
 import { PriceDeltaBadge } from './PriceDeltaBadge'
 import { BrandSelect } from './BrandSelect'
+import { MarketSelector } from './MarketSelector'
+import {
+  RETAILERS,
+  catalogBrand,
+  retailSelection,
+  retailCurrency,
+  type RetailSelection,
+} from '@/data/retailCatalog'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { centsToAmount } from '@/utils/numpadInput'
@@ -72,7 +80,7 @@ export function CheckoffPriceSheet({
   item,
   profile,
   brands,
-  currency,
+  currency: selectedCurrency,
   onClose,
   onSave,
   onSkip,
@@ -80,7 +88,43 @@ export function CheckoffPriceSheet({
   onAmountChange,
   highlightOptions = false,
 }: CheckoffPriceSheetProps) {
+  const settings = useStore((s) => s.settings)
+  const session = useStore((s) => s.shoppingSession)
+  const activeList = useStore((s) => s.activeList())
+  const activeSession = session?.listId === activeList?.id ? session : null
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const recorded = item.done
+    ? (purchaseLog.find((e) => e.id === item.purchaseLogId) ??
+      purchaseLog.filter((e) => e.itemId === item.id).slice(-1)[0])
+    : undefined
+  const stores = useStore((s) => s.retailStores)
+  const recordedStore = recorded
+    ? (stores.find((s) => s.id === recorded.storeId)?.name ?? recorded.storeId?.split(':').slice(1).join(':'))
+    : undefined
+  const [market, setMarket] = useState(() =>
+    recorded
+      ? retailSelection({ currency: recorded.currency ?? selectedCurrency }, recordedStore)
+      : retailSelection(settings, activeSession?.store ?? activeList?.name)
+  )
+  const currency = recorded?.currency ?? retailCurrency(market.country)
+  const lockCountry = !!activeSession?.checkedItemIds.length || !!recorded
+  function chooseMarket(next: RetailSelection) {
+    if (recorded) return
+    if (activeSession?.checkedItemIds.length && retailCurrency(next.country) !== activeSession.currency)
+      return
+    if (next.country !== market.country) setCents(0)
+    const brand = brands.find((b) => b.id === brandId)
+    const meta = brand && catalogBrand(brand.name)
+    if (meta?.retailerIds.length && !meta.retailerIds.includes(next.retailerId)) {
+      setBrandId('')
+      setSelection(NEW_VARIANT)
+      setVariantName('')
+    }
+    setMarket(next)
+    useStore.getState().setRetailSelection(next)
+    const retailer = RETAILERS.find((r) => r.id === next.retailerId)
+    if (activeSession && retailer) useStore.getState().setShoppingStore(retailer.name, next.country)
+  }
   const ensureBrand = useStore((s) => s.ensureBrand)
   const variants = profile?.variants ?? []
   const hasVariants = variants.length > 0
@@ -243,6 +287,7 @@ export function CheckoffPriceSheet({
   }
 
   function handleSave() {
+    if (!recorded) chooseMarket(market)
     const price = centsToAmount(cents)
     if (price === null) {
       setError('Bitte einen gültigen Preis eingeben.')
@@ -310,6 +355,10 @@ export function CheckoffPriceSheet({
             <div className="mb-2" />
           )}
 
+          <div className="mb-3">
+            <MarketSelector value={market} onChange={chooseMarket} lockCountry={lockCountry} />
+          </div>
+
           {canChooseProduceMode && (
             <OptionSegment
               highlight={highlightOptions}
@@ -375,190 +424,204 @@ export function CheckoffPriceSheet({
             <BrandSelect
               brands={brands}
               value={brandId}
-              onChange={setBrandId}
+              onChange={(nextBrandId) => {
+                setBrandId(nextBrandId)
+                const matching = variants.find((v) => v.brandId === nextBrandId)
+                setSelection(matching?.id ?? NEW_VARIANT)
+                setVariantName('')
+              }}
               onCreateBrand={ensureBrand}
               label="Marke"
+              context={market}
+              onContextChange={chooseMarket}
+              lockCountry={lockCountry}
             />
           </div>
 
-          {sizePresets.length > 0 && (
-            <div className="mb-2">
+          <details className="price-details mb-3">
+            <summary className="min-h-11 cursor-pointer text-[13px] font-semibold">
+              Variante, Größe & bisherige Preise
+            </summary>
+            {sizePresets.length > 0 && (
+              <div className="mb-2">
+                <div
+                  className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-wide"
+                  style={{ color: 'var(--category-fg)' }}
+                >
+                  Grösse
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sizePresets.map((preset) => {
+                    const active =
+                      (selectedVariant && selectedVariant.name === preset) ||
+                      (showNewVariantName && variantName === preset)
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                        style={{
+                          background: active ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                          color: active ? 'var(--accent)' : 'var(--text)',
+                          outline: active ? '2px solid var(--accent)' : 'none',
+                        }}
+                        onClick={() => applySizePreset(preset)}
+                        aria-pressed={active}
+                      >
+                        {preset}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasVariants ? (
+              <div className="mb-2">
+                <label
+                  className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide"
+                  style={{ color: 'var(--category-fg)' }}
+                >
+                  Variante
+                </label>
+                <select
+                  className="input w-full py-2.5 text-[14px]"
+                  value={selection}
+                  onChange={(e) => {
+                    setSelection(e.target.value)
+                    setError('')
+                    if (e.target.value !== NEW_VARIANT) setVariantName('')
+                  }}
+                >
+                  {variants.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {formatVariantLabel(v, brands)}
+                    </option>
+                  ))}
+                  <option value={NEW_VARIANT}>+ Neue Variante</option>
+                </select>
+              </div>
+            ) : (
+              <div className="mb-2">
+                <label
+                  className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide"
+                  style={{ color: 'var(--category-fg)' }}
+                >
+                  Variante (Marke / Grösse)
+                </label>
+                <input
+                  type="text"
+                  className="input w-full py-2.5 text-[14px]"
+                  placeholder="z. B. Coop Naturaplan Bio 1L"
+                  value={variantName}
+                  onChange={(e) => {
+                    setVariantName(e.target.value)
+                    setError('')
+                  }}
+                />
+              </div>
+            )}
+
+            {showNewVariantName && hasVariants && (
+              <div className="mb-2">
+                <input
+                  type="text"
+                  className="input w-full py-2.5 text-[14px]"
+                  placeholder="Name der neuen Variante"
+                  value={variantName}
+                  onChange={(e) => {
+                    setVariantName(e.target.value)
+                    setError('')
+                  }}
+                />
+              </div>
+            )}
+
+            {selectedVariant && selectedPrices && (
               <div
-                className="mb-1.5 px-0.5 text-[11px] font-bold uppercase tracking-wide"
-                style={{ color: 'var(--category-fg)' }}
+                className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl px-2.5 py-2 text-center text-[11px]"
+                style={{ background: 'var(--chip-bg)' }}
               >
-                Grösse
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {sizePresets.map((preset) => {
-                  const active =
-                    (selectedVariant && selectedVariant.name === preset) ||
-                    (showNewVariantName && variantName === preset)
-                  return (
-                    <button
-                      key={preset}
-                      type="button"
-                      className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
-                      style={{
-                        background: active ? 'var(--accent-soft)' : 'var(--chip-bg)',
-                        color: active ? 'var(--accent)' : 'var(--text)',
-                        outline: active ? '2px solid var(--accent)' : 'none',
-                      }}
-                      onClick={() => applySizePreset(preset)}
-                      aria-pressed={active}
-                    >
-                      {preset}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {hasVariants ? (
-            <div className="mb-2">
-              <label
-                className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide"
-                style={{ color: 'var(--category-fg)' }}
-              >
-                Variante
-              </label>
-              <select
-                className="input w-full py-2.5 text-[14px]"
-                value={selection}
-                onChange={(e) => {
-                  setSelection(e.target.value)
-                  setError('')
-                  if (e.target.value !== NEW_VARIANT) setVariantName('')
-                }}
-              >
-                {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {formatVariantLabel(v, brands)}
-                  </option>
-                ))}
-                <option value={NEW_VARIANT}>+ Neue Variante</option>
-              </select>
-            </div>
-          ) : (
-            <div className="mb-2">
-              <label
-                className="mb-1 block px-0.5 text-[11px] font-bold uppercase tracking-wide"
-                style={{ color: 'var(--category-fg)' }}
-              >
-                Variante (Marke / Grösse)
-              </label>
-              <input
-                type="text"
-                className="input w-full py-2.5 text-[14px]"
-                placeholder="z. B. Coop Naturaplan Bio 1L"
-                value={variantName}
-                onChange={(e) => {
-                  setVariantName(e.target.value)
-                  setError('')
-                }}
-              />
-            </div>
-          )}
-
-          {showNewVariantName && hasVariants && (
-            <div className="mb-2">
-              <input
-                type="text"
-                className="input w-full py-2.5 text-[14px]"
-                placeholder="Name der neuen Variante"
-                value={variantName}
-                onChange={(e) => {
-                  setVariantName(e.target.value)
-                  setError('')
-                }}
-              />
-            </div>
-          )}
-
-          {selectedVariant && selectedPrices && (
-            <div
-              className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl px-2.5 py-2 text-center text-[11px]"
-              style={{ background: 'var(--chip-bg)' }}
-            >
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>{priceByWeight ? 'Pro 100 g' : 'Zuletzt'}</div>
-                <div className="font-bold tabular-nums">
-                  {priceByWeight
-                    ? selectedPrices.pricePerKg
-                      ? formatMoney(pricePer100gFromKg(selectedPrices.pricePerKg), currency)
-                      : '–'
-                    : selectedPrices.lastPrice
-                      ? formatMoney(selectedPrices.lastPrice, currency)
-                      : '–'}
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>{priceByWeight ? 'Pro 100 g' : 'Zuletzt'}</div>
+                  <div className="font-bold tabular-nums">
+                    {priceByWeight
+                      ? selectedPrices.pricePerKg
+                        ? formatMoney(pricePer100gFromKg(selectedPrices.pricePerKg), currency)
+                        : '–'
+                      : selectedPrices.lastPrice
+                        ? formatMoney(selectedPrices.lastPrice, currency)
+                        : '–'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>Ø normal</div>
+                  <div className="font-bold tabular-nums">
+                    {selectedPrices.avgPrice ? formatMoney(selectedPrices.avgPrice, currency) : '–'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>Gekauft</div>
+                  <div className="font-bold">{formatShortDate(selectedPrices.lastPurchaseDate)}</div>
                 </div>
               </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>Ø normal</div>
-                <div className="font-bold tabular-nums">
-                  {selectedPrices.avgPrice ? formatMoney(selectedPrices.avgPrice, currency) : '–'}
-                </div>
+            )}
+          </details>
+          <section className="price-keypad">
+            <MoneyNumpad
+              cents={cents}
+              onChange={(value) => {
+                setCents(value)
+                setError('')
+              }}
+              currency={currency}
+              dense
+              label={
+                priceByWeight
+                  ? 'Preis am Kassenbon'
+                  : quantity > 1 && priceMode === 'unit'
+                    ? packAmount
+                      ? 'Preis pro Packung'
+                      : 'Preis pro Stück'
+                    : 'Preis'
+              }
+              trailing={
+                priceDelta && priceDelta.direction !== 'same' ? (
+                  <PriceDeltaBadge label={priceDelta.label} direction={priceDelta.direction} />
+                ) : undefined
+              }
+            />
+            {priceByWeight && enteredAmount > 0 && weightGrams && (
+              <div
+                className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
+                style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+              >
+                {formatMoney(
+                  pricePer100gFromKg(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg),
+                  currency
+                )}
+                /100 g{' · '}
+                {formatWeightGrams(weightGrams)}
               </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)' }}>Gekauft</div>
-                <div className="font-bold">{formatShortDate(selectedPrices.lastPurchaseDate)}</div>
+            )}
+            {resolved && resolved.total > 0 && !priceByWeight && quantity > 1 && (
+              <div
+                className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
+                style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+              >
+                {priceMode === 'unit'
+                  ? `${quantity} × ${formatMoney(resolved.unitPrice, currency)} = ${formatMoney(resolved.total, currency)}`
+                  : `Gesamt: ${formatMoney(resolved.total, currency)}`}
               </div>
-            </div>
-          )}
-
-          <MoneyNumpad
-            cents={cents}
-            onChange={(value) => {
-              setCents(value)
-              setError('')
-            }}
-            currency={currency}
-            dense
-            label={
-              priceByWeight
-                ? 'Preis am Kassenbon'
-                : quantity > 1 && priceMode === 'unit'
-                  ? packAmount
-                    ? 'Preis pro Packung'
-                    : 'Preis pro Stück'
-                  : 'Preis'
-            }
-            trailing={
-              priceDelta && priceDelta.direction !== 'same' ? (
-                <PriceDeltaBadge label={priceDelta.label} direction={priceDelta.direction} />
-              ) : undefined
-            }
-          />
-          {priceByWeight && enteredAmount > 0 && weightGrams && (
-            <div
-              className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
-              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-            >
-              {formatMoney(
-                pricePer100gFromKg(resolveProduceCheckoffPrice(enteredAmount, weightGrams).pricePerKg),
-                currency
-              )}
-              /100 g{' · '}
-              {formatWeightGrams(weightGrams)}
-            </div>
-          )}
-          {resolved && resolved.total > 0 && !priceByWeight && quantity > 1 && (
-            <div
-              className="mb-1 rounded-xl px-3 py-2 text-center text-[13px] font-bold tabular-nums"
-              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-            >
-              {priceMode === 'unit'
-                ? `${quantity} × ${formatMoney(resolved.unitPrice, currency)} = ${formatMoney(resolved.total, currency)}`
-                : `Gesamt: ${formatMoney(resolved.total, currency)}`}
-            </div>
-          )}
-          <PriceTypePicker
-            wasSale={wasSale}
-            onChange={setWasSale}
-            variant={selectedVariant}
-            currency={currency}
-            highlight={highlightOptions}
-          />
+            )}
+            <PriceTypePicker
+              wasSale={wasSale}
+              onChange={setWasSale}
+              variant={selectedVariant}
+              currency={currency}
+              highlight={highlightOptions}
+            />
+          </section>
         </div>
 
         <div className="shrink-0 border-t pt-2.5" style={{ borderColor: 'var(--border)' }}>
@@ -568,7 +631,13 @@ export function CheckoffPriceSheet({
             </p>
           )}
           <div className="flex gap-2">
-            <button className="btn-soft flex-1 py-3 text-[14px]" onClick={onSkip}>
+            <button
+              className="btn-soft flex-1 py-3 text-[14px]"
+              onClick={() => {
+                if (!recorded) chooseMarket(market)
+                onSkip()
+              }}
+            >
               {skipLabel ?? (item.done ? 'Ohne Änderung zurück' : 'Ohne Preis abhaken')}
             </button>
             <button className="btn-primary flex-1 py-3 text-[14px]" onClick={handleSave}>

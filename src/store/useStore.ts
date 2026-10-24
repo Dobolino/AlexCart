@@ -1,4 +1,11 @@
 import type { CatalogProduct, PriceObservation, FxSnapshot, RetailStore } from '@/types/catalog'
+import {
+  RETAILERS,
+  findRetailer,
+  retailSelection,
+  retailCurrency,
+  type RetailSelection,
+} from '@/data/retailCatalog'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
@@ -61,6 +68,9 @@ const STORE_NAME = 'alexshop-store'
 
 function defaultSettings(): AppSettings {
   return {
+    preferredRetailers: { CH: 'migros', DE: 'edeka' },
+    favoriteBrandNames: [],
+    hiddenBrandNames: [],
     theme: 'system',
     listViewMode: 'list',
     hasSeenOnboarding: false,
@@ -167,6 +177,7 @@ interface AppState {
   setHandedness: (value: 'left' | 'right') => void
   setStoreLayout: (store: string, categories: string[]) => void
   setShoppingStore: (store: string, country?: 'CH' | 'DE') => void
+  setRetailSelection: (selection: RetailSelection) => void
   setItemUnavailable: (id: string, unavailable: boolean) => void
   lists: ShoppingList[]
   activeListId: string
@@ -361,6 +372,29 @@ export const useStore = create<AppState>()(
       setHandedness: (handedness) => set((state) => ({ settings: { ...state.settings, handedness } })),
       setStoreLayout: (store, categories) =>
         set((state) => ({ storeLayouts: { ...state.storeLayouts, [store]: [...new Set(categories)] } })),
+      setRetailSelection: (selection) => {
+        const retailer = RETAILERS.find(
+          (r) => r.id === selection.retailerId && r.country === selection.country
+        )
+        if (!retailer) return
+        const currency = retailCurrency(selection.country)
+        const id = `${selection.country}:${retailer.name.toLocaleLowerCase('de')}`
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            retailSelection: selection,
+            preferredRetailers: {
+              ...state.settings.preferredRetailers,
+              [selection.country]: selection.retailerId,
+            },
+          },
+          retailStores: [
+            ...state.retailStores.filter((s) => s.id !== id),
+            { id, name: retailer.name, retailerId: retailer.id, country: selection.country, currency },
+          ],
+        }))
+        get().setCurrency(currency)
+      },
       setShoppingStore: (store, country) =>
         set((state) => {
           const currency = country
@@ -380,7 +414,7 @@ export const useStore = create<AppState>()(
               ...state.retailStores.filter((s) => s.id !== storeId),
               {
                 id: storeId,
-                retailerId: storeId.split(':').slice(0, 2).join(':'),
+                retailerId: findRetailer(store, country)?.id ?? storeId,
                 name: store,
                 country: country ?? (currency === 'CHF' ? 'CH' : 'DE'),
                 currency,
@@ -940,6 +974,13 @@ export const useStore = create<AppState>()(
 
         set((state) => {
           let base: Partial<AppState>
+          const chosenRetailer = RETAILERS.find((r) => r.id === state.settings.retailSelection?.retailerId)
+          const purchaseStoreId =
+            state.shoppingSession?.listId === list.id
+              ? state.shoppingSession.storeId
+              : chosenRetailer
+                ? `${chosenRetailer.country}:${chosenRetailer.name.toLocaleLowerCase('de')}`
+                : undefined
           if (nowDone) {
             if (checkoff) {
               base = commitItemPurchase(state, item, checkoff, {
@@ -947,7 +988,7 @@ export const useStore = create<AppState>()(
                 itemId,
                 markDone: true,
                 wasDone: item.done,
-                storeId: state.shoppingSession?.storeId,
+                storeId: purchaseStoreId,
                 currency:
                   state.shoppingSession?.listId === list.id
                     ? (state.shoppingSession.currency ?? state.settings.currency)
@@ -971,10 +1012,11 @@ export const useStore = create<AppState>()(
                 purchaseLog: [
                   ...state.purchaseLog,
                   {
-                    id: uid(),
+                    id: logId,
                     itemId,
                     productId: item.productId,
-                    storeId: state.shoppingSession?.storeId,
+                    amount: item.amount,
+                    storeId: purchaseStoreId,
                     name: item.name,
                     category: item.category,
                     date: todayKey(),
@@ -1501,7 +1543,17 @@ export const useStore = create<AppState>()(
 
       startShoppingSession: (listId) => {
         const existing = get().shoppingSession
-        if (existing?.listId === listId) return
+        if (existing?.listId === listId) {
+          if (!existing.store && !existing.checkedItemIds.length) {
+            const choice = retailSelection(get().settings, get().lists.find((l) => l.id === listId)?.name)
+            get().setRetailSelection(choice)
+            const retailer = RETAILERS.find((r) => r.id === choice.retailerId)
+            if (retailer) get().setShoppingStore(retailer.name, choice.country)
+          }
+          return
+        }
+        const choice = retailSelection(get().settings, get().lists.find((l) => l.id === listId)?.name)
+        get().setRetailSelection(choice)
         set({
           shoppingSession: {
             listId,
@@ -1511,6 +1563,8 @@ export const useStore = create<AppState>()(
             checkedItemIds: [],
           },
         })
+        const retailer = RETAILERS.find((r) => r.id === choice.retailerId)
+        if (retailer) get().setShoppingStore(retailer.name, choice.country)
       },
 
       pauseShopping: () => {
@@ -1533,6 +1587,7 @@ export const useStore = create<AppState>()(
             ...session,
             listId: session.listId,
             startedAt: session.startedAt,
+            pausedAt: undefined,
             totalPausedMs: session.totalPausedMs + pausedMs,
             checkedItemIds: session.checkedItemIds ?? [],
           },
@@ -1788,6 +1843,9 @@ export const useStore = create<AppState>()(
                 }),
               }))
             }
+          }
+          if (version < 21) {
+            state.settings = { ...defaultSettings(), ...state.settings }
           }
           if (version < 20) {
             const originalCurrency = state.settings?.currency ?? 'CHF'

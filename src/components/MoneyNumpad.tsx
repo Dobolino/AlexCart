@@ -50,17 +50,20 @@ export function MoneyNumpad({
     <>
       {display === 'summary' ? (
         <div
-          className="mb-3 flex items-center justify-between rounded-3xl px-5 py-4"
+          className="money-display mb-3 flex items-center justify-between rounded-3xl px-5 py-4"
+          data-active={cents > 0}
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            color: 'var(--text)',
+            color: cents > 0 ? 'var(--accent)' : 'var(--text)',
           }}
         >
           <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
             {label}
           </span>
-          <span className="text-[28px] font-extrabold tabular-nums">{formatMoney(amount, currency)}</span>
+          <span aria-live="polite" aria-atomic="true" className="text-[28px] font-extrabold tabular-nums">
+            {formatMoney(amount, currency)}
+          </span>
         </div>
       ) : (
         <>
@@ -70,8 +73,13 @@ export function MoneyNumpad({
             </div>
           )}
           <div
-            className={`card-surface ${displayMb} flex items-center justify-between gap-2 px-4 font-bold tabular-nums`}
-            style={{ color: 'var(--text)', minHeight: displayMinH, fontSize: displaySize }}
+            className={`money-display card-surface ${displayMb} flex items-center justify-between gap-2 px-4 font-bold tabular-nums`}
+            data-active={cents > 0}
+            style={{
+              color: cents > 0 ? 'var(--accent)' : 'var(--text)',
+              minHeight: displayMinH,
+              fontSize: displaySize,
+            }}
           >
             <span className="min-w-0 truncate">{formatMoney(amount, currency)}</span>
             {trailing}

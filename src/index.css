@@ -406,6 +406,56 @@ h3,
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.search-field .input {
+  padding-left: 44px;
+  padding-right: 44px;
+  min-height: 48px;
+}
+.search-field input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.market-selector .input {
+  padding: 10px 28px 10px 10px;
+  min-height: 46px;
+}
+.price-keypad {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 12px;
+  background: var(--chip-bg);
+}
+.price-keypad [data-testid='money-numpad-key'] {
+  background: var(--surface);
+  min-height: 44px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.price-keypad .money-display {
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 2px;
+}
+.money-display[data-active='true'] {
+  color: var(--accent);
+}
+.calculator-pad {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+}
+.calculator-pad [data-testid='money-numpad-key'] {
+  background: var(--chip-bg);
+  box-shadow: none;
+  border-radius: 14px;
+  min-height: 48px;
+}
+.calculator-pad .money-display {
+  border: 0;
+  background: transparent;
+  padding-left: 4px;
+  padding-right: 4px;
+}
 select.input {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238e8e93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 8 10 12 14 8'/%3E%3C/svg%3E");
   background-repeat: no-repeat;

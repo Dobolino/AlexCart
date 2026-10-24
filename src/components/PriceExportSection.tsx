@@ -1,26 +1,17 @@
-import { useState } from 'react'
-import { Icon } from '@/components/Icon'
-import { ICON_PATHS } from '@/constants/icons'
+import { useMemo, useState } from 'react'
+import { useStore } from '@/store/useStore'
 import { shareOrDownloadFile } from '@/utils/backup'
-import {
-  buildPriceAnalysisPrompt,
-  buildPriceExport,
-  exportPriceCsv,
-  exportPriceJson,
-  priceExportFilename,
-} from '@/utils/priceExport'
+import { buildAiPriceExport, aiPriceCsv, aiPricePrompt, type ExportScope } from '@/utils/aiPriceExport'
 import type { CompletedTrip, Currency, GlobalBrand, ProductPriceProfile, PurchaseLogEntry } from '@/types'
 
-interface PriceExportSectionProps {
+interface Props {
   purchaseLog: PurchaseLogEntry[]
   priceProfiles: ProductPriceProfile[]
   brands: GlobalBrand[]
   completedTrips: CompletedTrip[]
   currency: Currency
-  /** Kompakte Darstellung in den Einstellungen. */
   compact?: boolean
 }
-
 export function PriceExportSection({
   purchaseLog,
   priceProfiles,
@@ -28,133 +19,140 @@ export function PriceExportSection({
   completedTrips,
   currency,
   compact = false,
-}: PriceExportSectionProps) {
+}: Props) {
+  const catalog = useStore((s) => s.catalog),
+    retailStores = useStore((s) => s.retailStores)
+  const observations = useStore((s) => s.priceObservations),
+    fx = useStore((s) => s.fxSnapshot)
+  const [scope, setScope] = useState<ExportScope>('ALL')
   const [message, setMessage] = useState('')
-  const pricedCount = purchaseLog.filter((e) => e.price && e.price > 0).length
-
-  if (!pricedCount) {
-    if (compact) return null
-    return (
-      <div className="mb-4.5">
-        <div
-          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-          style={{ color: 'var(--category-fg)' }}
-        >
-          Preise exportieren
-        </div>
-        <div className="card-surface px-3.5 py-3.5">
-          <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            Noch keine Preise erfasst. Beim Abhaken Preise eintragen – dann kannst du CSV/JSON exportieren
-            und z. B. mit einer KI Diagramme erstellen.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  function buildPayload() {
-    return buildPriceExport({
+  const [busy, setBusy] = useState(false)
+  const payload = useMemo(
+    () =>
+      buildAiPriceExport(
+        {
+          purchaseLog,
+          priceProfiles,
+          brands,
+          completedTrips,
+          catalog,
+          retailStores,
+          priceObservations: observations,
+          fxSnapshot: fx,
+          settings: { currency },
+        },
+        scope
+      ),
+    [
       purchaseLog,
       priceProfiles,
       brands,
       completedTrips,
+      catalog,
+      retailStores,
+      observations,
+      fx,
       currency,
-    })
-  }
-
-  async function handleExportCsv() {
-    const payload = buildPayload()
-    await shareOrDownloadFile(
-      exportPriceCsv(payload),
-      priceExportFilename('csv'),
-      'text/csv;charset=utf-8',
-      'AlexShop Preise'
-    )
-    setMessage('CSV exportiert.')
-  }
-
-  async function handleExportJson() {
-    const payload = buildPayload()
-    await shareOrDownloadFile(
-      exportPriceJson(payload),
-      priceExportFilename('json'),
-      'application/json',
-      'AlexShop Preise'
-    )
-    setMessage('JSON exportiert.')
-  }
-
-  async function handleCopyAiPrompt() {
-    const prompt = buildPriceAnalysisPrompt(buildPayload())
+      scope,
+    ]
+  )
+  async function exportData(format: 'json' | 'csv' | 'prompt' | 'copy') {
+    setBusy(true)
+    setMessage('')
     try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(prompt)
+      if (format === 'copy') {
+        await navigator.clipboard.writeText(aiPricePrompt(payload))
+        setMessage('Analyseauftrag mit Preisdaten kopiert.')
       } else {
-        const ta = document.createElement('textarea')
-        ta.value = prompt
-        document.body.appendChild(ta)
-        ta.select()
-        document.execCommand('copy')
-        document.body.removeChild(ta)
+        const text =
+          format === 'json'
+            ? JSON.stringify(payload, null, 2)
+            : format === 'csv'
+              ? aiPriceCsv(payload)
+              : aiPricePrompt(payload)
+        const extension = format === 'prompt' ? 'txt' : format
+        await shareOrDownloadFile(
+          text,
+          `alexshop-preise-${scope.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.${extension}`,
+          format === 'json'
+            ? 'application/json'
+            : format === 'csv'
+              ? 'text/csv;charset=utf-8'
+              : 'text/plain;charset=utf-8',
+          'AlexShop Preisvergleich'
+        )
+        setMessage('Datei zum Teilen oder Speichern bereit.')
       }
-      setMessage('Prompt kopiert.')
-    } catch {
-      setMessage('Kopieren fehlgeschlagen.')
+    } catch (e) {
+      setMessage(
+        e instanceof Error && e.name === 'AbortError'
+          ? 'Export abgebrochen.'
+          : 'Export nicht möglich. Bitte erneut versuchen.'
+      )
+    } finally {
+      setBusy(false)
     }
   }
-
   return (
-    <div className={compact ? 'mb-3' : 'mb-4.5'}>
-      {!compact && (
-        <div
-          className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
-          style={{ color: 'var(--category-fg)' }}
+    <section className={compact ? 'mb-3' : 'mb-4'}>
+      <h2 className="mb-2 text-lg font-bold">Preise exportieren & mit KI analysieren</h2>
+      <p className="mb-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        Käufe und eigene Preisbeobachtungen mit Marke, Geschäft, Datum, Originalwährung und bekannten Mengen.
+        Persönliche Notizen, Listennamen und Einladungen werden nicht exportiert.
+      </p>
+      <label className="block text-sm font-semibold">
+        Länder im Export
+        <select
+          className="input my-2 w-full"
+          value={scope}
+          onChange={(e) => setScope(e.target.value as ExportScope)}
         >
-          Preise exportieren
-        </div>
-      )}
-      <div className="card-surface flex flex-col">
-        {!compact && (
-          <p className="border-b px-3.5 py-3 text-[12px] leading-snug" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-            {pricedCount} Preise · vollständiger Export mit stabilem KEY (Datum|Produkt|Filiale|Währung) zum Nachverfolgen von Änderungen. Enthält auch Quittungen.
-          </p>
-        )}
+          <option value="ALL">Schweiz & Deutschland</option>
+          <option value="CH">Nur Schweiz</option>
+          <option value="DE">Nur Deutschland</option>
+        </select>
+      </label>
+      <p className="mb-3 text-sm">{payload.recordCount} Preisdatensätze · CHF / EUR getrennt</p>
+      <div className="grid grid-cols-2 gap-2">
         <button
-          type="button"
-          className="tap-scale flex items-center gap-3 border-b px-3.5 py-3.5 text-left text-[14px] font-semibold"
-          style={{ borderColor: 'var(--border)' }}
-          onClick={() => void handleExportCsv()}
+          className="btn-primary min-h-12 px-3 text-sm"
+          disabled={busy || !payload.recordCount}
+          onClick={() => void exportData('json')}
         >
-          <Icon path={ICON_PATHS.share} size={18} />
-          Als CSV exportieren
+          JSON für KI exportieren
         </button>
         <button
-          type="button"
-          className="tap-scale flex items-center gap-3 px-3.5 py-3.5 text-left text-[14px] font-semibold"
-          onClick={() => void handleExportJson()}
+          className="btn-soft min-h-12 px-3 text-sm"
+          disabled={busy || !payload.recordCount}
+          onClick={() => void exportData('csv')}
         >
-          <Icon path={ICON_PATHS.share} size={18} />
-          Als JSON exportieren
+          CSV für Tabellen
+        </button>
+        <button
+          className="btn-soft col-span-2 min-h-12 px-3 text-sm"
+          disabled={busy || !payload.recordCount}
+          onClick={() => void exportData('prompt')}
+        >
+          Analyseauftrag mit Daten als Datei
+        </button>
+        <button
+          className="btn-soft col-span-2 min-h-11 px-3 text-sm"
+          disabled={busy || !payload.recordCount}
+          onClick={() => void exportData('copy')}
+        >
+          Analyseauftrag mit Daten kopieren
         </button>
       </div>
-      <details className="mt-2 rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
-        <summary className="cursor-pointer text-[13px] font-bold" style={{ color: 'var(--text-muted)' }}>
-          Optional: Diagramme per KI
-        </summary>
-        <button
-          type="button"
-          className="btn-soft tap-scale mt-2 flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-bold"
-          onClick={() => void handleCopyAiPrompt()}
-        >
-          <Icon path={ICON_PATHS.copy} size={18} />
-          Prompt mit Daten kopieren
-        </button>
-      </details>
+      {!payload.recordCount && (
+        <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Erfasse zuerst einen Kaufpreis oder eine Preisbeobachtung.
+        </p>
+      )}
       {message && (
-        <p className="mt-2 px-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <p role="status" className="mt-3 text-sm">
           {message}
         </p>
       )}
-    </div>
+    </section>
   )
 }

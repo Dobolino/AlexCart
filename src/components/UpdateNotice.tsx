@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
+import { useLocation } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 
 let update: ((reload?: boolean) => Promise<void>) | undefined
 export function UpdateNotice() {
   const [available, setAvailable] = useState(false)
-  const shopping = useStore((s) => s.shoppingSession !== null)
+  const session = useStore((s) => s.shoppingSession)
+  const { pathname } = useLocation()
+  const shopping = session !== null && pathname === '/shop'
   useEffect(() => {
     if (!import.meta.env.PROD) return
     update = registerSW({
@@ -24,7 +27,7 @@ export function UpdateNotice() {
   return (
     <aside role="status" className="storage-notice">
       {shopping
-        ? 'Ein Update ist bereit. Du kannst es nach dem Einkauf laden.'
+        ? 'Ein Update ist bereit. Wechsle zur Liste, um es zu laden. Dein Einkauf bleibt gespeichert.'
         : 'Eine neue Version ist bereit.'}
       {!shopping && (
         <button

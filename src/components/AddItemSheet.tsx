@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Sheet } from './Sheet'
+import { SearchField } from './SearchField'
+import { ListImportPanel } from './ListImportPanel'
 import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
 import { BrandSelect } from './BrandSelect'
@@ -15,9 +17,7 @@ import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
 import { parseRecipeText } from '@/utils/recipe'
 import { RecipeReviewSheet, type RecipeReviewItem } from '@/components/RecipeReviewSheet'
-import { OptionCard } from '@/components/OptionCard'
 import { uid } from '@/utils/id'
-import { buildClaudeImportPrompt } from '@/utils/claudeImportPrompt'
 import type { ImportMode } from '@/types'
 
 interface AddItemSheetProps {
@@ -43,8 +43,6 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const addItemToActiveList = useStore((s) => s.addItemToActiveList)
   const addCustomProduct = useStore((s) => s.addCustomProduct)
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
-  const importIntoActiveList = useStore((s) => s.importIntoActiveList)
-  const repeatLastWeekToActiveList = useStore((s) => s.repeatLastWeekToActiveList)
   const importRecipeItemsToActiveList = useStore((s) => s.importRecipeItemsToActiveList)
   const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
   const ensureBrand = useStore((s) => s.ensureBrand)
@@ -61,12 +59,6 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const [form, setForm] = useState<ProductFormValues>(EMPTY_FORM)
   const [selectedBrandId, setSelectedBrandId] = useState('')
 
-  const [importText, setImportText] = useState('')
-  const [importError, setImportError] = useState('')
-  const [importMode, setImportMode] = useState<ImportMode>('merge')
-  const [promptCopied, setPromptCopied] = useState(false)
-  const [showImportAiHelp, setShowImportAiHelp] = useState(false)
-  const claudePrompt = useMemo(() => buildClaudeImportPrompt(), [])
   const [recipeText, setRecipeText] = useState('')
   const [recipeError, setRecipeError] = useState('')
   const [recipeMode, setRecipeMode] = useState<ImportMode>('append')
@@ -128,36 +120,6 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
     setMode('search')
   }
 
-  function handleImport() {
-    if (!importText.trim()) {
-      setImportError('Bitte JSON einfügen.')
-      setShowImportAiHelp(true)
-      return
-    }
-    const result = importIntoActiveList(importText.trim(), importMode)
-    if (!result.ok) {
-      setImportError(result.error || 'Import fehlgeschlagen.')
-      setShowImportAiHelp(true)
-      return
-    }
-    onClose()
-    const suffix = result.filteredCount ? `, ${result.filteredCount} aus Vorrat gefiltert` : ''
-    const modeLabel =
-      importMode === 'replace' ? 'importiert' : importMode === 'append' ? 'angehängt' : 'zusammengeführt'
-    onImported(`${result.keptCount} Artikel ${modeLabel}${suffix}`)
-  }
-
-  function handleRepeatLastWeek() {
-    setImportError('')
-    const result = repeatLastWeekToActiveList()
-    if (!result.ok) {
-      setImportError(result.error || 'Konnte letzte Woche nicht übernehmen.')
-      return
-    }
-    onClose()
-    onImported(`${result.addedCount} Artikel von letzter Woche hinzugefügt`)
-  }
-
   function handleRecipeAnalyze() {
     setRecipeError('')
     const parsed = parseRecipeText(recipeText.trim(), customProducts)
@@ -189,7 +151,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   }
 
   return (
-    <Sheet onClose={onClose}>
+    <Sheet onClose={onClose} tall>
       <div className="mb-4 flex gap-1 rounded-2xl p-1" style={{ background: 'var(--chip-bg)' }}>
         {(
           [
@@ -206,14 +168,17 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                 mode === m || (m === 'search' && mode === 'form') ? 'var(--surface)' : 'transparent',
               color: 'var(--text)',
             }}
-            onClick={() => setMode(m)}
+            onClick={() => {
+              ;(document.activeElement as HTMLElement | null)?.blur()
+              setMode(m)
+            }}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {onOpenReceiptImport && (
+      {onOpenReceiptImport && mode === 'search' && (
         <button
           type="button"
           className="btn-soft tap-scale mb-3 flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-bold"
@@ -231,13 +196,12 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="shrink-0">
             <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
-            <input
-              autoFocus
-              type="text"
-              className="input"
-              placeholder="z.B. Tomaten"
+            <SearchField
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={setQuery}
+              label="Artikelsuche"
+              placeholder="z.B. Tomaten"
+              autoFocus
             />
           </div>
           <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -355,123 +319,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
       )}
 
       {mode === 'import' && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-          <h2 className="mb-1 text-lg font-bold">Wochenplan importieren</h2>
-          <p className="mb-3 text-[13px] leading-snug" style={{ color: 'var(--text)' }}>
-            JSON-Liste einfügen oder die letzte Woche wiederholen. Kassenbon direkt als Foto/PDF importieren.
-          </p>
-          <button
-            className="btn-soft tap-scale mb-3 flex w-full items-center justify-center gap-2 py-3 text-[14px] font-bold"
-            onClick={handleRepeatLastWeek}
-          >
-            <Icon path={ICON_PATHS.copy} size={16} />
-            Letzte Woche wiederholen
-          </button>
-          {onOpenReceiptImport && (
-            <button
-              type="button"
-              className="btn-primary tap-scale mb-3 flex w-full items-center justify-center gap-2 py-3 text-[14px] font-bold"
-              onClick={() => {
-                onClose()
-                onOpenReceiptImport()
-              }}
-            >
-              <Icon path={ICON_PATHS.import} size={16} />
-              Kassenbon importieren (Foto / PDF)
-            </button>
-          )}
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <div className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>
-              JSON einfügen
-            </div>
-            {importText.trim() ? (
-              <button
-                type="button"
-                className="tap-scale rounded-full px-2.5 py-1 text-[12px] font-bold"
-                style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-                onClick={() => {
-                  setImportText('')
-                  setImportError('')
-                  setShowImportAiHelp(false)
-                }}
-              >
-                Alles löschen
-              </button>
-            ) : null}
-          </div>
-          <textarea
-            className="input min-h-[160px] font-mono text-[14px]"
-            placeholder='{"week":"2026-07-06","items":[{"name":"Tomaten","amount":"500 g","category":"Früchte & Gemüse"}]}'
-            value={importText}
-            onChange={(e) => {
-              setImportText(e.target.value)
-              setImportError('')
-            }}
-          />
-          {openCount > 0 && (
-            <div className="mt-3">
-              <div className="mb-2 text-[13px] font-bold" style={{ color: 'var(--text)' }}>
-                Mit bestehender Liste
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {(
-                  [
-                    ['merge', 'Zusammenführen', 'Gleiche Namen werden addiert, neue ergänzt'],
-                    ['append', 'Anhängen', 'Importierte Artikel hinten anfügen'],
-                    ['replace', 'Ersetzen', 'Offene Artikel ersetzen (Erledigte bleiben)'],
-                  ] as const
-                ).map(([value, label, hint]) => (
-                  <OptionCard
-                    key={value}
-                    selected={importMode === value}
-                    onClick={() => setImportMode(value)}
-                    title={label}
-                    hint={hint}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="mt-2 min-h-[16px] text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
-            {importError}
-          </div>
-          <button className="btn-primary mt-3 w-full py-3.5 text-[15px]" onClick={handleImport}>
-            Importieren
-          </button>
-          {(showImportAiHelp || importText.trim()) && (
-            <details
-              className="mt-4 rounded-xl border px-3.5 py-3 text-[12px]"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
-              open={showImportAiHelp}
-            >
-              <summary
-                className="cursor-pointer text-[13px] font-bold"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Optional: JSON per KI erzeugen
-              </summary>
-              <p className="mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Prompt kopieren, Wochenplan oder Rezept an ChatGPT/Claude senden, JSON hier einfügen.
-              </p>
-              <button
-                type="button"
-                className="btn-soft tap-scale mt-2 flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-bold"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(claudePrompt)
-                    setPromptCopied(true)
-                    window.setTimeout(() => setPromptCopied(false), 2000)
-                  } catch {
-                    setImportError('Kopieren nicht möglich – Prompt manuell markieren.')
-                  }
-                }}
-              >
-                <Icon path={ICON_PATHS.copy} size={15} />
-                {promptCopied ? 'Kopiert' : 'Prompt kopieren'}
-              </button>
-            </details>
-          )}
-        </div>
+        <ListImportPanel onClose={onClose} onImported={onImported} onReceipt={onOpenReceiptImport} />
       )}
 
       {mode === 'recipe' && (

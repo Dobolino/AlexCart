@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { productSchema, priceObservationSchema, retailStoreSchema, fxSchema } from './catalogSchemas'
 
-export const STORAGE_VERSION = 20
+export const STORAGE_VERSION = 21
 export const MAX_BACKUP_BYTES = 8 * 1024 * 1024
 const text = z.string().max(1000)
 const id = z.string().min(1).max(200)
@@ -70,6 +70,7 @@ const entry = z
     id: id.optional(),
     itemId: id.optional(),
     name: text,
+    amount: text.optional(),
     category: text,
     date,
     price: money.optional(),
@@ -111,6 +112,10 @@ const trip = z
   .passthrough()
 const settings = z
   .object({
+    retailSelection: z.object({ country: z.enum(['CH', 'DE']), retailerId: text }).optional(),
+    preferredRetailers: z.object({ CH: text.optional(), DE: text.optional() }).optional(),
+    favoriteBrandNames: array(text).optional(),
+    hiddenBrandNames: array(text).optional(),
     theme: z.enum(['light', 'dark', 'system']).optional(),
     listViewMode: z.enum(['list', 'tiles']).optional(),
     hasSeenOnboarding: z.boolean().optional(),

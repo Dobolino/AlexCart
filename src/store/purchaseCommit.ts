@@ -131,6 +131,7 @@ export function commitItemPurchase(
     id: logIdx >= 0 ? purchaseLog[logIdx]!.id || uid() : uid(),
     itemId: opts.itemId,
     name: item.name,
+    amount: item.amount,
     productId: item.productId,
     storeId: opts.storeId ?? previous?.storeId,
     category: item.category,

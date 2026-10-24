@@ -42,6 +42,10 @@ selbst betriebenen Backend abgeglichen; Preisgedächtnis, Vorrat und andere List
 - Navigation und Hinzufügen/Scannen reservieren eigenen Platz. Vorrat mit Suche und Eingabe per Dialog.
 - Filialbezogene Kategorienreihenfolge, Einkäufe pausieren/fortsetzen, „nicht gefunden“.
 - Getrennte CHF/EUR-Budgets, konsistente Bonkorrekturen und Vorratsbewegungen.
+- Länderauswahl mit passenden Supermärkten, getrennten Eigenmarken und allgemeinen Marken.
+- Offline-Markenkatalog mit 856 Bezeichnungen, Favoriten, Ausblenden und Bereichsfiltern.
+- Import aus Text oder Datei mit Vorschau; kompakte Suche und integriertes Preis-Tastenfeld.
+- Preisexport für KI-Auswertungen als JSON, CSV oder mit Analyseauftrag als Textdatei.
 - Barcode-Scanner mit nativer Erkennung und ZXing-Fallback sowie manueller Eingabe.
 - Persönlicher Produktkatalog, Packungs-/Grundpreise und nachvollziehbare Wechselkurse.
 - Optionale Produktdaten von Open Food Facts und Preisbeobachtungen von Open Prices.
@@ -113,6 +117,9 @@ App-Sicherungen enthalten die Listen, aber keine Einladungsschlüssel. Nach eine
 auf einem anderen Gerät den Einladungslink erneut verwenden.
 
 ## Preise und offene Daten
+
+Bedienung und vollständige kuratierte Markenliste: [Markenkatalog](docs/Markenkatalog.md).
+Exportformate, Mengen und Wechselkurse: [Preisexport für KI-Auswertungen](docs/Preisexport.md).
 
 Originalpreise bleiben in CHF beziehungsweise EUR gespeichert. Umrechnungen verwenden
 Decimal-Arithmetik und einen sichtbaren Kurs mit Quelle und Datum. Ohne Kurs erscheint kein

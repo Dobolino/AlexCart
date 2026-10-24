@@ -6,7 +6,7 @@ interface ShoppingPausedOverlayProps {
 }
 export function ShoppingPausedOverlay({ onResume, onExit }: ShoppingPausedOverlayProps) {
   return (
-    <Sheet onClose={onExit}>
+    <Sheet onClose={onResume}>
       <h2 className="mb-4 text-xl font-bold">Einkauf pausiert</h2>
       <p className="mb-4 text-sm">
         Deine Artikel und dieser Einkauf bleiben erhalten. Der Timer läuft während der Pause nicht weiter.

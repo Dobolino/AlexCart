@@ -3,6 +3,10 @@ export type ListViewMode = 'list' | 'tiles'
 export type Currency = 'CHF' | 'EUR'
 
 export interface AppSettings {
+  retailSelection?: import('@/data/retailCatalog').RetailSelection
+  preferredRetailers?: Partial<Record<'CH' | 'DE', string>>
+  favoriteBrandNames?: string[]
+  hiddenBrandNames?: string[]
   theme: Theme
   listViewMode: ListViewMode
   hasSeenOnboarding: boolean
@@ -58,6 +62,7 @@ export interface PantryItem {
 }
 
 export interface PurchaseLogEntry {
+  amount?: string
   productId?: string
   storeId?: string
   /** Wird beim Abhaken gesetzt; ältere Einträge erhalten eine ID bei der Migration. */

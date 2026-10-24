@@ -19,11 +19,6 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
   useEffect(() => {
     const dialog = dialogRef.current!
     const previous = document.activeElement as HTMLElement | null
-    const title = panelRef.current?.querySelector('h2')
-    if (title) {
-      title.id ||= titleId
-      dialog.setAttribute('aria-labelledby', title.id)
-    }
     dialog.showModal()
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -33,6 +28,13 @@ export function Sheet({ onClose, children, tall = false }: SheetProps) {
       if (previous?.isConnected) previous.focus({ preventScroll: true })
     }
   }, [titleId])
+  useEffect(() => {
+    const title = panelRef.current?.querySelector('h2')
+    if (title) {
+      title.id ||= titleId
+      dialogRef.current?.setAttribute('aria-labelledby', title.id)
+    } else dialogRef.current?.removeAttribute('aria-labelledby')
+  })
   const maxPanelHeight = Math.min(height * (tall ? 0.96 : 0.92), height - 8)
   return createPortal(
     <dialog

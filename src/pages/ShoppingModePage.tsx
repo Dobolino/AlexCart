@@ -355,7 +355,8 @@ export function ShoppingModePage() {
         style={{ background: 'var(--surface)' }}
         onClick={() => setLayoutOpen(true)}
       >
-        {sessionForList?.store || 'Geschäft & Laufweg wählen'} · Laufweg bearbeiten
+        {currency === 'CHF' ? 'Schweiz' : 'Deutschland'} · {sessionForList?.store || 'Supermarkt wählen'} ·
+        Laufweg
       </button>
       {(showTripTotal || showProjectedTotal) && (
         <div
