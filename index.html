@@ -88,86 +88,14 @@
     />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#000000" />
     <link rel="icon" type="image/png" href="/AlexCart/icons/icon-192.png" />
     <link rel="manifest" href="/AlexCart/manifest.webmanifest" />
     <title>AlexShop</title>
-    <style>
-      /* Kritisches Minimal-CSS für den Moment vor dem React-Mount (Theme ist durch das
-         obige Script bereits korrekt gesetzt, sodass hier nie Weiß aufblitzt). */
-      html[data-theme='light'] {
-        background: #f2f2f7;
-      }
-      html[data-theme='dark'] {
-        background: #000000;
-      }
-      #boot-skeleton {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      html[data-theme='dark'] #boot-skeleton {
-        background: #000000;
-      }
-      html[data-theme='light'] #boot-skeleton {
-        background: #f2f2f7;
-      }
-      #boot-skeleton svg {
-        width: 48px;
-        height: 48px;
-        animation: boot-pulse 1.1s ease-in-out infinite;
-      }
-      html[data-theme='dark'] #boot-skeleton svg {
-        color: #ffffff;
-      }
-      html[data-theme='light'] #boot-skeleton svg {
-        color: #12213b;
-      }
-      @keyframes boot-pulse {
-        0%,
-        100% {
-          opacity: 0.35;
-          transform: scale(0.96);
-        }
-        50% {
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
-      #boot-fallback {
-        display: none;
-        position: fixed;
-        inset: 0;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        padding: 24px;
-        text-align: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      }
-      #boot-fallback p {
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.45;
-        opacity: 0.75;
-      }
-      #boot-fallback button {
-        border: none;
-        border-radius: 12px;
-        padding: 12px 20px;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        background: #007aff;
-        color: #fff;
-      }
-    </style>
+    <style>html[data-theme=light]{background:#f2f2f7}html[data-theme=dark]{background:#000}#boot-skeleton{justify-content:center;align-items:center;display:flex;position:fixed;inset:0}html[data-theme=dark] #boot-skeleton{background:#000}html[data-theme=light] #boot-skeleton{background:#f2f2f7}#boot-skeleton svg{width:48px;height:48px;animation:1.1s ease-in-out infinite boot-pulse}html[data-theme=dark] #boot-skeleton svg{color:#fff}html[data-theme=light] #boot-skeleton svg{color:#12213b}@keyframes boot-pulse{0%,to{opacity:.35;transform:scale(.96)}50%{opacity:1;transform:scale(1)}}#boot-fallback{text-align:center;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;display:none;position:fixed;inset:0}#boot-fallback p{opacity:.75;margin:0;font-size:15px;line-height:1.45}#boot-fallback button{cursor:pointer;color:#fff;background:#007aff;border:none;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:600}</style>
     <script>
       /* Wenn das JS-Bundle nicht lädt (z. B. veralteter Service Worker), nicht ewig pulsieren. */
       window.setTimeout(function () {
@@ -178,10 +106,11 @@
         fb.style.display = 'flex'
       }, 8000)
     </script>
-    <script type="module" crossorigin src="/AlexCart/assets/dev-CkGHIvhj.js"></script>
-    <link rel="modulepreload" crossorigin href="/AlexCart/assets/rolldown-runtime-DAXXjFlN.js">
-    <link rel="modulepreload" crossorigin href="/AlexCart/assets/useStore-C3fcNBAm.js">
-    <link rel="stylesheet" crossorigin href="/AlexCart/assets/dev-CBnOQrFP.css">
+    <script type="module" crossorigin src="/AlexCart/assets/dev-NbjkGY6H.js"></script>
+    <link rel="modulepreload" crossorigin href="/AlexCart/assets/rolldown-runtime-BCiCTKAo.js">
+    <link rel="modulepreload" crossorigin href="/AlexCart/assets/useStore-ZME0Tdy0.js">
+    <link rel="modulepreload" crossorigin href="/AlexCart/assets/jsx-runtime-BB9-612F.js">
+    <link rel="stylesheet" crossorigin href="/AlexCart/assets/dev-DQAKCidi.css">
   <link rel="manifest" href="/AlexCart/manifest.webmanifest"></head>
   <body>
     <div id="root">
