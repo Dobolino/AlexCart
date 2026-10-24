@@ -1,5 +1,5 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/src-BX_HuAdg.js","assets/rolldown-runtime-BCiCTKAo.js"])))=>i.map(i=>d[i]);
-import{o as e}from"./rolldown-runtime-BCiCTKAo.js";import{Ct as t,M as n,N as r,P as i,St as a,Tt as o,a as s,j as c,n as ee,r as te,t as l,xt as u}from"./useStore-73SjTik3.js";import{t as d}from"./jsx-runtime-BB9-612F.js";import{A as f,O as ne,k as p,n as m,y as h}from"./dev-K5LlcWVn.js";import{t as g}from"./OptionCard-DD2lPo0Q.js";import{h as re}from"./stats-Bv5YzqhO.js";var _=e(o(),1);function ie(e,t=[],n=`CHF`){let r=a.join(`, `),i=te(t,n).join(`, `);return`Du liest einen Kassenbon (${n===`EUR`?`Deutschland/EU`:`Schweiz`}, ${n}) für die App AlexShop.
+import{o as e}from"./rolldown-runtime-BCiCTKAo.js";import{Ct as t,M as n,N as r,P as i,St as a,Tt as o,a as s,j as c,n as ee,r as te,t as l,xt as u}from"./useStore-73SjTik3.js";import{t as d}from"./jsx-runtime-BB9-612F.js";import{A as f,O as ne,k as p,n as m,y as h}from"./dev-oKR-55bx.js";import{t as g}from"./OptionCard-DD2lPo0Q.js";import{h as re}from"./stats-Bv5YzqhO.js";var _=e(o(),1);function ie(e,t=[],n=`CHF`){let r=a.join(`, `),i=te(t,n).join(`, `);return`Du liest einen Kassenbon (${n===`EUR`?`Deutschland/EU`:`Schweiz`}, ${n}) für die App AlexShop.
 
 FILIALE (Kontext): ${e||`unbekannt`}
 Bekannte Filialen/Ketten: ${i}
