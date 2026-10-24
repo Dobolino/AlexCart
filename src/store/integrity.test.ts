@@ -31,6 +31,27 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
+describe('persisted settings compatibility', () => {
+  it.each([{ customStores: undefined }, { customStores: ['Dorfladen'] }])(
+    'restores custom stores and normalizes legacy lists and shopping sessions (%j)',
+    ({ customStores }) => {
+      const merge = useStore.persist.getOptions().merge!
+      const restored = merge(
+        {
+          lists: [{ id: 'legacy', items: [] }],
+          settings: { customStores },
+          shoppingSession: { listId: 'legacy', startedAt: 1, totalPausedMs: 0 },
+        },
+        useStore.getState()
+      )
+      expect(restored.settings.customStores).toEqual(customStores ?? [])
+      expect(restored.lists[0]).toMatchObject({ name: 'Einkaufsliste', weekLabel: '' })
+      expect(restored.shoppingSession).toMatchObject({ currency: 'CHF', checkedItemIds: [] })
+      expect(restored.addCustomStore).toBeTypeOf('function')
+    }
+  )
+})
+
 describe('purchase integrity', () => {
   it('reverses only the purchased inventory, preserving consumption between check and undo', () => {
     const s = useStore.getState()

@@ -1846,7 +1846,11 @@ export const useStore = create<AppState>()(
               ...currentState,
               ...persisted,
               stats: { ...defaultStats(), ...persisted.stats },
-              settings: { ...defaultSettings(), ...persisted.settings },
+              settings: {
+                ...defaultSettings(),
+                ...persisted.settings,
+                customStores: persisted.settings?.customStores ?? [],
+              },
               lists: persisted.lists!.map((l) => ({
                 ...l,
                 name: l.name ?? 'Einkaufsliste',
