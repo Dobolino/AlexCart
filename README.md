@@ -44,6 +44,7 @@ selbst betriebenen Backend abgeglichen; Preisgedächtnis, Vorrat und andere List
 - Getrennte CHF/EUR-Budgets, konsistente Bonkorrekturen und Vorratsbewegungen.
 - Länderauswahl mit passenden Supermärkten, getrennten Eigenmarken und allgemeinen Marken.
 - Einkaufsort pro Liste merken und nach dem Abhaken oder im Bon korrigieren, einschließlich verknüpfter Vergleichspreise. [Bedienung](docs/Einkaufsort.md)
+- Einkauf ausdrücklich abschließen und direkt mit einer frischen Liste starten; offene Artikel nur auf Wunsch übernehmen, Bon und Preise im Verlauf behalten.
 - Offline-Markenkatalog mit 856 Bezeichnungen, Favoriten, Ausblenden und Bereichsfiltern.
 - Import aus Text oder Datei mit Vorschau; kompakte Suche und integriertes Preis-Tastenfeld.
 - Preisexport für KI-Auswertungen als JSON, CSV oder mit Analyseauftrag als Textdatei.

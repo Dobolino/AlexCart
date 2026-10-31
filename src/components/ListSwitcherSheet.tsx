@@ -5,15 +5,23 @@ import { ICON_PATHS } from '@/constants/icons'
 import { useStore } from '@/store/useStore'
 import { exportListJson, listExportFilename } from '@/utils/exportList'
 import { shareOrDownloadBackup } from '@/utils/backup'
+import { FinishShoppingSheet } from './FinishShoppingSheet'
 
 interface ListSwitcherSheetProps {
   onClose: () => void
   onRepeated?: (count: number) => void
   onDuplicated?: (name: string) => void
   onExported?: () => void
+  onCompleted?: () => void
 }
 
-export function ListSwitcherSheet({ onClose, onRepeated, onDuplicated, onExported }: ListSwitcherSheetProps) {
+export function ListSwitcherSheet({
+  onClose,
+  onRepeated,
+  onDuplicated,
+  onExported,
+  onCompleted,
+}: ListSwitcherSheetProps) {
   const lists = useStore((s) => s.lists)
   const activeListId = useStore((s) => s.activeListId)
   const switchList = useStore((s) => s.switchList)
@@ -26,6 +34,19 @@ export function ListSwitcherSheet({ onClose, onRepeated, onDuplicated, onExporte
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [repeatError, setRepeatError] = useState('')
+  const session = useStore((state) => state.shoppingSession)
+  const [finishName, setFinishName] = useState<string | null>(null)
+
+  function startNewList() {
+    if (!newName.trim()) return
+    if (session?.listId === activeListId) {
+      setFinishName(newName.trim())
+      return
+    }
+    createList(newName)
+    setNewName('')
+    onClose()
+  }
 
   function startRename(listId: string, currentName: string) {
     setEditingId(listId)
@@ -49,93 +70,99 @@ export function ListSwitcherSheet({ onClose, onRepeated, onDuplicated, onExporte
     <Sheet onClose={onClose}>
       <h2 className="mb-3 text-lg font-bold">Meine Listen</h2>
       <div className="card-surface mb-4">
-        {lists.map((list) => (
-          <div
-            key={list.id}
-            className="flex items-center gap-2 border-b px-3.5 py-3"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            {editingId === list.id ? (
-              <>
-                <input
-                  autoFocus
-                  type="text"
-                  className="input flex-1 py-2 text-[15px]"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveRename(list.id)
-                    if (e.key === 'Escape') setEditingId(null)
-                  }}
-                />
-                <button
-                  className="tap-scale rounded-full p-1.5"
-                  style={{ color: 'var(--accent)' }}
-                  onClick={() => saveRename(list.id)}
-                  aria-label="Name speichern"
-                >
-                  <Icon path={ICON_PATHS.check} size={18} />
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="min-w-0 flex-1 text-left text-[15px] font-semibold"
-                  style={{ color: list.id === activeListId ? 'var(--accent)' : 'var(--text)' }}
-                  onClick={() => {
-                    switchList(list.id)
-                    onClose()
-                  }}
-                >
-                  {list.name}
-                  <span className="ml-2 text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>
-                    {list.items.filter((i) => !i.done).length} offen
-                  </span>
-                </button>
-                <button
-                  className="tap-scale p-1"
-                  style={{ color: 'var(--text-muted)' }}
-                  onClick={() => {
-                    duplicateList(list.id)
-                    onDuplicated?.(`${list.name} (Kopie)`)
-                    onClose()
-                  }}
-                  aria-label={`${list.name} duplizieren`}
-                >
-                  <Icon path={ICON_PATHS.copy} size={17} />
-                </button>
-                <button
-                  className="tap-scale p-1"
-                  style={{ color: 'var(--text-muted)' }}
-                  onClick={() => void handleExport(list.id)}
-                  aria-label={`${list.name} exportieren`}
-                >
-                  <Icon path={ICON_PATHS.share} size={17} />
-                </button>
-                <button
-                  className="tap-scale p-1"
-                  style={{ color: 'var(--text-muted)' }}
-                  onClick={() => startRename(list.id, list.name)}
-                  aria-label={`${list.name} umbenennen`}
-                >
-                  <Icon path={ICON_PATHS.edit} size={17} />
-                </button>
-                {lists.length > 1 && (
+        {[...lists]
+          .sort(
+            (a, b) =>
+              Number(b.id === activeListId) - Number(a.id === activeListId) || b.createdAt - a.createdAt
+          )
+          .map((list) => (
+            <div
+              key={list.id}
+              className="flex items-center gap-2 border-b px-3.5 py-3"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              {editingId === list.id ? (
+                <>
+                  <input
+                    autoFocus
+                    type="text"
+                    className="input flex-1 py-2 text-[15px]"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveRename(list.id)
+                      if (e.key === 'Escape') setEditingId(null)
+                    }}
+                  />
+                  <button
+                    className="tap-scale rounded-full p-1.5"
+                    style={{ color: 'var(--accent)' }}
+                    onClick={() => saveRename(list.id)}
+                    aria-label="Name speichern"
+                  >
+                    <Icon path={ICON_PATHS.check} size={18} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="min-w-0 flex-1 text-left text-[15px] font-semibold"
+                    style={{ color: list.id === activeListId ? 'var(--accent)' : 'var(--text)' }}
+                    onClick={() => {
+                      switchList(list.id)
+                      onClose()
+                    }}
+                  >
+                    {list.name}
+                    <span className="ml-2 text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                      {list.id === activeListId ? 'Aktive Liste · ' : ''}
+                      {list.items.filter((i) => !i.done).length} offen
+                    </span>
+                  </button>
                   <button
                     className="tap-scale p-1"
-                    style={{ color: 'var(--danger)' }}
+                    style={{ color: 'var(--text-muted)' }}
                     onClick={() => {
-                      if (window.confirm(`„${list.name}“ wirklich löschen?`)) deleteList(list.id)
+                      duplicateList(list.id)
+                      onDuplicated?.(`${list.name} (Kopie)`)
+                      onClose()
                     }}
-                    aria-label={`${list.name} löschen`}
+                    aria-label={`${list.name} duplizieren`}
                   >
-                    <Icon path={ICON_PATHS.trash} size={18} />
+                    <Icon path={ICON_PATHS.copy} size={17} />
                   </button>
-                )}
-              </>
-            )}
-          </div>
-        ))}
+                  <button
+                    className="tap-scale p-1"
+                    style={{ color: 'var(--text-muted)' }}
+                    onClick={() => void handleExport(list.id)}
+                    aria-label={`${list.name} exportieren`}
+                  >
+                    <Icon path={ICON_PATHS.share} size={17} />
+                  </button>
+                  <button
+                    className="tap-scale p-1"
+                    style={{ color: 'var(--text-muted)' }}
+                    onClick={() => startRename(list.id, list.name)}
+                    aria-label={`${list.name} umbenennen`}
+                  >
+                    <Icon path={ICON_PATHS.edit} size={17} />
+                  </button>
+                  {lists.length > 1 && (
+                    <button
+                      className="tap-scale p-1"
+                      style={{ color: 'var(--danger)' }}
+                      onClick={() => {
+                        if (window.confirm(`„${list.name}“ wirklich löschen?`)) deleteList(list.id)
+                      }}
+                      aria-label={`${list.name} löschen`}
+                    >
+                      <Icon path={ICON_PATHS.trash} size={18} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
       </div>
       <button
         className="btn-soft tap-scale mb-4 flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-bold"
@@ -166,26 +193,28 @@ export function ListSwitcherSheet({ onClose, onRepeated, onDuplicated, onExporte
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && newName.trim()) {
-              createList(newName)
-              setNewName('')
-              onClose()
-            }
+            if (e.key === 'Enter') startNewList()
           }}
         />
         <button
           className="btn-primary tap-scale rounded-xl px-5 text-xl"
           aria-label="Neue Liste anlegen"
-          onClick={() => {
-            if (!newName.trim()) return
-            createList(newName)
-            setNewName('')
-            onClose()
-          }}
+          onClick={startNewList}
         >
           <Icon path={ICON_PATHS.plus} size={18} />
         </button>
       </div>
+      {finishName !== null && (
+        <FinishShoppingSheet
+          listId={activeListId}
+          initialName={finishName}
+          onClose={() => setFinishName(null)}
+          onFinished={() => {
+            onCompleted?.()
+            onClose()
+          }}
+        />
+      )}
     </Sheet>
   )
 }

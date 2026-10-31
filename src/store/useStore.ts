@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { fingerprint } from '@/utils/fingerprint'
 import { observationFromPurchase } from './catalogPurchase'
+import { activeShoppingDurationMs } from '@/utils/shoppingDuration'
 import {
   makeShoppingStore,
   locationForList,
@@ -363,6 +364,10 @@ interface AppState {
   pauseShopping: () => void
   resumeShopping: () => void
   clearShoppingSession: () => void
+  finishShopping: (
+    listId: string,
+    options: { createNewList: boolean; carryOpen?: boolean; name?: string; expectedStartedAt?: number }
+  ) => { ok: boolean; error?: string; tripId?: string; nextListId?: string }
 }
 
 export const useStore = create<AppState>()(
@@ -1690,6 +1695,103 @@ export const useStore = create<AppState>()(
       },
 
       clearShoppingSession: () => set({ shoppingSession: null }),
+
+      finishShopping: (listId, options) => {
+        let result: { ok: boolean; error?: string; tripId?: string; nextListId?: string } = {
+          ok: false,
+          error: 'Dieser Einkauf ist bereits beendet oder die Liste wurde gewechselt.',
+        }
+        let nextCurrency: AppSettings['currency'] | undefined
+        set((state) => {
+          const list = state.lists.find((list) => list.id === listId)
+          const session = state.shoppingSession
+          if (
+            !list ||
+            state.activeListId !== listId ||
+            session?.listId !== listId ||
+            (options.expectedStartedAt !== undefined && options.expectedStartedAt !== session.startedAt)
+          )
+            return state
+          const ids = sessionPurchaseIds(session, list, state.purchaseLog, state.completedTrips)
+          const linked = state.purchaseLog.filter((entry) => entry.id && ids.has(entry.id))
+          const checked = new Set(session.checkedItemIds)
+          const items = list.items
+            .filter((item) => item.done && checked.has(item.id))
+            .map((item) => {
+              const entry =
+                linked.find((entry) => entry.id === item.purchaseLogId) ??
+                linked.find((entry) => entry.itemId === item.id)
+              return {
+                id: item.id,
+                purchaseLogId: entry?.id,
+                name: item.name,
+                amount: item.amount,
+                price: entry?.price,
+              }
+            })
+          const now = Date.now()
+          const currency = session.currency ?? 'CHF'
+          const store = state.retailStores.find((store) => store.id === session.storeId)
+          const trip: CompletedTrip | null = items.length
+            ? {
+                id: uid(),
+                listId,
+                listName: list.name,
+                completedAt: now,
+                items,
+                currency,
+                store: session.store,
+                storeId: session.storeId,
+                country: store?.country,
+                durationMs: activeShoppingDurationMs(session, now),
+              }
+            : null
+          const open = list.items.filter((item) => !item.done)
+          const next = options.createNewList ? newList(options.name?.trim() || list.name) : null
+          if (next && options.carryOpen)
+            next.items = open.map((item) => ({
+              ...item,
+              id: uid(),
+              done: false,
+              purchaseLogId: undefined,
+              unavailable: false,
+              addedAt: now,
+            }))
+          const remembered = store ?? locationForList(state.settings, state.retailStores, list)
+          if (next) nextCurrency = remembered.currency
+          result = { ok: true, tripId: trip?.id, nextListId: next?.id }
+          return {
+            completedTrips: trip ? [...state.completedTrips, trip] : state.completedTrips,
+            // Bought rows leave the working list; prices and inventory remain historical facts.
+            lists: [
+              ...state.lists.map((entry) =>
+                entry.id !== listId ? entry : { ...entry, items: next && options.carryOpen ? [] : open }
+              ),
+              ...(next ? [next] : []),
+            ],
+            activeListId: next?.id ?? state.activeListId,
+            shoppingSession: null,
+            calculatorEntries: state.calculatorEntries.filter(
+              (entry) => (entry.currency ?? 'CHF') !== currency
+            ),
+            calculatorExcludedPurchaseIds: mergeCalculatorExclusions(state.calculatorExcludedPurchaseIds, [
+              ...ids,
+            ]),
+            settings: next
+              ? {
+                  ...state.settings,
+                  listStoreIds: { ...state.settings.listStoreIds, [next.id]: remembered.id },
+                }
+              : state.settings,
+            retailStores: state.retailStores.some((store) => store.id === remembered.id)
+              ? state.retailStores
+              : [...state.retailStores, remembered],
+            stats: next ? { ...state.stats, listsCreated: state.stats.listsCreated + 1 } : state.stats,
+          }
+        })
+        if (result.ok && nextCurrency) get().setCurrency(nextCurrency)
+        return result
+      },
 
       updateCompletedTripItemPrice: (tripId, itemId, price) =>
         set((state) => {

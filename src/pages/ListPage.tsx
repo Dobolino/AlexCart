@@ -1,5 +1,5 @@
 import { lazy, Suspense, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { adjustAmount } from '@/utils/amount'
@@ -23,6 +23,9 @@ import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
 import { ShoppingLocationButton } from '@/components/ShoppingLocationButton'
+const FinishShoppingSheet = lazy(() =>
+  import('@/components/FinishShoppingSheet').then((module) => ({ default: module.FinishShoppingSheet }))
+)
 import { locationForList } from '@/store/shoppingLocation'
 const StoreLayoutSheet = lazy(() =>
   import('@/components/StoreLayoutSheet').then((m) => ({ default: m.StoreLayoutSheet }))
@@ -56,6 +59,9 @@ interface ToastState {
 
 export function ListPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [completionNotice, setCompletionNotice] = useState(location.state?.shoppingCompleted === true)
+  const [finishOpen, setFinishOpen] = useState(false)
   const list = useStore((s) => s.activeList())
   const filteredItems = useStore((s) => s.filteredForActiveList())
   const toggleItemDone = useStore((s) => s.toggleItemDone)
@@ -260,7 +266,35 @@ export function ListPage() {
       <InstallPrompt />
 
       <main className="scroll-behind-nav-fab flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3">
+        {completionNotice && (
+          <div
+            role="status"
+            className="card-surface mb-3 flex items-center justify-between gap-2 px-3 py-2 text-sm"
+          >
+            <span>Einkauf abgeschlossen. Deine bisherigen Preise bleiben im Verlauf.</span>
+            <button
+              className="min-h-11 w-11 shrink-0"
+              aria-label="Abschlussmeldung schließen"
+              onClick={() => setCompletionNotice(false)}
+            >
+              ×
+            </button>
+          </div>
+        )}
         <ShoppingLocationButton onClick={() => setLocationOpen(true)} />
+        {session?.listId === list.id && (
+          <section className="card-surface mb-3 flex items-center justify-between gap-2 p-3">
+            <div className="text-xs">
+              <p className="font-bold">Einkauf {session.pausedAt != null ? 'pausiert' : 'läuft'}</p>
+              <p style={{ color: 'var(--text-muted)' }}>
+                {session.checkedItemIds.length} in diesem Einkauf abgehakt
+              </p>
+            </div>
+            <button className="btn-primary min-h-11 px-3 text-xs" onClick={() => setFinishOpen(true)}>
+              Einkauf abschließen
+            </button>
+          </section>
+        )}
         {budget && <BudgetBar progress={budget} currency={currency} />}
         {filteredItems.length > 0 && (
           <div
@@ -408,6 +442,16 @@ export function ListPage() {
         </button>
       </div>
       <Suspense fallback={null}>
+        {finishOpen && (
+          <FinishShoppingSheet
+            listId={list.id}
+            onClose={() => setFinishOpen(false)}
+            onFinished={() => {
+              setFinishOpen(false)
+              setCompletionNotice(true)
+            }}
+          />
+        )}
         {locationOpen && <StoreLayoutSheet onClose={() => setLocationOpen(false)} />}
         {shareOpen && <ShareListSheet onClose={() => setShareOpen(false)} />}
         {scannerOpen && (
@@ -428,6 +472,7 @@ export function ListPage() {
         {switcherOpen && (
           <ListSwitcherSheet
             onClose={() => setSwitcherOpen(false)}
+            onCompleted={() => setCompletionNotice(true)}
             onRepeated={(count) => showToast(`${count} Artikel von letzter Woche hinzugefügt`)}
             onDuplicated={(name) => showToast(`„${name}“ erstellt`)}
             onExported={() => showToast('Liste exportiert')}

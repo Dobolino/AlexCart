@@ -211,3 +211,76 @@ test('a completed receipt permits explicit currency correction and keeps its lin
     price: { minor: 249, currency: 'CHF' },
   })
 })
+
+test('finishing confirms a partial trip, saves one receipt and starts an empty list with no stale progress', async ({
+  page,
+}) => {
+  await legacySession(page, true)
+  await page.getByRole('button', { name: 'Einkauf abschließen', exact: true }).tap()
+  let confirmation = page.getByRole('dialog', { name: 'Einkauf abschließen?', exact: true })
+  await expect(confirmation).toContainText('13 gekauft · 2 noch offen')
+  await confirmation.getByRole('button', { name: 'Schließen', exact: true }).tap()
+  expect((await stored(page)).shoppingSession.checkedItemIds).toHaveLength(13)
+  await page.getByRole('button', { name: 'Einkauf abschließen', exact: true }).tap()
+  confirmation = page.getByRole('dialog', { name: 'Einkauf abschließen?', exact: true })
+  await expect(confirmation.getByRole('checkbox')).not.toBeChecked()
+  await confirmation.getByRole('button', { name: 'Abschließen & neue Liste', exact: true }).tap()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText('Einkauf abgeschlossen')
+  const state = await stored(page)
+  expect(state.shoppingSession).toBeNull()
+  expect(state.activeListId).not.toBe('list')
+  expect(state.lists.find((list: { id: string }) => list.id === state.activeListId).items).toEqual([])
+  expect(state.completedTrips).toHaveLength(1)
+  expect(state.completedTrips[0].items).toHaveLength(13)
+  expect(state.completedTrips[0]).toMatchObject({ store: 'Edeka', currency: 'EUR' })
+  expect(state.purchaseLog).toHaveLength(13)
+  await page.reload()
+  expect((await stored(page)).shoppingSession).toBeNull()
+  await expect(page.getByText('0 offen', { exact: true })).toBeVisible()
+})
+
+test('shopping mode can explicitly carry the remaining products to the next list', async ({ page }) => {
+  await legacySession(page, true)
+  await page.getByRole('button', { name: 'Einkaufsmodus starten', exact: true }).tap()
+  await page.getByRole('button', { name: 'Abschließen', exact: true }).tap()
+  const confirmation = page.getByRole('dialog', { name: 'Einkauf abschließen?', exact: true })
+  await confirmation
+    .getByRole('checkbox', { name: '2 offene Artikel in die neue Liste übernehmen', exact: true })
+    .check()
+  await confirmation.getByRole('button', { name: 'Abschließen & neue Liste', exact: true }).tap()
+  await expect(page).toHaveURL(/#\/$/)
+  const state = await stored(page)
+  const items = state.lists.find((list: { id: string }) => list.id === state.activeListId).items
+  expect(items).toHaveLength(2)
+  expect(items.map((item: { name: string }) => item.name)).toEqual(['Artikel 13', 'Artikel 14'])
+  expect(
+    items.every(
+      (item: { id: string; done: boolean; purchaseLogId?: string }) =>
+        !item.done && !item.purchaseLogId && !['item-13', 'item-14'].includes(item.id)
+    )
+  ).toBe(true)
+  expect(state.shoppingSession).toBeNull()
+})
+
+test('creating a list during a running shop first offers to finish the existing purchase', async ({
+  page,
+}) => {
+  await legacySession(page, true)
+  await page.getByRole('heading', { name: 'Migros', exact: true }).tap()
+  const lists = page.getByRole('dialog', { name: 'Meine Listen', exact: true })
+  await lists.getByPlaceholder('z.B. Grillfest').fill('Nächster Einkauf')
+  await lists.getByRole('button', { name: 'Neue Liste anlegen', exact: true }).tap()
+  const confirmation = page.getByRole('dialog', { name: 'Einkauf abschließen?', exact: true })
+  await expect(confirmation.getByLabel('Name der neuen Liste')).toHaveValue('Nächster Einkauf')
+  expect((await stored(page)).completedTrips).toHaveLength(0)
+  await confirmation.getByRole('button', { name: 'Abschließen & neue Liste', exact: true }).tap()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const state = await stored(page)
+  expect(state.lists.find((list: { id: string }) => list.id === state.activeListId)).toMatchObject({
+    name: 'Nächster Einkauf',
+    items: [],
+  })
+  expect(state.completedTrips).toHaveLength(1)
+  expect(state.shoppingSession).toBeNull()
+})

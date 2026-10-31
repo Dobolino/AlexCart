@@ -7,7 +7,7 @@ import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budg
 import { ShoppingLocationButton } from '@/components/ShoppingLocationButton'
 import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
-import { receiptItemsForSession, todayPricedTotalForList } from '@/utils/purchaseLog'
+import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { nextOpenCategory } from '@/utils/shoppingProgress'
@@ -31,8 +31,9 @@ import { ItemActionSheet } from '@/components/ItemActionSheet'
 import { ShoppingCategoryBlock } from '@/components/ShoppingCategoryBlock'
 import { ShoppingProgressBar } from '@/components/ShoppingProgressBar'
 import { ShoppingPausedOverlay } from '@/components/ShoppingPausedOverlay'
+import { FinishShoppingSheet } from '@/components/FinishShoppingSheet'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
-import { activeShoppingDurationMs, isShoppingPaused } from '@/utils/shoppingDuration'
+import { isShoppingPaused } from '@/utils/shoppingDuration'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
 /** Trennzeichen für den Kategorie-Key (kommt in Kategorienamen nicht vor). */
@@ -52,13 +53,10 @@ export function ShoppingModePage() {
   const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
-  const resetCalculatorSession = useStore((s) => s.resetCalculatorSession)
-  const logCompletedTrip = useStore((s) => s.logCompletedTrip)
   const shoppingSession = useStore((s) => s.shoppingSession)
   const startShoppingSession = useStore((s) => s.startShoppingSession)
   const pauseShopping = useStore((s) => s.pauseShopping)
   const resumeShopping = useStore((s) => s.resumeShopping)
-  const clearShoppingSession = useStore((s) => s.clearShoppingSession)
   const selectedBudget = useStore((s) => s.settings.weeklyBudget)
   const currencyBudgets = useStore((s) => s.settings.budgetsByCurrency)
   const askPriceOnCheckoff = useStore((s) => s.settings.askPriceOnCheckoff)
@@ -74,6 +72,7 @@ export function ShoppingModePage() {
   const [priceSheetItem, setPriceSheetItem] = useState<ShoppingItem | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [layoutOpen, setLayoutOpen] = useState(false)
+  const [finishOpen, setFinishOpen] = useState(false)
   const storeLayouts = useStore((s) => s.storeLayouts)
   const [addOpen, setAddOpen] = useState(false)
   const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null)
@@ -98,8 +97,8 @@ export function ShoppingModePage() {
   )
   const listId = list?.id
   useEffect(() => {
-    if (listId) startShoppingSession(listId)
-  }, [listId, startShoppingSession])
+    if (listId && !finishOpen) startShoppingSession(listId)
+  }, [listId, startShoppingSession, finishOpen])
 
   const tripTotal = useMemo(() => {
     if (!list) return 0
@@ -226,25 +225,7 @@ export function ShoppingModePage() {
   }
 
   function handleFinishShopping() {
-    if (
-      openItems.length &&
-      !window.confirm(`${openItems.length} Artikel bleiben auf der Liste. Einkauf trotzdem abschließen?`)
-    )
-      return
-    if (list && doneCount > 0) {
-      const durationMs = sessionForList ? activeShoppingDurationMs(sessionForList) : undefined
-      logCompletedTrip({
-        listId: list.id,
-        listName: list.name,
-        items: receiptItemsForSession(purchaseLog, list.items, sessionForList?.checkedItemIds ?? []),
-        durationMs,
-      })
-    }
-    clearShoppingSession()
-    if (tripTotal > 0 || calculatorEntries.length > 0) {
-      resetCalculatorSession()
-    }
-    navigate('/')
+    setFinishOpen(true)
   }
 
   function handleAdjustAmount(item: ShoppingItem, direction: 1 | -1) {
@@ -415,7 +396,7 @@ export function ShoppingModePage() {
                 className="btn-primary tap-scale rounded-full px-8 py-3.5 text-[15px]"
                 onClick={handleFinishShopping}
               >
-                {showTripTotal ? 'Fertig & Rechner leeren' : 'Zurück zur Liste'}
+                Einkauf abschließen
               </button>
             </div>
           </div>
@@ -548,6 +529,15 @@ export function ShoppingModePage() {
         </FloatingPortal>
       )}
 
+      {finishOpen && (
+        <FinishShoppingSheet
+          listId={list.id}
+          onClose={() => setFinishOpen(false)}
+          onFinished={(newList) =>
+            navigate('/', { replace: true, state: { shoppingCompleted: true, newList } })
+          }
+        />
+      )}
       {scannerOpen && (
         <Suspense fallback={null}>
           <BarcodeScannerSheet onClose={() => setScannerOpen(false)} />
