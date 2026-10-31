@@ -4,6 +4,7 @@ import { useStore } from '@/store/useStore'
 import { groupByCategory } from '@/utils/group'
 import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
+import { ShoppingLocationButton } from '@/components/ShoppingLocationButton'
 import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { receiptItemsForSession, todayPricedTotalForList } from '@/utils/purchaseLog'
@@ -350,14 +351,9 @@ export function ShoppingModePage() {
         </div>
       </header>
 
-      <button
-        className="mx-3 my-2 min-h-11 rounded-xl px-3 text-left text-sm font-bold"
-        style={{ background: 'var(--surface)' }}
-        onClick={() => setLayoutOpen(true)}
-      >
-        {currency === 'CHF' ? 'Schweiz' : 'Deutschland'} · {sessionForList?.store || 'Supermarkt wählen'} ·
-        Laufweg
-      </button>
+      <div className="mx-3 mt-2">
+        <ShoppingLocationButton onClick={() => setLayoutOpen(true)} showRoute />
+      </div>
       {(showTripTotal || showProjectedTotal) && (
         <div
           className="mx-4 mb-2 flex items-center justify-between rounded-2xl px-4 py-3"

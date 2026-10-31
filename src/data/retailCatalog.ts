@@ -16,8 +16,8 @@ export const RETAILERS: Retailer[] = [
   { id: 'migros', name: 'Migros', country: 'CH' },
   { id: 'coop', name: 'Coop', country: 'CH' },
   { id: 'denner', name: 'Denner', country: 'CH' },
-  { id: 'aldi-ch', name: 'Aldi Suisse', country: 'CH' },
-  { id: 'lidl-ch', name: 'Lidl Schweiz', country: 'CH' },
+  { id: 'aldi-ch', name: 'Aldi Suisse', country: 'CH', aliases: ['Aldi'] },
+  { id: 'lidl-ch', name: 'Lidl Schweiz', country: 'CH', aliases: ['Lidl'] },
   { id: 'volg', name: 'Volg', country: 'CH' },
   { id: 'spar-ch', name: 'Spar Schweiz', country: 'CH', aliases: ['Spar'] },
   { id: 'manor', name: 'Manor', country: 'CH' },
@@ -45,13 +45,12 @@ export const retailCurrency = (country: RetailCountry): Currency => (country ===
 export const defaultRetailer = (country: RetailCountry) => (country === 'CH' ? 'migros' : 'edeka')
 export function findRetailer(name: string, country?: RetailCountry) {
   const key = normalize(name)
-  return RETAILERS.find(
-    (r) =>
-      (!country || r.country === country) &&
-      [r.name, ...(r.aliases ?? [])].some(
-        (alias) => key === normalize(alias) || key.startsWith(normalize(alias) + ' ')
-      )
-  )
+  return RETAILERS.filter((r) => !country || r.country === country)
+    .flatMap((retailer) =>
+      [retailer.name, ...(retailer.aliases ?? [])].map((alias) => ({ retailer, key: normalize(alias) }))
+    )
+    .filter((candidate) => key === candidate.key || key.startsWith(candidate.key + ' '))
+    .sort((a, b) => b.key.length - a.key.length)[0]?.retailer
 }
 export function retailSelection(
   settings: { currency: Currency; retailSelection?: RetailSelection },
@@ -59,7 +58,7 @@ export function retailSelection(
   listName?: string
 ): RetailSelection {
   const known = store
-    ? findRetailer(store)
+    ? (findRetailer(store, settings.currency === 'CHF' ? 'CH' : 'DE') ?? findRetailer(store))
     : settings.retailSelection
       ? undefined
       : findRetailer(listName ?? '')

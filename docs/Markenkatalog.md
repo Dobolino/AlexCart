@@ -2,7 +2,7 @@
 
 ## Land, Supermarkt und Marken auswählen
 
-Beim Erfassen eines Preises zuerst **Schweiz** oder **Deutschland** wählen. Die Supermarktauswahl zeigt nur Geschäfte dieses Landes und merkt sich die letzte Auswahl je Land. Neue Einkäufe auf einer nach einem bekannten Supermarkt benannten Liste übernehmen dieses Geschäft. Schweiz verwendet CHF, Deutschland EUR. Bereits verbuchte Käufe behalten ihre ursprüngliche Währung; während eines begonnenen Einkaufs mit abgehakten Artikeln sind Land und Supermarkt gesperrt.
+Beim Erfassen eines Preises zuerst **Schweiz** oder **Deutschland** wählen. Die Supermarktauswahl zeigt nur Geschäfte dieses Landes und merkt sich die letzte Auswahl je Land. Der **Einkaufsort** wird außerdem pro Liste gespeichert; diese ausdrückliche Wahl hat Vorrang vor dem Listennamen. Ohne gespeicherte Wahl dienen bekannte Listennamen wie Migros oder Edeka als Vorschlag. Neue Schweizer Einkäufe verwenden CHF, neue deutsche Einkäufe EUR. Der Ort bleibt auch nach dem Abhaken und im abgeschlossenen Bon änderbar. Vorhandene Preise behalten ihre Währung, bis eine falsch erfasste Währungsangabe ausdrücklich korrigiert wird. Siehe [Einkaufsort ändern](Einkaufsort.md).
 
 **Marke auswählen** öffnet eine durchsuchbare Übersicht mit Bereichen wie Lebensmittel, Haushalt, Pflege, Baby und Tierbedarf. Eigenmarken stehen unter dem ausgewählten Händler. **Allgemeine Marken · beide Länder** bleibt unabhängig davon verfügbar. Das bedeutet keine garantierte Verfügbarkeit bei jedem Händler. Beim Händlerwechsel wird eine nicht passende Eigenmarke abgewählt. Ein Länderwechsel setzt eine noch nicht gespeicherte Preiseingabe zurück, damit CHF und EUR nicht nur umetikettiert werden.
 

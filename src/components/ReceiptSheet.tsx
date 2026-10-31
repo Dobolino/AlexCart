@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Sheet } from './Sheet'
+import { StoreLayoutSheet } from './StoreLayoutSheet'
+import { findRetailer } from '@/data/retailCatalog'
 import { Icon } from './Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
@@ -13,7 +15,6 @@ interface ReceiptSheetProps {
   currency: Currency
   onClose: () => void
   onUpdatePrice: (itemId: string, price: number | undefined) => void
-  onUpdateStore: (store: string | undefined) => void
   onUpdateDate: (dateKey: string) => void
   onRemoveItem: (itemId: string) => void
   onDeleteTrip: () => void
@@ -29,20 +30,21 @@ function formatTripDate(completedAt: number): string {
 
 /** Quittung eines abgeschlossenen Einkaufs - Preise pro Artikel und das Einkaufszentrum lassen
  *  sich hier nachträglich korrigieren, z. B. wenn beim Abhaken etwas falsch eingegeben wurde. */
-export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateStore, onUpdateDate, onRemoveItem, onDeleteTrip }: ReceiptSheetProps) {
+export function ReceiptSheet({
+  trip,
+  currency,
+  onClose,
+  onUpdatePrice,
+  onUpdateDate,
+  onRemoveItem,
+  onDeleteTrip,
+}: ReceiptSheetProps) {
   const total = tripTotalSpent(trip)
   const [editingStore, setEditingStore] = useState(false)
-  const [storeDraft, setStoreDraft] = useState('')
   const purchaseDate = timestampToDateKey(trip.completedAt)
 
   function startEditStore() {
-    setStoreDraft(trip.store ?? '')
     setEditingStore(true)
-  }
-
-  function saveStore() {
-    onUpdateStore(storeDraft.trim() || undefined)
-    setEditingStore(false)
   }
 
   return (
@@ -71,12 +73,21 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
             className="tap-scale mb-3 flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-left text-[14px]"
             style={{ borderColor: 'var(--border)' }}
             onClick={startEditStore}
+            aria-label="Einkaufsort des Bons ändern"
           >
             <span
               className="truncate"
-              style={{ color: trip.store ? 'var(--text)' : 'var(--text-muted)', fontWeight: trip.store ? 600 : 400 }}
+              style={{
+                color: trip.store ? 'var(--text)' : 'var(--text-muted)',
+                fontWeight: trip.store ? 600 : 400,
+              }}
             >
-              {trip.store || 'Einkaufszentrum hinzufügen'}
+              {trip.store || 'Einkaufsort wählen'} ·{' '}
+              {(trip.country ??
+                findRetailer(trip.store ?? '')?.country ??
+                (currency === 'CHF' ? 'CH' : 'DE')) === 'CH'
+                ? 'Schweiz'
+                : 'Deutschland'}
             </span>
             <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
               <Icon path={ICON_PATHS.edit} size={15} />
@@ -132,30 +143,7 @@ export function ReceiptSheet({ trip, currency, onClose, onUpdatePrice, onUpdateS
         </div>
       </div>
 
-      {editingStore && (
-        <Sheet onClose={() => setEditingStore(false)}>
-          <h2 className="mb-3 text-lg font-bold">Einkaufszentrum</h2>
-          <input
-            type="text"
-            className="input w-full py-3 text-[15px]"
-            placeholder="z. B. Migros Zürich HB"
-            value={storeDraft}
-            onChange={(e) => setStoreDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') saveStore()
-            }}
-            autoFocus
-          />
-          <div className="mt-4 flex gap-2.5">
-            <button className="btn-soft flex-1 py-3.5 text-[15px]" onClick={() => setEditingStore(false)}>
-              Abbrechen
-            </button>
-            <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={saveStore}>
-              Speichern
-            </button>
-          </div>
-        </Sheet>
-      )}
+      {editingStore && <StoreLayoutSheet tripId={trip.id} onClose={() => setEditingStore(false)} />}
     </Sheet>
   )
 }
@@ -179,7 +167,10 @@ function ReceiptRow({
   }
 
   return (
-    <div className="mb-2.5 flex items-center gap-2.5 border-b pb-2.5 last:mb-0 last:border-b-0" style={{ borderColor: 'var(--border)' }}>
+    <div
+      className="mb-2.5 flex items-center gap-2.5 border-b pb-2.5 last:mb-0 last:border-b-0"
+      style={{ borderColor: 'var(--border)' }}
+    >
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-semibold">{item.name}</div>
         {item.amount && (

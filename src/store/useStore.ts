@@ -1,16 +1,18 @@
 import type { CatalogProduct, PriceObservation, FxSnapshot, RetailStore } from '@/types/catalog'
-import {
-  RETAILERS,
-  findRetailer,
-  retailSelection,
-  retailCurrency,
-  type RetailSelection,
-} from '@/data/retailCatalog'
+import { RETAILERS, findRetailer, retailCurrency, type RetailSelection } from '@/data/retailCatalog'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { fingerprint } from '@/utils/fingerprint'
 import { observationFromPurchase } from './catalogPurchase'
+import {
+  makeShoppingStore,
+  locationForList,
+  sessionPurchaseIds,
+  relocatePurchases,
+  hasRecordedPrices,
+  correctedShoppingCurrency,
+} from './shoppingLocation'
 import { safeStorage } from './storage'
 import { BACKUP_VERSION } from '@/utils/backup'
 import { importFromJSON } from '@/utils/import'
@@ -177,6 +179,18 @@ interface AppState {
   setHandedness: (value: 'left' | 'right') => void
   setStoreLayout: (store: string, categories: string[]) => void
   setShoppingStore: (store: string, country?: 'CH' | 'DE') => void
+  setListShoppingStore: (
+    listId: string,
+    store: string,
+    country: 'CH' | 'DE',
+    correctCurrency?: boolean
+  ) => void
+  updateCompletedTripLocation: (
+    tripId: string,
+    store: string,
+    country: 'CH' | 'DE',
+    correctCurrency?: boolean
+  ) => void
   setRetailSelection: (selection: RetailSelection) => void
   setItemUnavailable: (id: string, unavailable: boolean) => void
   lists: ShoppingList[]
@@ -395,33 +409,100 @@ export const useStore = create<AppState>()(
         }))
         get().setCurrency(currency)
       },
-      setShoppingStore: (store, country) =>
+      setShoppingStore: (store, country) => {
+        const state = get()
+        const listId = state.shoppingSession?.listId ?? state.activeListId
+        get().setListShoppingStore(
+          listId,
+          store,
+          country ?? ((state.shoppingSession?.currency ?? state.settings.currency) === 'CHF' ? 'CH' : 'DE')
+        )
+      },
+      setListShoppingStore: (listId, name, country, correctCurrency = false) => {
+        if (!name.trim() || !get().lists.some((list) => list.id === listId)) return
+        const store = makeShoppingStore(name, country)
         set((state) => {
-          const currency = country
-            ? country === 'CH'
-              ? 'CHF'
-              : 'EUR'
-            : (state.shoppingSession?.currency ?? state.settings.currency)
-          if (
-            !state.shoppingSession ||
-            (state.shoppingSession.checkedItemIds.length && currency !== state.shoppingSession.currency)
+          const session = state.shoppingSession?.listId === listId ? state.shoppingSession : null
+          const ids = sessionPurchaseIds(
+            session,
+            state.lists.find((list) => list.id === listId),
+            state.purchaseLog,
+            state.completedTrips
           )
-            return state
-          const storeId = `${country ?? (currency === 'CHF' ? 'CH' : 'DE')}:${store.toLocaleLowerCase('de')}`
+          const linked = state.purchaseLog.filter((entry) => entry.id && ids.has(entry.id))
+          const links = new Map(
+            linked.filter((entry) => entry.itemId).map((entry) => [entry.itemId!, entry.id!])
+          )
+          const currency = correctedShoppingCurrency(
+            session?.currency ?? 'CHF',
+            store.currency,
+            hasRecordedPrices(linked),
+            correctCurrency
+          )
           return {
-            shoppingSession: { ...state.shoppingSession, store, storeId, currency },
-            retailStores: [
-              ...state.retailStores.filter((s) => s.id !== storeId),
-              {
-                id: storeId,
-                retailerId: findRetailer(store, country)?.id ?? storeId,
-                name: store,
-                country: country ?? (currency === 'CHF' ? 'CH' : 'DE'),
-                currency,
+            ...relocatePurchases(state, ids, store, currency, correctCurrency),
+            lists: state.lists.map((list) =>
+              list.id !== session?.listId
+                ? list
+                : {
+                    ...list,
+                    items: list.items.map((item) =>
+                      session.checkedItemIds.includes(item.id) && links.has(item.id)
+                        ? { ...item, purchaseLogId: links.get(item.id) }
+                        : item
+                    ),
+                  }
+            ),
+            settings: {
+              ...state.settings,
+              listStoreIds: { ...state.settings.listStoreIds, [listId]: store.id },
+              retailSelection: findRetailer(name, country)
+                ? { country, retailerId: store.retailerId }
+                : state.settings.retailSelection,
+              preferredRetailers: {
+                ...state.settings.preferredRetailers,
+                ...(findRetailer(name, country) ? { [country]: store.retailerId } : {}),
               },
-            ],
+            },
+            ...(session
+              ? { shoppingSession: { ...session, store: store.name, storeId: store.id, currency } }
+              : {}),
+            retailStores: [...state.retailStores.filter((s) => s.id !== store.id), store],
           }
-        }),
+        })
+        const session = get().shoppingSession
+        if (get().activeListId === listId)
+          get().setCurrency(
+            session?.listId === listId ? (session.currency ?? store.currency) : store.currency
+          )
+      },
+      updateCompletedTripLocation: (tripId, name, country, correctCurrency = false) => {
+        if (!name.trim()) return
+        set((state) => {
+          const trip = state.completedTrips.find((trip) => trip.id === tripId)
+          if (!trip) return state
+          const store = makeShoppingStore(name, country)
+          const ids = new Set(trip.items.flatMap((item) => (item.purchaseLogId ? [item.purchaseLogId] : [])))
+          const hasPrices =
+            trip.items.some((item) => item.price !== undefined) ||
+            hasRecordedPrices(state.purchaseLog.filter((entry) => entry.id && ids.has(entry.id)))
+          const currency = correctedShoppingCurrency(
+            trip.currency ?? 'CHF',
+            store.currency,
+            hasPrices,
+            correctCurrency
+          )
+          return {
+            ...relocatePurchases(state, ids, store, currency, correctCurrency),
+            retailStores: [...state.retailStores.filter((s) => s.id !== store.id), store],
+            completedTrips: state.completedTrips.map((entry) =>
+              entry.id !== tripId
+                ? entry
+                : { ...entry, store: store.name, storeId: store.id, country, currency }
+            ),
+          }
+        })
+      },
       setItemUnavailable: (id, unavailable) => {
         const list = get().activeList()
         set((state) => ({
@@ -974,13 +1055,9 @@ export const useStore = create<AppState>()(
 
         set((state) => {
           let base: Partial<AppState>
-          const chosenRetailer = RETAILERS.find((r) => r.id === state.settings.retailSelection?.retailerId)
+          const chosenStore = locationForList(state.settings, state.retailStores, list)
           const purchaseStoreId =
-            state.shoppingSession?.listId === list.id
-              ? state.shoppingSession.storeId
-              : chosenRetailer
-                ? `${chosenRetailer.country}:${chosenRetailer.name.toLocaleLowerCase('de')}`
-                : undefined
+            state.shoppingSession?.listId === list.id ? state.shoppingSession.storeId : chosenStore.id
           if (nowDone) {
             if (checkoff) {
               base = commitItemPurchase(state, item, checkoff, {
@@ -992,7 +1069,7 @@ export const useStore = create<AppState>()(
                 currency:
                   state.shoppingSession?.listId === list.id
                     ? (state.shoppingSession.currency ?? state.settings.currency)
-                    : state.settings.currency,
+                    : chosenStore.currency,
               })
             } else {
               const logId = uid()
@@ -1023,7 +1100,7 @@ export const useStore = create<AppState>()(
                     currency:
                       state.shoppingSession?.listId === list.id
                         ? (state.shoppingSession.currency ?? state.settings.currency)
-                        : state.settings.currency,
+                        : chosenStore.currency,
                     ...(stock && pantry !== state.pantry
                       ? {
                           pantryMovement: {
@@ -1051,6 +1128,12 @@ export const useStore = create<AppState>()(
             (p) => !p.purchaseLogId || !replacedIds.has(p.purchaseLogId)
           )
           if (observation) base.priceObservations.push(observation)
+          if (
+            nowDone &&
+            purchaseStoreId === chosenStore.id &&
+            !state.retailStores.some((store) => store.id === chosenStore.id)
+          )
+            base.retailStores = [...state.retailStores, chosenStore]
           // Nur in dieser Sitzung abgehakte Artikel merken – bestimmt später die Quittung.
           const session = state.shoppingSession
           if (session && session.listId === list.id) {
@@ -1068,15 +1151,19 @@ export const useStore = create<AppState>()(
         const list = get().activeList()
         if (!checkoff || !list) return
         set((state) => {
-          const previous = state.purchaseLog.filter((e) => e.itemId === item.id).slice(-1)[0]
+          const previous =
+            state.purchaseLog.find((entry) => entry.id === item.purchaseLogId) ??
+            state.purchaseLog.filter((e) => e.itemId === item.id).slice(-1)[0]
+          const session = state.shoppingSession?.listId === list.id ? state.shoppingSession : null
+          const store = locationForList(state.settings, state.retailStores, list)
           const next = commitItemPurchase(state, item, checkoff, {
             listId: list.id,
             itemId: item.id,
             markDone: true,
             wasDone: true,
-            currency: previous?.currency ?? state.settings.currency,
+            currency: previous?.currency ?? session?.currency ?? store.currency,
             purchaseDate: previous?.date,
-            storeId: previous?.storeId ?? state.shoppingSession?.storeId,
+            storeId: previous?.storeId ?? session?.storeId ?? store.id,
           })
           const log = next.purchaseLog.filter((e) => e.itemId === item.id).slice(-1)[0]
           const observation = log ? observationFromPurchase(log) : null
@@ -1399,17 +1486,21 @@ export const useStore = create<AppState>()(
           },
         })),
       setCurrency: (currency) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            currency,
-            budgetsByCurrency: {
-              ...state.settings.budgetsByCurrency,
-              [state.settings.currency]: state.settings.weeklyBudget,
-            },
-            weeklyBudget: state.settings.budgetsByCurrency?.[currency] ?? 0,
-          },
-        })),
+        set((state) =>
+          state.settings.currency === currency
+            ? state
+            : {
+                settings: {
+                  ...state.settings,
+                  currency,
+                  budgetsByCurrency: {
+                    ...state.settings.budgetsByCurrency,
+                    [state.settings.currency]: state.settings.weeklyBudget,
+                  },
+                  weeklyBudget: state.settings.budgetsByCurrency?.[currency] ?? 0,
+                },
+              }
+        ),
       addCustomStore: (name) => {
         const trimmed = name.trim()
         if (!trimmed) return
@@ -1534,6 +1625,9 @@ export const useStore = create<AppState>()(
               completedAt: Date.now(),
               currency: state.shoppingSession?.currency ?? state.settings.currency,
               store: state.shoppingSession?.store,
+              storeId: state.shoppingSession?.storeId,
+              country: state.retailStores.find((store) => store.id === state.shoppingSession?.storeId)
+                ?.country,
               items: entry.items,
               ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
             },
@@ -1545,26 +1639,27 @@ export const useStore = create<AppState>()(
         const existing = get().shoppingSession
         if (existing?.listId === listId) {
           if (!existing.store && !existing.checkedItemIds.length) {
-            const choice = retailSelection(get().settings, get().lists.find((l) => l.id === listId)?.name)
-            get().setRetailSelection(choice)
-            const retailer = RETAILERS.find((r) => r.id === choice.retailerId)
-            if (retailer) get().setShoppingStore(retailer.name, choice.country)
+            const list = get().lists.find((list) => list.id === listId)
+            if (list) {
+              const store = locationForList(get().settings, get().retailStores, list)
+              get().setListShoppingStore(listId, store.name, store.country)
+            }
           }
           return
         }
-        const choice = retailSelection(get().settings, get().lists.find((l) => l.id === listId)?.name)
-        get().setRetailSelection(choice)
+        const list = get().lists.find((list) => list.id === listId)
+        if (!list) return
+        const store = locationForList(get().settings, get().retailStores, list)
         set({
           shoppingSession: {
             listId,
             startedAt: Date.now(),
-            currency: get().settings.currency,
+            currency: store.currency,
             totalPausedMs: 0,
             checkedItemIds: [],
           },
         })
-        const retailer = RETAILERS.find((r) => r.id === choice.retailerId)
-        if (retailer) get().setShoppingStore(retailer.name, choice.country)
+        get().setListShoppingStore(listId, store.name, store.country)
       },
 
       pauseShopping: () => {
@@ -1643,12 +1738,28 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      updateCompletedTripStore: (tripId, store) =>
-        set((state) => ({
-          completedTrips: state.completedTrips.map((trip) =>
-            trip.id !== tripId ? trip : { ...trip, store: store?.trim() || undefined }
-          ),
-        })),
+      updateCompletedTripStore: (tripId, store) => {
+        const trip = get().completedTrips.find((entry) => entry.id === tripId)
+        if (!trip) return
+        if (store?.trim()) {
+          const country =
+            findRetailer(store)?.country ?? trip.country ?? ((trip.currency ?? 'CHF') === 'CHF' ? 'CH' : 'DE')
+          get().updateCompletedTripLocation(tripId, store, country)
+        } else
+          set((state) => ({
+            ...relocatePurchases(
+              state,
+              new Set(trip.items.flatMap((item) => (item.purchaseLogId ? [item.purchaseLogId] : []))),
+              null,
+              trip.currency ?? 'CHF'
+            ),
+            completedTrips: state.completedTrips.map((entry) =>
+              entry.id === tripId
+                ? { ...entry, store: undefined, storeId: undefined, country: undefined }
+                : entry
+            ),
+          }))
+      },
 
       updateCompletedTripDate: (tripId, dateKey) =>
         set((state) => {

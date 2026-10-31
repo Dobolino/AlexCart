@@ -22,6 +22,11 @@ import { EditItemSheet } from '@/components/EditItemSheet'
 import { ListSwitcherSheet } from '@/components/ListSwitcherSheet'
 import { EmptyState } from '@/components/EmptyState'
 import { PageHeader } from '@/components/PageHeader'
+import { ShoppingLocationButton } from '@/components/ShoppingLocationButton'
+import { locationForList } from '@/store/shoppingLocation'
+const StoreLayoutSheet = lazy(() =>
+  import('@/components/StoreLayoutSheet').then((m) => ({ default: m.StoreLayoutSheet }))
+)
 import { Sheet } from '@/components/Sheet'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
@@ -72,8 +77,10 @@ export function ListPage() {
   const purchaseLog = useStore((s) => s.purchaseLog)
   const priceProfiles = useStore((s) => s.priceProfiles)
   const brands = useStore((s) => s.brands)
-  const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
-  const currency = useStore((s) => s.settings.currency)
+  const settings = useStore((s) => s.settings)
+  const stores = useStore((s) => s.retailStores)
+  const session = useStore((s) => s.shoppingSession)
+  const [locationOpen, setLocationOpen] = useState(false)
 
   const [shareOpen, setShareOpen] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -96,6 +103,13 @@ export function ListPage() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   if (!list) return null
+
+  const currency =
+    session?.listId === list.id
+      ? (session.currency ?? 'CHF')
+      : locationForList(settings, stores, list).currency
+  const weeklyBudget =
+    currency === settings.currency ? settings.weeklyBudget : (settings.budgetsByCurrency?.[currency] ?? 0)
 
   const activeItems = list.items.filter((i) => !i.done)
   const doneItems = list.items.filter((i) => i.done)
@@ -246,6 +260,7 @@ export function ListPage() {
       <InstallPrompt />
 
       <main className="scroll-behind-nav-fab flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3">
+        <ShoppingLocationButton onClick={() => setLocationOpen(true)} />
         {budget && <BudgetBar progress={budget} currency={currency} />}
         {filteredItems.length > 0 && (
           <div
@@ -393,6 +408,7 @@ export function ListPage() {
         </button>
       </div>
       <Suspense fallback={null}>
+        {locationOpen && <StoreLayoutSheet onClose={() => setLocationOpen(false)} />}
         {shareOpen && <ShareListSheet onClose={() => setShareOpen(false)} />}
         {scannerOpen && (
           <BarcodeScannerSheet

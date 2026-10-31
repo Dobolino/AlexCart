@@ -8,6 +8,7 @@ import { BrandSelect } from './BrandSelect'
 import { MarketSelector } from './MarketSelector'
 import {
   RETAILERS,
+  findRetailer,
   catalogBrand,
   retailSelection,
   retailCurrency,
@@ -44,6 +45,7 @@ import { computePriceDelta } from '@/utils/priceDelta'
 import { productPriceHistory } from '@/utils/priceHistory'
 import { formatMoney } from '@/utils/currency'
 import { useStore } from '@/store/useStore'
+import { locationForList } from '@/store/shoppingLocation'
 import type {
   CheckoffPriceData,
   Currency,
@@ -104,9 +106,13 @@ export function CheckoffPriceSheet({
   const [market, setMarket] = useState(() =>
     recorded
       ? retailSelection({ currency: recorded.currency ?? selectedCurrency }, recordedStore)
-      : retailSelection(settings, activeSession?.store ?? activeList?.name)
+      : retailSelection(
+          settings,
+          activeSession?.store ??
+            (activeList ? locationForList(settings, stores, activeList).name : undefined)
+        )
   )
-  const currency = recorded?.currency ?? retailCurrency(market.country)
+  const currency = recorded?.currency ?? activeSession?.currency ?? retailCurrency(market.country)
   const lockCountry = !!activeSession?.checkedItemIds.length || !!recorded
   function chooseMarket(next: RetailSelection) {
     if (recorded) return
@@ -121,9 +127,18 @@ export function CheckoffPriceSheet({
       setVariantName('')
     }
     setMarket(next)
-    useStore.getState().setRetailSelection(next)
     const retailer = RETAILERS.find((r) => r.id === next.retailerId)
-    if (activeSession && retailer) useStore.getState().setShoppingStore(retailer.name, next.country)
+    if (activeList && retailer) {
+      const currentStore = activeSession?.store ?? locationForList(settings, stores, activeList).name
+      const currentRetailer = findRetailer(currentStore, next.country)
+      useStore
+        .getState()
+        .setListShoppingStore(
+          activeList.id,
+          currentRetailer?.id === next.retailerId ? currentStore : retailer.name,
+          next.country
+        )
+    }
   }
   const ensureBrand = useStore((s) => s.ensureBrand)
   const variants = profile?.variants ?? []

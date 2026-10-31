@@ -55,7 +55,6 @@ export function StatsPage() {
   const currency = useStore((s) => s.settings.currency)
   const resetStats = useStore((s) => s.resetStats)
   const updateCompletedTripItemPrice = useStore((s) => s.updateCompletedTripItemPrice)
-  const updateCompletedTripStore = useStore((s) => s.updateCompletedTripStore)
   const updateCompletedTripDate = useStore((s) => s.updateCompletedTripDate)
   const removeCompletedTrip = useStore((s) => s.removeCompletedTrip)
   const removeCompletedTripItem = useStore((s) => s.removeCompletedTripItem)
@@ -386,7 +385,6 @@ export function StatsPage() {
           currency={selectedTrip.currency ?? 'CHF'}
           onClose={() => setSelectedTripId(null)}
           onUpdatePrice={(itemId, price) => updateCompletedTripItemPrice(selectedTrip.id, itemId, price)}
-          onUpdateStore={(store) => updateCompletedTripStore(selectedTrip.id, store)}
           onUpdateDate={(dateKey) => updateCompletedTripDate(selectedTrip.id, dateKey)}
           onRemoveItem={(itemId) => removeCompletedTripItem(selectedTrip.id, itemId)}
           onDeleteTrip={() => {

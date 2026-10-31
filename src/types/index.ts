@@ -3,6 +3,7 @@ export type ListViewMode = 'list' | 'tiles'
 export type Currency = 'CHF' | 'EUR'
 
 export interface AppSettings {
+  listStoreIds?: Record<string, string>
   retailSelection?: import('@/data/retailCatalog').RetailSelection
   preferredRetailers?: Partial<Record<'CH' | 'DE', string>>
   favoriteBrandNames?: string[]
@@ -220,6 +221,8 @@ export interface CompletedTripItem {
  *  itemCount/totalSpent werden aus `items` abgeleitet, nicht separat gespeichert, damit eine
  *  nachträgliche Preiskorrektur nie aus dem Takt geraten kann. */
 export interface CompletedTrip {
+  storeId?: string
+  country?: 'CH' | 'DE'
   id: string
   listId: string
   listName: string

@@ -11,6 +11,9 @@ describe('cross-border retail context', () => {
     ).toEqual({ country: 'CH', retailerId: 'migros' })
     expect(findRetailer('Aldi Süd Freiburg')?.country).toBe('DE')
     expect(findRetailer('Aldi Suisse Basel')?.country).toBe('CH')
+    expect(retailSelection({ currency: 'CHF' }, 'Aldi')).toEqual({ country: 'CH', retailerId: 'aldi-ch' })
+    expect(retailSelection({ currency: 'EUR' }, 'Aldi')).toEqual({ country: 'DE', retailerId: 'aldi-de' })
+    expect(retailSelection({ currency: 'CHF' }, 'Lidl')).toEqual({ country: 'CH', retailerId: 'lidl-ch' })
   })
 
   it('recovers from unknown or mismatched retailer preferences in older backups', () => {
