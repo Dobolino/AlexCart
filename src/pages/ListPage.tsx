@@ -44,6 +44,9 @@ const CheckoffPriceSheet = lazy(() =>
 const ReceiptImportSheet = lazy(() =>
   import('@/components/ReceiptImportSheet').then((m) => ({ default: m.ReceiptImportSheet }))
 )
+const ReceiptCheckSheet = lazy(() =>
+  import('@/components/ReceiptCheckSheet').then((module) => ({ default: module.ReceiptCheckSheet }))
+)
 import { BudgetBar } from '@/components/BudgetBar'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { formatMoney } from '@/utils/currency'
@@ -61,6 +64,8 @@ export function ListPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [completionNotice, setCompletionNotice] = useState(location.state?.shoppingCompleted === true)
+  const [finishedTripId, setFinishedTripId] = useState<string | undefined>(location.state?.finishedTripId)
+  const [checkTripId, setCheckTripId] = useState<string | null>(null)
   const [finishOpen, setFinishOpen] = useState(false)
   const list = useStore((s) => s.activeList())
   const filteredItems = useStore((s) => s.filteredForActiveList())
@@ -271,7 +276,17 @@ export function ListPage() {
             role="status"
             className="card-surface mb-3 flex items-center justify-between gap-2 px-3 py-2 text-sm"
           >
-            <span>Einkauf abgeschlossen. Deine bisherigen Preise bleiben im Verlauf.</span>
+            <span>
+              Einkauf abgeschlossen. Deine bisherigen Preise bleiben im Verlauf.
+              {finishedTripId && (
+                <button
+                  className="mt-1 block min-h-11 font-bold underline"
+                  onClick={() => setCheckTripId(finishedTripId)}
+                >
+                  Bon mit Foto prüfen
+                </button>
+              )}
+            </span>
             <button
               className="min-h-11 w-11 shrink-0"
               aria-label="Abschlussmeldung schließen"
@@ -442,13 +457,26 @@ export function ListPage() {
         </button>
       </div>
       <Suspense fallback={null}>
+        {checkTripId && (
+          <ReceiptCheckSheet
+            tripId={checkTripId}
+            onClose={() => setCheckTripId(null)}
+            onSaved={(updated, unlinked) => {
+              setCheckTripId(null)
+              showToast(
+                `Abgleich gespeichert · ${updated} Preise korrigiert${unlinked ? ` · ${unlinked} nur im Bon` : ''}`
+              )
+            }}
+          />
+        )}
         {finishOpen && (
           <FinishShoppingSheet
             listId={list.id}
             onClose={() => setFinishOpen(false)}
-            onFinished={() => {
+            onFinished={(_newList, tripId) => {
               setFinishOpen(false)
               setCompletionNotice(true)
+              setFinishedTripId(tripId)
             }}
           />
         )}
@@ -472,7 +500,10 @@ export function ListPage() {
         {switcherOpen && (
           <ListSwitcherSheet
             onClose={() => setSwitcherOpen(false)}
-            onCompleted={() => setCompletionNotice(true)}
+            onCompleted={(tripId) => {
+              setCompletionNotice(true)
+              setFinishedTripId(tripId)
+            }}
             onRepeated={(count) => showToast(`${count} Artikel von letzter Woche hinzugefügt`)}
             onDuplicated={(name) => showToast(`„${name}“ erstellt`)}
             onExported={() => showToast('Liste exportiert')}

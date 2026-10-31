@@ -533,8 +533,8 @@ export function ShoppingModePage() {
         <FinishShoppingSheet
           listId={list.id}
           onClose={() => setFinishOpen(false)}
-          onFinished={(newList) =>
-            navigate('/', { replace: true, state: { shoppingCompleted: true, newList } })
+          onFinished={(newList, finishedTripId) =>
+            navigate('/', { replace: true, state: { shoppingCompleted: true, newList, finishedTripId } })
           }
         />
       )}

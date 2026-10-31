@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { productSchema, priceObservationSchema, retailStoreSchema, fxSchema } from './catalogSchemas'
 
-export const STORAGE_VERSION = 22
+export const STORAGE_VERSION = 23
 export const MAX_BACKUP_BYTES = 8 * 1024 * 1024
 const text = z.string().max(1000)
 const id = z.string().min(1).max(200)
@@ -97,6 +97,18 @@ const tripItem = z.object({
 })
 const trip = z
   .object({
+    receiptReview: z
+      .object({
+        checkedAt: number,
+        status: z.enum(['matched', 'partial', 'differences']),
+        source: z.enum(['photo', 'text']),
+        currency,
+        receiptTotalMinor: z.number().int().min(0).max(100000000).optional(),
+        checkedItems: z.number().int().min(0).max(2000),
+        unresolved: z.number().int().min(0).max(5000),
+        fingerprint: id,
+      })
+      .optional(),
     storeId: text.optional(),
     country: z.enum(['CH', 'DE']).optional(),
     id,

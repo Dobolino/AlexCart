@@ -5,6 +5,14 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { fingerprint } from '@/utils/fingerprint'
 import { observationFromPurchase } from './catalogPurchase'
+import { repriceReceiptItems } from './receiptCheckCommit'
+import {
+  compareReceiptCheck,
+  quantityMismatch,
+  receiptTripSnapshot,
+  receiptTripFingerprint,
+  type ReceiptCheckEvidence,
+} from '@/utils/receiptCheck'
 import { activeShoppingDurationMs } from '@/utils/shoppingDuration'
 import {
   makeShoppingStore,
@@ -351,6 +359,12 @@ interface AppState {
   }) => void
   /** Nachträgliche Preiskorrektur auf der Quittung eines abgeschlossenen Einkaufs. */
   updateCompletedTripItemPrice: (tripId: string, itemId: string, price: number | undefined) => void
+  saveReceiptCheck: (
+    tripId: string,
+    snapshot: string,
+    evidence: ReceiptCheckEvidence,
+    confirmed: boolean
+  ) => { ok: boolean; error?: string; updated?: number; unlinked?: number }
   /** Einkaufszentrum/Filiale nachträglich auf der Quittung erfassen. */
   updateCompletedTripStore: (tripId: string, store: string | undefined) => void
   /** Einkaufsdatum der Quittung ändern (Kalender). */
@@ -1795,50 +1809,144 @@ export const useStore = create<AppState>()(
 
       updateCompletedTripItemPrice: (tripId, itemId, price) =>
         set((state) => {
-          const trip = state.completedTrips.find((t) => t.id === tripId)
-          const item = trip?.items.find((i) => i.id === itemId)
-          if (!trip || !item) return state
+          if (
+            !state.completedTrips.some(
+              (trip) => trip.id === tripId && trip.items.some((item) => item.id === itemId)
+            )
+          )
+            return state
           const nextPrice =
             price !== undefined && Number.isFinite(price) && price > 0
               ? Math.round(price * 100) / 100
               : undefined
-          const affected = state.purchaseLog.find((e) => e.id === item.purchaseLogId)
-          const ratio = affected?.profilePrice && affected.price ? affected.price / affected.profilePrice : 1
-          const purchaseLog = state.purchaseLog.map((entry) =>
-            entry !== affected
-              ? entry
-              : {
-                  ...entry,
-                  price: nextPrice,
-                  profilePrice: nextPrice === undefined ? undefined : nextPrice / ratio,
-                  pricePerKg:
-                    entry.pricePerKg === undefined
-                      ? undefined
-                      : nextPrice === undefined
-                        ? undefined
-                        : nextPrice / ratio,
-                }
+          return repriceReceiptItems(state, tripId, new Map([[itemId, nextPrice]]))
+        }),
+
+      saveReceiptCheck: (tripId, snapshot, evidence, confirmed) => {
+        let result: { ok: boolean; error?: string; updated?: number; unlinked?: number } = {
+          ok: false,
+          error: 'Bitte den Abgleich zuerst prüfen und bestätigen.',
+        }
+        if (!confirmed) return result
+        if (
+          !evidence.rows.length ||
+          evidence.rows.length > 200 ||
+          evidence.adjustments.length > 200 ||
+          evidence.warnings.length > 100 ||
+          !['photo', 'text'].includes(evidence.source)
+        )
+          return { ok: false, error: 'Bon-Daten sind nicht gültig.' }
+        if (
+          evidence.rows.some(
+            (row) => !Number.isSafeInteger(row.minor) || row.minor < 0 || row.minor > 100000000
+          ) ||
+          evidence.adjustments.some(
+            (row) => !Number.isSafeInteger(row.minor) || Math.abs(row.minor) > 100000000
+          ) ||
+          (evidence.totalMinor !== undefined &&
+            (!Number.isSafeInteger(evidence.totalMinor) ||
+              evidence.totalMinor < 0 ||
+              evidence.totalMinor > 100000000))
+        )
+          return { ok: false, error: 'Bitte die erkannten Beträge prüfen.' }
+        set((state) => {
+          const trip = state.completedTrips.find((trip) => trip.id === tripId)
+          if (!trip || receiptTripSnapshot(trip) !== snapshot) {
+            result = {
+              ok: false,
+              error: 'Der gespeicherte Bon wurde verändert. Bitte den Abgleich erneut erstellen.',
+            }
+            return state
+          }
+          if (evidence.currency !== (trip.currency ?? 'CHF')) {
+            result = {
+              ok: false,
+              error:
+                'Bon und Einkauf haben unterschiedliche Währungen. Bitte zuerst die Währung des Einkaufs prüfen.',
+            }
+            return state
+          }
+          const comparison = compareReceiptCheck(trip, evidence)
+          if (
+            comparison.rows.some(
+              (row) => row.duplicate || (row.targetId && !row.item) || (row.apply && !row.canApply)
+            )
+          ) {
+            result = { ok: false, error: 'Bitte Zuordnungen, Mengen und ausgewählte Preisänderungen prüfen.' }
+            return state
+          }
+          const changes = new Map(
+            comparison.rows.filter((row) => row.apply).map((row) => [row.targetId, row.minor / 100])
           )
+          const changing = trip.items.filter((item) => changes.has(item.id))
+          const linked = new Set(changing.flatMap((item) => (item.purchaseLogId ? [item.purchaseLogId] : [])))
+          if (
+            state.completedTrips.some(
+              (other) =>
+                other.id !== tripId &&
+                other.items.some((item) => item.purchaseLogId && linked.has(item.purchaseLogId))
+            ) ||
+            trip.items.some(
+              (item) =>
+                item.purchaseLogId &&
+                linked.has(item.purchaseLogId) &&
+                trip.items.filter((other) => other.purchaseLogId === item.purchaseLogId).length > 1
+            )
+          ) {
+            result = {
+              ok: false,
+              error:
+                'Eine historische Kaufverknüpfung ist mehrdeutig. Bitte die Bonpositionen einzeln prüfen.',
+            }
+            return state
+          }
+          if (
+            changing.some((item) => {
+              const entry = state.purchaseLog.find((entry) => entry.id === item.purchaseLogId)
+              const row = comparison.rows.find((row) => row.targetId === item.id)!
+              return (
+                entry &&
+                ((entry.currency ?? 'CHF') !== evidence.currency ||
+                  quantityMismatch(row.amount, entry.amount ?? ''))
+              )
+            })
+          ) {
+            result = {
+              ok: false,
+              error: 'Menge oder Währung des verknüpften Kaufs weicht ab. Bitte zuerst den Einkauf prüfen.',
+            }
+            return state
+          }
+          const patch = repriceReceiptItems(state, tripId, changes)
+          const updatedTrip = patch.completedTrips.find((trip) => trip.id === tripId)!
+          const after = compareReceiptCheck(updatedTrip, evidence)
+          const reviewed = {
+            checkedAt: Date.now(),
+            status: after.status,
+            source: evidence.source,
+            currency: evidence.currency,
+            receiptTotalMinor: evidence.totalMinor,
+            checkedItems: after.rows.filter((row) => row.item && !row.quantityMismatch && !row.duplicate)
+              .length,
+            unresolved: after.unresolved,
+            fingerprint: receiptTripFingerprint(updatedTrip),
+          }
+          result = {
+            ok: true,
+            updated: changes.size,
+            unlinked: changing.filter(
+              (item) => !state.purchaseLog.some((entry) => entry.id === item.purchaseLogId)
+            ).length,
+          }
           return {
-            purchaseLog,
-            priceObservations: state.priceObservations.flatMap((observation) => {
-              if (!affected?.id || observation.purchaseLogId !== affected.id) return [observation]
-              const updated = purchaseLog.find((e) => e.id === affected.id)
-              const next = updated ? observationFromPurchase(updated) : null
-              return next ? [next] : []
-            }),
-            priceProfiles: refreshPurchaseProfiles(
-              state.priceProfiles,
-              purchaseLog,
-              affected ? [affected] : []
-            ),
-            completedTrips: state.completedTrips.map((t) =>
-              t.id !== tripId
-                ? t
-                : { ...t, items: t.items.map((i) => (i.id !== itemId ? i : { ...i, price: nextPrice })) }
+            ...patch,
+            completedTrips: patch.completedTrips.map((trip) =>
+              trip.id === tripId ? { ...trip, receiptReview: reviewed } : trip
             ),
           }
-        }),
+        })
+        return result
+      },
 
       updateCompletedTripStore: (tripId, store) => {
         const trip = get().completedTrips.find((entry) => entry.id === tripId)

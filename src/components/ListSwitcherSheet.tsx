@@ -12,7 +12,7 @@ interface ListSwitcherSheetProps {
   onRepeated?: (count: number) => void
   onDuplicated?: (name: string) => void
   onExported?: () => void
-  onCompleted?: () => void
+  onCompleted?: (tripId?: string) => void
 }
 
 export function ListSwitcherSheet({
@@ -209,8 +209,8 @@ export function ListSwitcherSheet({
           listId={activeListId}
           initialName={finishName}
           onClose={() => setFinishName(null)}
-          onFinished={() => {
-            onCompleted?.()
+          onFinished={(_newList, tripId) => {
+            onCompleted?.(tripId)
             onClose()
           }}
         />

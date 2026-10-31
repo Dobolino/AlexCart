@@ -15,7 +15,7 @@ export function FinishShoppingSheet({
   listId: string
   initialName?: string
   onClose: () => void
-  onFinished: (newList: boolean) => void
+  onFinished: (newList: boolean, tripId?: string) => void
 }) {
   const list = useStore((state) => state.lists.find((list) => list.id === listId))
   const session = useStore((state) => state.shoppingSession)
@@ -42,7 +42,7 @@ export function FinishShoppingSheet({
       .getState()
       .finishShopping(listId, { createNewList, carryOpen, name, expectedStartedAt: startedAt })
     if (!result.ok) setError(result.error ?? 'Der Einkauf konnte nicht abgeschlossen werden.')
-    else onFinished(createNewList)
+    else onFinished(createNewList, result.tripId)
   }
   return (
     <Sheet onClose={onClose} tall>

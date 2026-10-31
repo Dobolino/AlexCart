@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Sheet } from './Sheet'
 import { StoreLayoutSheet } from './StoreLayoutSheet'
 import { findRetailer } from '@/data/retailCatalog'
@@ -8,7 +8,11 @@ import { formatMoney, parseMoneyInput } from '@/utils/currency'
 import { timestampToDateKey } from '@/utils/date'
 import { tripTotalSpent } from '@/utils/stats'
 import { shareReceiptImage } from '@/utils/receiptExport'
+import { receiptTripFingerprint } from '@/utils/receiptCheck'
 import type { CompletedTrip, Currency } from '@/types'
+const ReceiptCheckSheet = lazy(() =>
+  import('./ReceiptCheckSheet').then((module) => ({ default: module.ReceiptCheckSheet }))
+)
 
 interface ReceiptSheetProps {
   trip: CompletedTrip
@@ -41,6 +45,8 @@ export function ReceiptSheet({
 }: ReceiptSheetProps) {
   const total = tripTotalSpent(trip)
   const [editingStore, setEditingStore] = useState(false)
+  const [checkOpen, setCheckOpen] = useState(false)
+  const [checkMessage, setCheckMessage] = useState('')
   const purchaseDate = timestampToDateKey(trip.completedAt)
 
   function startEditStore() {
@@ -96,6 +102,30 @@ export function ReceiptSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <button
+            className="btn-primary mb-3 min-h-12 w-full px-2 text-sm"
+            onClick={() => setCheckOpen(true)}
+          >
+            Mit Kassenbonfoto prüfen
+          </button>
+          {trip.receiptReview && (
+            <p className="card-surface mb-3 p-3 text-xs">
+              {trip.receiptReview.fingerprint !== receiptTripFingerprint(trip)
+                ? 'Bon seit dem letzten Abgleich verändert – erneut prüfen.'
+                : trip.receiptReview.status === 'matched'
+                  ? 'Letzter Abgleich: keine erkannten Preisabweichungen.'
+                  : trip.receiptReview.status === 'partial'
+                    ? 'Letzter Abgleich: noch offene Punkte.'
+                    : 'Letzter Abgleich: Preisabweichungen vorhanden.'}{' '}
+              · {new Date(trip.receiptReview.checkedAt).toLocaleDateString('de-DE')} ·{' '}
+              {trip.receiptReview.checkedItems} Positionen zugeordnet
+            </p>
+          )}
+          {checkMessage && (
+            <p role="status" className="mb-3 text-sm">
+              {checkMessage}
+            </p>
+          )}
           {trip.items.map((item) => (
             <ReceiptRow
               key={item.id}
@@ -144,6 +174,20 @@ export function ReceiptSheet({
       </div>
 
       {editingStore && <StoreLayoutSheet tripId={trip.id} onClose={() => setEditingStore(false)} />}
+      {checkOpen && (
+        <Suspense fallback={null}>
+          <ReceiptCheckSheet
+            tripId={trip.id}
+            onClose={() => setCheckOpen(false)}
+            onSaved={(updated, unlinked) => {
+              setCheckOpen(false)
+              setCheckMessage(
+                `Abgleich gespeichert · ${updated} Preise korrigiert.${unlinked ? ` ${unlinked} Positionen ohne eindeutige Kaufverknüpfung wurden nur im Bon korrigiert.` : ''}`
+              )
+            }}
+          />
+        </Suspense>
+      )}
     </Sheet>
   )
 }

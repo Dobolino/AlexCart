@@ -221,6 +221,16 @@ export interface CompletedTripItem {
  *  itemCount/totalSpent werden aus `items` abgeleitet, nicht separat gespeichert, damit eine
  *  nachträgliche Preiskorrektur nie aus dem Takt geraten kann. */
 export interface CompletedTrip {
+  receiptReview?: {
+    checkedAt: number
+    status: 'matched' | 'partial' | 'differences'
+    source: 'photo' | 'text'
+    currency: Currency
+    receiptTotalMinor?: number
+    checkedItems: number
+    unresolved: number
+    fingerprint: string
+  }
   storeId?: string
   country?: 'CH' | 'DE'
   id: string
