@@ -4,6 +4,7 @@ import { ItemAmountColumn } from './ItemAmountColumn'
 import { AmountBadge } from './AmountBadge'
 import { ICON_PATHS } from '@/constants/icons'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
+import { getCategoryColor } from '@/utils/categoryColor'
 import type { ShoppingItem } from '@/types'
 
 interface ShoppingCategoryBlockProps {
@@ -23,6 +24,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
     ref
   ) {
     const openLabel = items.length === 1 ? '1 offen' : `${items.length} offen`
+    const colors = getCategoryColor(category)
 
     return (
       <div ref={ref} className="mb-3 scroll-mt-24">
@@ -30,7 +32,8 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
           type="button"
           className="tap-scale mb-2 flex min-h-[44px] w-full items-center gap-2 rounded-xl px-2 py-2 text-left"
           style={{
-            background: expanded && onToggle ? 'var(--accent-soft)' : 'transparent',
+            background: expanded ? colors.bg : 'transparent',
+            borderLeft: `3px solid ${colors.fg}`,
             cursor: onToggle ? 'pointer' : 'default',
           }}
           onClick={onToggle}
@@ -41,7 +44,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
             <span
               className="flex h-7 w-7 flex-none items-center justify-center transition-transform duration-200"
               style={{
-                color: expanded ? 'var(--accent)' : 'var(--text-muted)',
+                color: expanded ? colors.fg : 'var(--text-muted)',
                 transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
               }}
             >
@@ -50,7 +53,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
           )}
           <span
             className="min-w-0 flex-1 break-words text-[14px] font-bold [overflow-wrap:anywhere]"
-            style={{ color: expanded && onToggle ? 'var(--accent)' : 'var(--text)' }}
+            style={{ color: expanded ? colors.fg : 'var(--text)' }}
           >
             {category}
           </span>
@@ -75,12 +78,12 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                 <div
                   key={item.id}
                   className="grid min-h-[72px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 rounded-2xl px-3 py-3 shadow-sm"
-                  style={{ background: 'var(--surface)' }}
+                  style={{ background: 'var(--surface)', borderLeft: `3px solid ${colors.fg}` }}
                 >
                   <button
                     type="button"
                     className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full border-2"
-                    style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                    style={{ borderColor: colors.fg, background: colors.bg, color: colors.fg }}
                     onClick={() => onCheck(item)}
                     aria-label={`${item.name} abhaken`}
                   >
