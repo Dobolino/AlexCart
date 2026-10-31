@@ -79,7 +79,7 @@ export function ItemAmountColumn({
 
   return (
     <span
-      className="flex-none text-right text-[12px] font-medium tabular-nums"
+      className="min-w-0 max-w-full break-words text-right text-[12px] font-medium tabular-nums [overflow-wrap:anywhere]"
       style={{ color: textColor, opacity: isTile ? 0.85 : 0.9 }}
     >
       {item.amount}

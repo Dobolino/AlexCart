@@ -107,7 +107,7 @@ export function ItemTile({
       {!isDragging && showDeleteAction && <SwipeDeleteAction onDelete={swipe.confirmDelete} rounded />}
 
       <div
-        className="relative flex min-h-16 items-center gap-1 pl-1.5 pr-1 py-1.5"
+        className="relative flex min-h-16 flex-wrap items-center gap-x-1 gap-y-0 pl-1.5 pr-1 py-1.5"
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
           borderLeft: `3px solid ${colors.fg}`,
@@ -193,7 +193,7 @@ export function ItemTile({
               </span>
             )}
             <div
-              className="line-clamp-2 break-words text-[15px] font-bold leading-snug"
+              className="min-w-0 break-words text-[15px] font-bold leading-snug [overflow-wrap:anywhere]"
               style={{
                 color: item.done ? 'var(--text-muted)' : 'var(--text)',
                 textDecoration: item.done ? 'line-through' : 'none',
@@ -203,15 +203,18 @@ export function ItemTile({
               {productDisplayName(item.name)}
             </div>
           </button>
-          {item.note && (
-            <div className="mt-0.5 truncate text-[12px]" style={{ color: colors.fg, opacity: 0.75 }}>
-              {item.note}
-            </div>
-          )}
         </div>
+        {item.note && (
+          <div
+            className="order-last basis-full break-words pl-12 pr-12 pb-0.5 text-[12px] [overflow-wrap:anywhere]"
+            style={{ color: colors.fg, opacity: 0.75 }}
+          >
+            {item.note}
+          </div>
+        )}
         <div
           data-item-quantity
-          className="flex w-[84px] shrink-0 items-center justify-end"
+          className="flex min-w-0 max-w-[104px] shrink-0 items-center justify-end"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
@@ -219,7 +222,7 @@ export function ItemTile({
             <button
               type="button"
               aria-label={`${item.name} Menge ändern`}
-              className="tap-scale min-h-11 max-w-full truncate rounded-xl px-2 text-right text-[13px] font-semibold tabular-nums"
+              className="tap-scale min-h-11 max-w-full whitespace-normal break-words rounded-xl px-2 py-1 text-right text-[13px] font-semibold leading-snug tabular-nums [overflow-wrap:anywhere]"
               style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
               onClick={() => setAmountOpen(true)}
             >

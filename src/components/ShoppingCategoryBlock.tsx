@@ -49,7 +49,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
             </span>
           )}
           <span
-            className="min-w-0 flex-1 truncate text-[14px] font-bold"
+            className="min-w-0 flex-1 break-words text-[14px] font-bold [overflow-wrap:anywhere]"
             style={{ color: expanded && onToggle ? 'var(--accent)' : 'var(--text)' }}
           >
             {category}
@@ -94,7 +94,7 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                     <span className="block break-words text-[18px] font-bold leading-tight">{item.name}</span>
                     {item.note && (
                       <span
-                        className="mt-0.5 block truncate text-[13px]"
+                        className="mt-0.5 block break-words text-[13px] [overflow-wrap:anywhere]"
                         style={{ color: 'var(--text-muted)' }}
                       >
                         {item.note}

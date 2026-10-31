@@ -189,7 +189,7 @@ export function ItemRow({
               </span>
             ) : null}
             <div
-              className="truncate text-[16px] font-bold leading-snug"
+              className="min-w-0 flex-1 break-words text-[16px] font-bold leading-snug [overflow-wrap:anywhere]"
               style={{
                 color: item.done ? 'var(--text-muted)' : 'var(--text)',
                 textDecoration: item.done ? 'line-through' : 'none',
@@ -221,7 +221,11 @@ export function ItemRow({
             >
               {hasPrice ? formatMoney(estimatedPrice!, currency) : '–'}
             </span>
-            {item.note ? <span className="truncate font-medium">{item.note}</span> : null}
+            {item.note ? (
+              <span className="min-w-0 basis-full break-words font-medium [overflow-wrap:anywhere]">
+                {item.note}
+              </span>
+            ) : null}
           </div>
         </div>
 
