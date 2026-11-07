@@ -16,6 +16,7 @@ import { currentBackupJSON } from '@/components/StorageNotice'
 import { getStorageInfo } from '@/utils/storageInfo'
 import { PriceProfilesSettingsSection } from '@/components/PriceProfilesSettingsSection'
 import { PriceExportSection } from '@/components/PriceExportSection'
+import { PriceArchiveSection } from '@/components/PriceArchiveSection'
 import type { Currency, CustomProduct, Theme } from '@/types'
 
 type SettingsTab = 'general' | 'prices'
@@ -145,6 +146,7 @@ export function SettingsPage() {
 
         {settingsTab === 'prices' ? (
           <>
+            <PriceArchiveSection />
             <div
               className="mb-2 px-1.5 text-[13px] font-extrabold uppercase tracking-wide"
               style={{ color: 'var(--category-fg)' }}

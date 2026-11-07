@@ -40,6 +40,7 @@ const EMPTY_FORM: ProductFormValues = {
 
 export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddItemSheetProps) {
   const customProducts = useStore((s) => s.customProducts)
+  const catalog = useStore((s) => s.catalog)
   const addItemToActiveList = useStore((s) => s.addItemToActiveList)
   const addCustomProduct = useStore((s) => s.addCustomProduct)
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
@@ -58,6 +59,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const [editingCustomId, setEditingCustomId] = useState<string | null>(null)
   const [form, setForm] = useState<ProductFormValues>(EMPTY_FORM)
   const [selectedBrandId, setSelectedBrandId] = useState('')
+  const [selectedProductId, setSelectedProductId] = useState<string | undefined>()
 
   const [recipeText, setRecipeText] = useState('')
   const [recipeError, setRecipeError] = useState('')
@@ -67,7 +69,10 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
 
   const openCount = activeList?.items.filter((i) => !i.done).length ?? 0
 
-  const results = useMemo(() => searchProducts(query, customProducts), [query, customProducts])
+  const results = useMemo(
+    () => searchProducts(query, customProducts, 12, catalog),
+    [query, customProducts, catalog]
+  )
   const lastPurchaseIndex = useMemo(() => buildLastPurchaseIndex(completedTrips), [completedTrips])
 
   function openConfirmFor(result: (typeof results)[number]) {
@@ -82,6 +87,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
     setFormMode(result.isCustom ? 'confirm-custom' : 'confirm-builtin')
     setEditingCustomId(result.customId ?? null)
     setSelectedBrandId('')
+    setSelectedProductId(result.productId)
     setMode('form')
   }
 
@@ -91,6 +97,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
     setFormMode('new')
     setEditingCustomId(null)
     setSelectedBrandId('')
+    setSelectedProductId(undefined)
     setMode('form')
   }
 
@@ -112,11 +119,22 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
     const variantId = selectedBrandId
       ? ensureBrandVariant(form.name, form.category, selectedBrandId)
       : undefined
-    addItemToActiveList({ name: form.name, amount, category: form.category, note: form.note, variantId })
+    const selectedProduct = catalog.find((product) => product.id === selectedProductId)
+    const productId =
+      !selectedBrandId && selectedProduct?.name === form.name.trim() ? selectedProduct.id : undefined
+    addItemToActiveList({
+      name: form.name,
+      amount,
+      category: form.category,
+      note: form.note,
+      variantId,
+      productId,
+    })
     setAddedCount((c) => c + 1)
     setQuery('')
     setForm(EMPTY_FORM)
     setSelectedBrandId('')
+    setSelectedProductId(undefined)
     setMode('search')
   }
 
@@ -211,7 +229,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
               const frequencyHint = lastPurchasedHintForName(r.name, lastPurchaseIndex)
               return (
                 <div
-                  key={r.customId || r.name}
+                  key={r.productId || r.customId || r.name}
                   className="flex items-center border-b"
                   style={{ borderColor: 'var(--border)' }}
                 >
@@ -224,6 +242,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                         category: r.category,
                         amount: r.amount || `1 ${getDefaultUnit(getIconKey(r.name, r.category))}`,
                         note: r.note,
+                        productId: r.productId,
                       })
                       onClose()
                       onImported(`„${r.name}“ hinzugefügt`)
@@ -247,7 +266,9 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                         </span>
                       )}
                       <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        {r.category}
+                        {r.productId
+                          ? [r.brand, r.amount, 'Bonpreis / Produktkatalog'].filter(Boolean).join(' · ')
+                          : r.category}
                       </span>
                     </span>
                     <Icon path={ICON_PATHS.plus} size={18} />

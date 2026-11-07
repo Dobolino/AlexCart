@@ -8,6 +8,14 @@ import {
 } from './producePrice'
 import { normalize } from '@/utils/text'
 import Decimal from 'decimal.js'
+import {
+  estimateReferencePrice,
+  estimatePersonalPrice,
+  hasEstimateQuantity,
+  variantMatchesEstimateStore,
+  type PriceEstimateContext,
+} from './priceEstimate'
+export type { PriceEstimateContext } from './priceEstimate'
 import type {
   CheckoffPriceData,
   Currency,
@@ -503,7 +511,7 @@ export function productPricePerKg(
   return withPerKg[0]?.prices.pricePerKg ?? null
 }
 
-export function estimateItemPrice(
+function estimateProfileItemPrice(
   profiles: ProductPriceProfile[],
   item: ShoppingItem,
   currency: Currency = 'CHF'
@@ -543,27 +551,89 @@ export interface ListCostEstimate {
   total: number
   pricedItemCount: number
   openItemCount: number
+  /** Items estimated from receipt observations rather than personal purchase profiles. */
+  referenceItemCount?: number
+  /** Priced items whose dated price is over 90 days old. */
+  oldPriceItemCount?: number
+}
+
+function estimateItemDetails(
+  profiles: ProductPriceProfile[],
+  item: ShoppingItem,
+  currency: Currency,
+  context?: PriceEstimateContext
+) {
+  if (!context)
+    return { price: estimateProfileItemPrice(profiles, item, currency), reference: false, date: undefined }
+  if (!hasEstimateQuantity(item.amount)) return { price: null, reference: false, date: undefined }
+  const now = (context.now ?? new Date()).getTime()
+  if (!Number.isFinite(now)) return { price: null, reference: false, date: undefined }
+  const nameProfile = findPriceProfile(profiles, item.name, item.category)
+  const personal = estimatePersonalPrice(item, currency, context, nameProfile?.preferredVariantId)
+  if (personal) return { price: personal.price, reference: false, date: personal.observedAt }
+  // A name-only profile does not prove the brand or package of an explicit catalog product.
+  // Its linked personal purchases are also available as exact receipt observations.
+  const profile = item.productId ? undefined : nameProfile
+  const candidates = profile && {
+    ...profile,
+    variants: profile.variants.filter((variant) => {
+      const date = pricesForCurrency(variant, currency).lastPurchaseDate
+      return (
+        variantMatchesEstimateStore(variant, currency, context) &&
+        !context.purchaseLog?.some((entry) => entry.variantId === variant.id) &&
+        (!date || (Number.isFinite(Date.parse(date)) && Date.parse(date) <= now)) &&
+        (!item.variantId || variant.id === item.variantId)
+      )
+    }),
+  }
+  const price = estimateProfileItemPrice(candidates ? [candidates] : [], item, currency)
+  if (price !== null) {
+    const variant = pickVariantForEstimate(candidates, item, currency)
+    return {
+      price,
+      reference: false,
+      date: variant ? pricesForCurrency(variant, currency).lastPurchaseDate : undefined,
+    }
+  }
+  const reference = estimateReferencePrice(item, currency, context)
+  return { price: reference?.price ?? null, reference: !!reference, date: reference?.observedAt }
+}
+
+export function estimateItemPrice(
+  profiles: ProductPriceProfile[],
+  item: ShoppingItem,
+  currency: Currency = 'CHF',
+  context?: PriceEstimateContext
+): number | null {
+  return estimateItemDetails(profiles, item, currency, context).price
 }
 
 export function estimateOpenListCost(
   items: ShoppingItem[],
   profiles: ProductPriceProfile[],
-  currency: Currency = 'CHF'
+  currency: Currency = 'CHF',
+  context?: PriceEstimateContext
 ): ListCostEstimate {
   const open = items.filter((i) => !i.done)
   let total = 0
   let pricedItemCount = 0
+  let referenceItemCount = 0
+  let oldPriceItemCount = 0
+  const now = (context?.now ?? new Date()).getTime()
   for (const item of open) {
-    const price = estimateItemPrice(profiles, item, currency)
+    const { price, reference, date } = estimateItemDetails(profiles, item, currency, context)
     if (price !== null) {
       total += price
       pricedItemCount += 1
+      if (reference) referenceItemCount++
+      if (date && now - Date.parse(date) > 90 * 86400000) oldPriceItemCount++
     }
   }
   return {
     total: roundMoney(total),
     pricedItemCount,
     openItemCount: open.length,
+    ...(context ? { referenceItemCount, oldPriceItemCount } : {}),
   }
 }
 

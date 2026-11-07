@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { ItemRow } from './ItemRow'
 import { ItemTile } from './ItemTile'
 import { useDragReorder } from '@/hooks/useDragReorder'
-import { estimateItemPrice } from '@/utils/priceProfiles'
+import { estimateItemPrice, type PriceEstimateContext } from '@/utils/priceProfiles'
 import type { Currency, ListViewMode, ProductPriceProfile, ShoppingItem } from '@/types'
 
 interface CategorySectionProps {
@@ -12,6 +12,7 @@ interface CategorySectionProps {
   viewMode: ListViewMode
   priceProfiles: ProductPriceProfile[]
   currency: Currency
+  estimateContext?: PriceEstimateContext
   onReorder: (orderedIds: string[]) => void
   onToggle: (id: string) => void
   onDelete: (id: string) => void
@@ -28,6 +29,7 @@ export function CategorySection({
   viewMode,
   priceProfiles,
   currency,
+  estimateContext,
   onReorder,
   onToggle,
   onDelete,
@@ -115,7 +117,7 @@ export function CategorySection({
             <ItemRow
               key={item.id}
               item={item}
-              estimatedPrice={estimateItemPrice(priceProfiles, item, currency)}
+              estimatedPrice={estimateItemPrice(priceProfiles, item, currency, estimateContext)}
               currency={currency}
               onToggle={onToggle}
               onDelete={onDelete}

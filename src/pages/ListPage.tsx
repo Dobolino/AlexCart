@@ -90,6 +90,8 @@ export function ListPage() {
   const brands = useStore((s) => s.brands)
   const settings = useStore((s) => s.settings)
   const stores = useStore((s) => s.retailStores)
+  const catalog = useStore((s) => s.catalog)
+  const observations = useStore((s) => s.priceObservations)
   const session = useStore((s) => s.shoppingSession)
   const [locationOpen, setLocationOpen] = useState(false)
 
@@ -134,7 +136,16 @@ export function ListPage() {
   const hasWeeklyBudget = weeklyBudget > 0
   const budget = hasWeeklyBudget ? budgetProgress(budgetSpend, weeklyBudget) : null
 
-  const listEstimate = estimateOpenListCost(activeItems, priceProfiles, currency)
+  const shoppingLocation = locationForList(settings, stores, list)
+  const estimateContext = {
+    catalog,
+    observations,
+    purchaseLog,
+    stores: stores.some((store) => store.id === shoppingLocation.id) ? stores : [...stores, shoppingLocation],
+    storeId: session?.listId === list.id ? (session.storeId ?? shoppingLocation.id) : shoppingLocation.id,
+    storeName: session?.listId === list.id ? (session.store ?? shoppingLocation.name) : shoppingLocation.name,
+  }
+  const listEstimate = estimateOpenListCost(activeItems, priceProfiles, currency, estimateContext)
 
   const summaryParts: string[] = []
   summaryParts.push(`${activeItems.length} offen`)
@@ -362,6 +373,7 @@ export function ListPage() {
                 viewMode={listViewMode}
                 priceProfiles={priceProfiles}
                 currency={currency}
+                estimateContext={estimateContext}
                 onReorder={(ids) => reorderItemsInCategory(g.category, ids)}
                 onToggle={handleToggle}
                 onDelete={handleDelete}
@@ -378,9 +390,16 @@ export function ListPage() {
                 className="mb-3 flex items-center justify-between rounded-[14px] px-4 py-3.5"
                 style={{ background: 'var(--surface)', boxShadow: 'var(--shadow-card)' }}
               >
-                <span className="text-[15px] font-bold" style={{ color: 'var(--text-muted)' }}>
-                  Ungefähres Total
-                </span>
+                <div className="min-w-0 pr-3" style={{ color: 'var(--text-muted)' }}>
+                  <div className="text-[15px] font-bold">Ungefähres Total</div>
+                  <div className="mt-1 text-xs">
+                    {listEstimate.pricedItemCount} von {listEstimate.openItemCount} Artikeln mit Preis
+                    {!!listEstimate.referenceItemCount &&
+                      ` · ${listEstimate.referenceItemCount} aus Bonpreisen`}
+                    {!!listEstimate.oldPriceItemCount &&
+                      ` · ${listEstimate.oldPriceItemCount} älter als 90 Tage`}
+                  </div>
+                </div>
                 <span className="text-[18px] font-extrabold tabular-nums">
                   {formatMoney(listEstimate.total, currency)}
                 </span>

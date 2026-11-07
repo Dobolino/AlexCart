@@ -46,6 +46,7 @@ selbst betriebenen Backend abgeglichen; Preisgedächtnis, Vorrat und andere List
 - Einkaufsort pro Liste merken und nach dem Abhaken oder im Bon korrigieren, einschließlich verknüpfter Vergleichspreise. [Bedienung](docs/Einkaufsort.md)
 - Einkauf ausdrücklich abschließen und direkt mit einer frischen Liste starten; offene Artikel nur auf Wunsch übernehmen, Bon und Preise im Verlauf behalten.
 - Bonfoto oder PDF gegen einen gespeicherten Einkauf prüfen: Preise, Mengen und Einkaufsdatum nach Bestätigung korrigieren sowie zusätzlich gekaufte Artikel ergänzen. [Bedienung und Grenzen](docs/Bonfoto-Pruefung.md) · [Artikel- und Markenerkennung](docs/Bon-Erkennung-Marken.md)
+- Historische Bonpreise als geprüfte Preisbasis importieren, ohne Ausgaben oder Vorrat erneut zu zählen: [Bonpreis-Archiv und Kostenschätzung](docs/Bonpreis-Archiv.md).
 - Offline-Markenkatalog mit 856 Bezeichnungen, Favoriten, Ausblenden und Bereichsfiltern.
 - Import aus Text oder Datei mit Vorschau; kompakte Suche und integriertes Preis-Tastenfeld.
 - Preisexport für KI-Auswertungen als JSON, CSV oder mit Analyseauftrag als Textdatei.

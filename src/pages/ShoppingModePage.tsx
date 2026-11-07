@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
+import { locationForList } from '@/store/shoppingLocation'
 import { groupByCategory } from '@/utils/group'
 import { formatMoney } from '@/utils/currency'
 import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
@@ -50,6 +51,10 @@ export function ShoppingModePage() {
   const brands = useStore((s) => s.brands)
   const purchaseLog = useStore((s) => s.purchaseLog)
   const priceProfiles = useStore((s) => s.priceProfiles)
+  const catalog = useStore((s) => s.catalog)
+  const observations = useStore((s) => s.priceObservations)
+  const stores = useStore((s) => s.retailStores)
+  const settings = useStore((s) => s.settings)
   const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
   const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
@@ -107,10 +112,29 @@ export function ShoppingModePage() {
 
   const openItems = useMemo(() => list?.items.filter((i) => !i.done) ?? [], [list])
 
-  const openEstimate = useMemo(
-    () => estimateOpenListCost(openItems, priceProfiles, currency),
-    [openItems, priceProfiles, currency]
-  )
+  const openEstimate = useMemo(() => {
+    const location = list ? locationForList(settings, stores, list) : undefined
+    return estimateOpenListCost(openItems, priceProfiles, currency, {
+      catalog,
+      observations,
+      purchaseLog,
+      stores: location && !stores.some((store) => store.id === location.id) ? [...stores, location] : stores,
+      storeId: sessionForList?.storeId ?? location?.id,
+      storeName: sessionForList?.store ?? location?.name,
+    })
+  }, [
+    openItems,
+    priceProfiles,
+    currency,
+    list,
+    settings,
+    stores,
+    catalog,
+    observations,
+    purchaseLog,
+    sessionForList?.storeId,
+    sessionForList?.store,
+  ])
 
   const projectedTotal = useMemo(
     () => Math.round((tripTotal + openEstimate.total) * 100) / 100,
@@ -347,6 +371,13 @@ export function ShoppingModePage() {
             {showProjectedTotal && tripTotal > 0 && openEstimate.pricedItemCount > 0 && (
               <div className="text-[11px] opacity-80">
                 inkl. {openEstimate.pricedItemCount} offene Artikel geschätzt
+              </div>
+            )}
+            {showProjectedTotal && (
+              <div className="mt-1 text-[11px] opacity-80">
+                {openEstimate.pricedItemCount} von {openEstimate.openItemCount} offenen Artikeln mit Preis
+                {!!openEstimate.referenceItemCount && ` · ${openEstimate.referenceItemCount} aus Bonpreisen`}
+                {!!openEstimate.oldPriceItemCount && ` · ${openEstimate.oldPriceItemCount} älter als 90 Tage`}
               </div>
             )}
           </div>

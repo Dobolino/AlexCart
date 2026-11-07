@@ -1,6 +1,8 @@
 import { normalize } from './text'
 import { PRODUCTS, type Product } from '@/data/products'
 import type { CustomProduct } from '@/types'
+import type { CatalogProduct } from '@/types/catalog'
+import { quantityText } from './quantity'
 
 export interface SearchableProduct {
   name: string
@@ -10,6 +12,8 @@ export interface SearchableProduct {
   note?: string
   isCustom?: boolean
   customId?: string
+  productId?: string
+  brand?: string
 }
 
 function toSearchable(p: Product): SearchableProduct {
@@ -29,22 +33,38 @@ function customToSearchable(p: CustomProduct): SearchableProduct {
 
 /** Sucht zuerst in eigenen Produkten (Nutzer-Priorität), dann in der Standard-Datenbank.
  *  "startsWith"-Treffer werden vor reinen Teilstring-Treffern einsortiert. */
-export function searchProducts(query: string, customProducts: CustomProduct[], limit = 8): SearchableProduct[] {
+export function searchProducts(
+  query: string,
+  customProducts: CustomProduct[],
+  limit = 8,
+  catalog: CatalogProduct[] = []
+): SearchableProduct[] {
   const q = normalize(query)
   if (!q) return []
 
-  const pool = [...customProducts.map(customToSearchable), ...PRODUCTS.map(toSearchable)]
+  const pool: SearchableProduct[] = [
+    ...customProducts.map(customToSearchable),
+    ...PRODUCTS.map(toSearchable),
+    ...catalog.map((product) => ({
+      name: product.name,
+      category: product.category,
+      brand: product.brand,
+      productId: product.id,
+      amount: product.netQuantity ? quantityText(product.netQuantity) : undefined,
+    })),
+  ]
   const starts: SearchableProduct[] = []
   const contains: SearchableProduct[] = []
   const seen = new Set<string>()
 
   for (const p of pool) {
-    const key = normalize(p.name)
+    const key = p.productId ? `catalog:${p.productId}` : normalize(p.name)
     if (seen.has(key)) continue
-    if (key.startsWith(q)) {
+    const searchable = normalize([p.brand, p.name].filter(Boolean).join(' '))
+    if (normalize(p.name).startsWith(q) || searchable.startsWith(q)) {
       starts.push(p)
       seen.add(key)
-    } else if (key.includes(q)) {
+    } else if (searchable.includes(q)) {
       contains.push(p)
       seen.add(key)
     }

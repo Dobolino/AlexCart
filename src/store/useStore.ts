@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { uid } from '@/utils/id'
 import { fingerprint } from '@/utils/fingerprint'
 import { observationFromPurchase } from './catalogPurchase'
+import { preparePriceArchiveImport, type PriceArchive } from '@/utils/priceArchive'
 import { repriceReceiptItems } from './receiptCheckCommit'
 import { appendReceiptCheckItems } from './receiptCheckAdditions'
 import { resolveReceiptBrands, correctReceiptBrands, receiptTripWithBrands } from './receiptBrandCommit'
@@ -196,6 +197,16 @@ interface AppState {
   fxSnapshot: FxSnapshot | null
   storeLayouts: Record<string, string[]>
   upsertProduct: (product: CatalogProduct) => void
+  importPriceArchive: (
+    archive: PriceArchive,
+    selectedProductIds?: string[]
+  ) => {
+    ok: boolean
+    error?: string
+    addedProducts?: number
+    addedObservations?: number
+    skippedObservations?: number
+  }
   addPriceObservation: (observation: PriceObservation) => void
   upsertRetailStore: (store: RetailStore) => void
   setFxSnapshot: (fx: FxSnapshot) => void
@@ -418,6 +429,38 @@ export const useStore = create<AppState>()(
       retailStores: [],
       fxSnapshot: null,
       storeLayouts: {},
+      importPriceArchive: (archive, selectedProductIds) => {
+        let result: {
+          ok: boolean
+          error?: string
+          addedProducts?: number
+          addedObservations?: number
+          skippedObservations?: number
+        } = { ok: false }
+        set((state) => {
+          try {
+            const imported = preparePriceArchiveImport(state, archive, selectedProductIds)
+            result = {
+              ok: true,
+              addedProducts: imported.addedProducts,
+              addedObservations: imported.addedObservations,
+              skippedObservations: imported.skippedObservations,
+            }
+            return {
+              catalog: imported.catalog,
+              retailStores: imported.retailStores,
+              priceObservations: imported.priceObservations,
+            }
+          } catch (error) {
+            result = {
+              ok: false,
+              error: error instanceof Error ? error.message : 'Bonpreise konnten nicht importiert werden.',
+            }
+            return state
+          }
+        })
+        return result
+      },
       upsertProduct: (product) =>
         set((state) => ({ catalog: [...state.catalog.filter((p) => p.id !== product.id), product] })),
       addPriceObservation: (observation) =>

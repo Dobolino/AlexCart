@@ -1,5 +1,7 @@
 # Bonpositionen, Marken und Zuordnungen
 
+Historische Bonpreise lassen sich zusätzlich über das [Bonpreis-Archiv](Bonpreis-Archiv.md) für die Kostenschätzung übernehmen. Dieser Import ergänzt Preisbeobachtungen, ohne Einkäufe doppelt zu erfassen.
+
 Im Bon-Abgleich können fehlende Zeilen über **Bonposition manuell erfassen** ergänzt werden – auch ohne Fototext. Artikelname, Menge, Preis, Kategorie und Marke sind vor dem Speichern editierbar. **Vorhandenen Artikel zuordnen** verknüpft eine Zeile mit einem bereits gekauften Artikel, statt ihn erneut anzulegen. Namensvorschläge sind anklickbare Kandidaten; eine ähnliche Marke oder ein ähnliches Wort löst keine automatische Preisübernahme aus.
 
 Eindeutige Bonkürzel werden getrennt vom Produktnamen erkannt, etwa `MClass` → **M Classic**, `MBud` → **M-Budget**, `G&G` → **Gut & Günstig** und `HERZ.` → **EDEKA Herzstücke**. Eigenmarkenkürzel gelten nur für den passenden Händler. `Bio`, `IP-SUISSE`, `MSC`, `Extra`, ein einzelnes `M` oder der Einkaufsort `Migros` beweisen keine Produktmarke. Insbesondere wird `BJ Extra Erdbeeren` nicht als Ben & Jerry’s behandelt. Unsichere Kürzel bleiben offen.
