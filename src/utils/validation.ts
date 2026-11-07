@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { productSchema, priceObservationSchema, retailStoreSchema, fxSchema } from './catalogSchemas'
 
-export const STORAGE_VERSION = 24
+export const STORAGE_VERSION = 25
 export const MAX_BACKUP_BYTES = 8 * 1024 * 1024
 const text = z.string().max(1000)
 const id = z.string().min(1).max(200)
@@ -89,6 +89,7 @@ const entry = z
   })
   .passthrough()
 const tripItem = z.object({
+  receiptKey: id.optional(),
   id,
   name: text,
   amount: text,

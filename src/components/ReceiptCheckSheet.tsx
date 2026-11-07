@@ -10,6 +10,8 @@ import {
   compareReceiptCheck,
   suggestReceiptRows,
   receiptTripSnapshot,
+  validReceiptDate,
+  checkName,
   type ReceiptCheckDocument,
   type ReceiptCheckRow,
   type ReceiptCheckEvidence,
@@ -17,6 +19,9 @@ import {
 import { formatMoney } from '@/utils/currency'
 import { tripTotalSpent } from '@/utils/stats'
 import type { Currency } from '@/types'
+import { CATEGORIES, PRODUCTS } from '@/data/products'
+import { timestampToDateKey, formatDateKeyDe } from '@/utils/date'
+import { baseQuantity } from '@/utils/quantity'
 
 type DraftRow = ReceiptCheckRow & { priceText: string }
 const editableMinor = (value: string) =>
@@ -29,16 +34,19 @@ export function ReceiptCheckSheet({
 }: {
   tripId: string
   onClose: () => void
-  onSaved: (updated: number, unlinked: number) => void
+  onSaved: (message: string) => void
 }) {
   const trip = useStore((state) => state.completedTrips.find((trip) => trip.id === tripId))
   const purchaseLog = useStore((state) => state.purchaseLog)
+  const catalog = useStore((state) => state.catalog)
   const [locationOpen, setLocationOpen] = useState(false)
   const [text, setText] = useState('')
   const [document, setDocument] = useState<ReceiptCheckDocument | null>(null)
   const [rows, setRows] = useState<DraftRow[]>([])
   const [currency, setCurrency] = useState<Currency>(trip?.currency ?? 'CHF')
   const [totalText, setTotalText] = useState('')
+  const [receiptDate, setReceiptDate] = useState('')
+  const [applyDate, setApplyDate] = useState(false)
   const [snapshot, setSnapshot] = useState('')
   const [analyzedText, setAnalyzedText] = useState('')
   const [photoUrl, setPhotoUrl] = useState('')
@@ -75,10 +83,21 @@ export function ReceiptCheckSheet({
       const parsed = parseReceiptCheck(value)
       setDocument(parsed)
       setRows(
-        suggestReceiptRows(parsed, trip).map((row) => ({ ...row, priceText: (row.minor / 100).toFixed(2) }))
+        suggestReceiptRows(parsed, trip).map((row) => ({
+          ...row,
+          priceText: (row.minor / 100).toFixed(2),
+          newName: row.name,
+          category:
+            catalog.find((product) => checkName(product.name) === checkName(row.name))?.category ??
+            PRODUCTS.find((product) => checkName(product.name) === checkName(row.name))?.category ??
+            'Sonstiges',
+          addAsWeight: !!row.weighed,
+        }))
       )
       setCurrency(parsed.currency ?? trip.currency ?? 'CHF')
       setTotalText(parsed.totalMinor === undefined ? '' : (parsed.totalMinor / 100).toFixed(2))
+      setReceiptDate(parsed.date ?? '')
+      setApplyDate(false)
       setSnapshot(receiptTripSnapshot(trip))
       setAnalyzedText(value)
       setSource(actualSource)
@@ -157,7 +176,8 @@ export function ReceiptCheckSheet({
     totalMinor,
     currency,
     store: document?.store,
-    date: document?.date,
+    date: receiptDate || undefined,
+    applyDate,
     warnings: document?.warnings ?? [],
     source,
   }
@@ -166,11 +186,37 @@ export function ReceiptCheckSheet({
   const currencyMismatch = currency !== (trip.currency ?? 'CHF')
   const appTotalMinor = Math.round(tripTotalSpent(trip) * 100)
   const selected = rows.filter((row) => row.apply).length
+  const amountChanges = rows.filter((row) => row.applyAmount).length
+  const additions = rows.filter((row) => row.add).length
+  const dateChange = applyDate && receiptDate !== timestampToDateKey(trip.completedAt)
+  const pendingSummary = [
+    selected ? `${selected} ${selected === 1 ? 'Preis' : 'Preise'}` : '',
+    amountChanges ? `${amountChanges} ${amountChanges === 1 ? 'Menge' : 'Mengen'}` : '',
+    additions ? `${additions} Artikel` : '',
+    dateChange ? 'Datum' : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const invalid =
-    comparison.rows.some((row) => row.invalidPrice || row.duplicate || (row.apply && !row.canApply)) ||
+    comparison.rows.some(
+      (row) =>
+        row.invalidPrice ||
+        row.duplicate ||
+        (row.apply && !row.canApply) ||
+        (row.applyAmount && !row.canApplyAmount) ||
+        (row.add && !row.canAdd)
+    ) ||
+    (applyDate && !validReceiptDate(receiptDate)) ||
     (totalMinor !== undefined && !Number.isSafeInteger(totalMinor))
   const visible = comparison.rows.filter(
-    (row) => !onlyDifferences || !row.equal || row.quantityMismatch || row.duplicate
+    (row) =>
+      !onlyDifferences ||
+      !row.equal ||
+      row.quantityMismatch ||
+      row.duplicate ||
+      row.applyAmount ||
+      row.add ||
+      row.apply
   )
   function changeRow(id: string, patch: Partial<DraftRow>) {
     setRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))
@@ -179,7 +225,19 @@ export function ReceiptCheckSheet({
   function save() {
     const result = useStore.getState().saveReceiptCheck(tripId, snapshot, evidence, confirmed)
     if (!result.ok) setError(result.error ?? 'Abgleich konnte nicht gespeichert werden.')
-    else onSaved(result.updated ?? 0, result.unlinked ?? 0)
+    else {
+      const changes = [
+        result.updated ? `${result.updated} ${result.updated === 1 ? 'Preis' : 'Preise'} korrigiert` : '',
+        result.amountUpdated
+          ? `${result.amountUpdated} ${result.amountUpdated === 1 ? 'Menge' : 'Mengen'} korrigiert`
+          : '',
+        result.added ? `${result.added} Artikel ergänzt` : '',
+        result.dateUpdated ? 'Datum korrigiert' : '',
+      ].filter(Boolean)
+      onSaved(
+        `Abgleich gespeichert${changes.length ? ` · ${changes.join(' · ')}` : ''}${result.unlinked ? ` · ${result.unlinked} Positionen nur im Bon korrigiert (Kaufverknüpfung fehlt)` : ''}`
+      )
+    }
   }
   return (
     <Sheet onClose={onClose} tall>
@@ -345,13 +403,51 @@ export function ReceiptCheckSheet({
                 />
               </label>
             </div>
+            <section className="card-surface mb-3 p-3 text-sm">
+              <label className="block text-xs font-semibold">
+                Datum laut Bon
+                <input
+                  type="date"
+                  className="input mt-1 w-full"
+                  value={receiptDate}
+                  onChange={(event) => {
+                    setReceiptDate(event.target.value)
+                    setApplyDate(false)
+                    setConfirmed(false)
+                  }}
+                />
+              </label>
+              <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Einkauf gespeichert am {formatDateKeyDe(timestampToDateKey(trip.completedAt))}.
+                {!receiptDate && ' Kein Datum erkannt. Du kannst es am Bon ablesen und eintragen.'}
+              </p>
+              {receiptDate && receiptDate !== timestampToDateKey(trip.completedAt) && (
+                <label className="mt-1 flex min-h-11 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={applyDate}
+                    disabled={!validReceiptDate(receiptDate) || currencyMismatch}
+                    onChange={(event) => {
+                      setApplyDate(event.target.checked)
+                      setConfirmed(false)
+                    }}
+                  />
+                  Bon-Datum übernehmen
+                </label>
+              )}
+              {dateChange && (
+                <p className="text-xs" style={{ color: 'var(--accent)' }}>
+                  Datum wird beim Speichern für diesen Einkauf und seine Preise korrigiert.
+                </p>
+              )}
+            </section>
             {currencyMismatch && (
               <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
                 Der Einkauf ist in {trip.currency ?? 'CHF'} gespeichert, der Bon in {currency}. Bitte zuerst
                 die Währungsangabe am Einkauf prüfen. Preise werden nicht umgerechnet.
               </p>
             )}
-            {currencyMismatch && (
+            {(currencyMismatch || additions > 0) && (
               <button
                 className="btn-soft mb-3 min-h-11 w-full px-2 text-sm"
                 onClick={() => setLocationOpen(true)}
@@ -385,10 +481,14 @@ export function ReceiptCheckSheet({
                 Preisgleichheit gilt nur für den erkannten Text. Bon, Mengen und Produkte bitte gegenlesen.
               </p>
             </section>
-            {comparison.metadataMismatch && (
-              <p className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
-                Erkanntes Datum oder Geschäft weicht vom gespeicherten Einkauf ab. Bitte sicherstellen, dass
-                dies der richtige Bon ist.
+            {(comparison.storeMismatch || (comparison.dateMismatch && !dateChange)) && (
+              <p
+                className="mb-3 text-sm"
+                style={{ color: comparison.storeMismatch ? 'var(--danger)' : 'var(--accent)' }}
+              >
+                {comparison.storeMismatch
+                  ? 'Erkanntes Geschäft weicht vom gespeicherten Einkauf ab. Bitte sicherstellen, dass dies der richtige Bon ist und den Einkaufsort prüfen.'
+                  : 'Das Datum weicht vom gespeicherten Einkauf ab. Bitte oben prüfen und bei Bedarf „Bon-Datum übernehmen“ auswählen.'}
               </p>
             )}
             {document.warnings.map((warning) => (
@@ -438,6 +538,11 @@ export function ReceiptCheckSheet({
                     Bonmenge: {row.amount} · App: {row.item?.amount || 'nicht erfasst'}
                   </p>
                 )}
+                {row.equal && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Preis stimmt bereits überein. Keine Preisübernahme nötig.
+                  </p>
+                )}
                 {row.discountMinor !== undefined && (
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Artikelrabatt {formatMoney(row.discountMinor / 100, currency)} bereits berücksichtigt.
@@ -451,27 +556,109 @@ export function ReceiptCheckSheet({
                 </button>
                 {editingId === row.id && (
                   <div className="mb-2 space-y-2">
+                    {!row.add && (
+                      <label className="block text-xs font-semibold">
+                        App-Position
+                        <select
+                          className="input mt-1 w-full"
+                          aria-label="App-Position"
+                          value={row.targetId}
+                          onChange={(event) =>
+                            changeRow(row.id, {
+                              targetId: event.target.value,
+                              apply: false,
+                              applyAmount: false,
+                              add: false,
+                            })
+                          }
+                        >
+                          <option value="">Nicht zugeordnet</option>
+                          {trip.items.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} · {item.amount}
+                              {item.price === undefined
+                                ? ''
+                                : ` · ${formatMoney(item.price, trip.currency ?? 'CHF')}`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     <label className="block text-xs font-semibold">
-                      App-Position
-                      <select
+                      Bon-Menge
+                      <input
                         className="input mt-1 w-full"
-                        aria-label="App-Position"
-                        value={row.targetId}
+                        value={row.amount}
+                        placeholder="z. B. 532 g oder 2 Stück"
                         onChange={(event) =>
-                          changeRow(row.id, { targetId: event.target.value, apply: false })
+                          changeRow(row.id, {
+                            amount: event.target.value,
+                            applyAmount: false,
+                            apply: false,
+                            addAsWeight: baseQuantity(event.target.value)?.unit === 'g' && row.addAsWeight,
+                          })
                         }
-                      >
-                        <option value="">Nicht zugeordnet</option>
-                        {trip.items.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name} · {item.amount}
-                            {item.price === undefined
-                              ? ''
-                              : ` · ${formatMoney(item.price, trip.currency ?? 'CHF')}`}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </label>
+                    {row.add && (
+                      <>
+                        <label className="block text-xs font-semibold">
+                          Produkt für Preisvergleich
+                          <select
+                            className="input mt-1 w-full"
+                            aria-label="Produkt für Preisvergleich"
+                            value={row.productId ?? ''}
+                            onChange={(event) => {
+                              const product = catalog.find((product) => product.id === event.target.value)
+                              changeRow(row.id, {
+                                productId: product?.id,
+                                ...(product ? { newName: product.name, category: product.category } : {}),
+                              })
+                            }}
+                          >
+                            <option value="">Neues Produkt anlegen</option>
+                            {catalog.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.name}
+                                {product.brand ? ` · ${product.brand}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block text-xs font-semibold">
+                          Artikelname
+                          <input
+                            className="input mt-1 w-full"
+                            maxLength={300}
+                            value={row.newName ?? ''}
+                            onChange={(event) => changeRow(row.id, { newName: event.target.value })}
+                          />
+                        </label>
+                        <label className="block text-xs font-semibold">
+                          Kategorie
+                          <select
+                            className="input mt-1 w-full"
+                            aria-label="Kategorie"
+                            value={row.category ?? 'Sonstiges'}
+                            onChange={(event) => changeRow(row.id, { category: event.target.value })}
+                          >
+                            {CATEGORIES.map((category) => (
+                              <option key={category}>{category}</option>
+                            ))}
+                          </select>
+                        </label>
+                        {baseQuantity(row.amount)?.unit === 'g' && (
+                          <label className="flex min-h-11 items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={!!row.addAsWeight}
+                              onChange={(event) => changeRow(row.id, { addAsWeight: event.target.checked })}
+                            />
+                            Lose Ware: Kilopreis aus Gewicht berechnen
+                          </label>
+                        )}
+                      </>
+                    )}
                     <label className="block text-xs font-semibold">
                       Erkannter Bonpreis
                       <input
@@ -489,16 +676,16 @@ export function ReceiptCheckSheet({
                     </label>
                   </div>
                 )}
-                {row.quantityMismatch && (
-                  <p className="mb-2 text-xs" style={{ color: 'var(--danger)' }}>
-                    Mengen weichen ab. Diese Position wird nicht automatisch korrigiert.
+                {row.quantityMismatch && !row.applyAmount && (
+                  <p className="mb-2 text-xs" style={{ color: 'var(--accent)' }}>
+                    Menge weicht ab. Bon-Menge übernehmen oder unter „bearbeiten“ korrigieren.
                   </p>
                 )}
-                {row.apply &&
+                {(row.apply || row.applyAmount) &&
                   row.item &&
                   !purchaseLog.some((entry) => entry.id === row.item?.purchaseLogId) && (
                     <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Bei dieser älteren Position kann nur der Bonpreis korrigiert werden. Eine eindeutige
+                      Bei dieser älteren Position kann nur der Bon korrigiert werden. Eine eindeutige
                       Verknüpfung für den Preisverlauf fehlt.
                     </p>
                   )}
@@ -512,15 +699,71 @@ export function ReceiptCheckSheet({
                     Null- oder Gratispreis bitte gesondert prüfen. Er wird nicht automatisch übernommen.
                   </p>
                 )}
-                <label className="flex min-h-11 items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={row.apply}
-                    disabled={!row.canApply || currencyMismatch}
-                    onChange={(event) => changeRow(row.id, { apply: event.target.checked })}
-                  />
-                  Preis für {row.name} übernehmen
-                </label>
+                {row.item && (row.canApplyAmount || row.applyAmount || row.quantityMismatch) && (
+                  <>
+                    <label className="flex min-h-11 items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!row.applyAmount}
+                        disabled={!row.canApplyAmount || currencyMismatch}
+                        onChange={(event) =>
+                          changeRow(row.id, { applyAmount: event.target.checked, apply: false })
+                        }
+                      />
+                      Bon-Menge für {row.name} übernehmen
+                    </label>
+                    {row.applyAmount && (
+                      <p className="mb-2 text-xs" style={{ color: 'var(--accent)' }}>
+                        Mengenänderung vorgemerkt: {row.item.amount} → {row.amount}. Wird erst beim Speichern
+                        übernommen.
+                      </p>
+                    )}
+                    {!row.canApplyAmount && !row.applyAmount && (
+                      <p className="text-xs">Bitte eine gültige Menge in passender Einheit eintragen.</p>
+                    )}
+                  </>
+                )}
+                {!row.item && !row.targetId && (
+                  <>
+                    <button
+                      className="btn-soft my-2 min-h-11 w-full px-2 text-sm"
+                      disabled={currencyMismatch || row.invalidPrice || row.minor <= 0}
+                      onClick={() => {
+                        changeRow(row.id, {
+                          add: !row.add,
+                          amount: row.amount || `${row.occurrences} Stück`,
+                          apply: false,
+                          applyAmount: false,
+                        })
+                        setEditingId(row.id)
+                      }}
+                    >
+                      {row.add ? 'Ergänzung zurücknehmen' : 'Zum Einkauf hinzufügen'}
+                    </button>
+                    {row.add && (
+                      <p className="mb-2 text-xs" style={{ color: 'var(--accent)' }}>
+                        Vorgemerkt: {row.newName} · {row.amount} · {row.category}. Wird diesem abgeschlossenen
+                        Einkauf beim Speichern ergänzt.
+                      </p>
+                    )}
+                    {row.add && !row.canAdd && (
+                      <p className="mb-2 text-xs" style={{ color: 'var(--danger)' }}>
+                        Name, Menge und Kategorie prüfen. Bereits enthaltene Artikel bitte zuordnen.
+                      </p>
+                    )}
+                  </>
+                )}
+                {row.item && (
+                  <label className="flex min-h-11 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={row.apply}
+                      disabled={!row.canApply || currencyMismatch}
+                      onChange={(event) => changeRow(row.id, { apply: event.target.checked })}
+                    />
+                    Preis für {row.name} übernehmen
+                  </label>
+                )}
               </section>
             ))}
             {!!comparison.missingItems.length && (
@@ -552,14 +795,26 @@ export function ReceiptCheckSheet({
           </p>
         )}
       </div>
+      {pendingSummary && (
+        <p className="mt-2 shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Beim Speichern: {pendingSummary}
+        </p>
+      )}
+      {document && !confirmed && (
+        <p className="mt-1 shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Zum Speichern am Ende des Abgleichs bestätigen, dass dieser Bon geprüft ist.
+        </p>
+      )}
       <button
         className="btn-primary mt-3 min-h-12 shrink-0 px-2"
         disabled={busy || !document || stale || !confirmed || currencyMismatch || invalid}
         onClick={save}
       >
-        {selected
-          ? `${selected} Preisänderung${selected === 1 ? '' : 'en'} & Prüfung speichern`
-          : 'Prüfergebnis speichern'}
+        {amountChanges || additions || dateChange
+          ? 'Änderungen & Prüfung speichern'
+          : selected
+            ? `${selected} Preisänderung${selected === 1 ? '' : 'en'} & Prüfung speichern`
+            : 'Prüfergebnis speichern'}
       </button>
       {locationOpen && <StoreLayoutSheet tripId={tripId} onClose={() => setLocationOpen(false)} />}
     </Sheet>

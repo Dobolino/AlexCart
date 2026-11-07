@@ -461,11 +461,9 @@ export function ListPage() {
           <ReceiptCheckSheet
             tripId={checkTripId}
             onClose={() => setCheckTripId(null)}
-            onSaved={(updated, unlinked) => {
+            onSaved={(message) => {
               setCheckTripId(null)
-              showToast(
-                `Abgleich gespeichert · ${updated} Preise korrigiert${unlinked ? ` · ${unlinked} nur im Bon` : ''}`
-              )
+              showToast(message)
             }}
           />
         )}

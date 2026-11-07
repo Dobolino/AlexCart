@@ -2,17 +2,17 @@ import { test, expect, type Page } from '@playwright/test'
 import { receiptPdfFixture } from './fixtures/receiptPdf'
 
 test.use({ hasTouch: true })
-async function openReceipt(page: Page, active = false) {
+async function openReceipt(page: Page, active = false, weight = false) {
   await page.addInitScript(
-    ({ active }) => {
+    ({ active, weight }) => {
       if (localStorage.getItem('alexshop-store')) return
       const now = Date.now(),
         date = new Date(now).toISOString().slice(0, 10)
       const items = [
         {
           id: 'milk',
-          name: 'Milch',
-          amount: '1 Stück',
+          name: weight ? 'Äpfel' : 'Milch',
+          amount: weight ? '536 g' : '1 Stück',
           category: 'Milch & Käse',
           productId: 'milk',
           done: true,
@@ -71,7 +71,7 @@ async function openReceipt(page: Page, active = false) {
                       name: item.name,
                       amount: item.amount,
                       purchaseLogId: item.purchaseLogId,
-                      price: index ? 2 : 1.5,
+                      price: index ? 2 : weight ? 2.3 : 1.5,
                     })),
                   },
                 ],
@@ -82,8 +82,9 @@ async function openReceipt(page: Page, active = false) {
               name: item.name,
               category: item.category,
               amount: item.amount,
-              price: index ? 2 : 1.5,
-              profilePrice: index ? 2 : 1.5,
+              price: index ? 2 : weight ? 2.3 : 1.5,
+              profilePrice: index ? 2 : weight ? 4.29104478 : 1.5,
+              pricePerKg: !index && weight ? 4.29104478 : undefined,
               storeId: 'CH:migros',
               date,
               currency: 'CHF',
@@ -108,7 +109,7 @@ async function openReceipt(page: Page, active = false) {
         })
       )
     },
-    { active }
+    { active, weight }
   )
   await page.goto(active ? '/AlexCart/' : '/AlexCart/#/stats')
   if (!active) {
@@ -118,6 +119,110 @@ async function openReceipt(page: Page, active = false) {
   }
 }
 const stored = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('alexshop-store')!).state)
+
+test('edits and explicitly adopts a receipt weight without changing the already correct total price', async ({
+  page,
+}) => {
+  await openReceipt(page, false, true)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit
+    .getByLabel('Bon-Text', { exact: true })
+    .fill('MIGROS\nÄpfel 532 g 2.30\nBrot 2.00\nTOTAL CHF 4.30')
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  const row = audit.getByRole('region', { name: 'Bonposition Äpfel', exact: true })
+  await expect(row).toContainText('Preis stimmt bereits überein')
+  await expect(row.getByRole('checkbox', { name: 'Preis für Äpfel übernehmen', exact: true })).toBeDisabled()
+  const takeAmount = row.getByRole('checkbox', { name: 'Bon-Menge für Äpfel übernehmen', exact: true })
+  await takeAmount.check()
+  expect((await stored(page)).completedTrips[0].items[0].amount).toBe('536 g')
+  await row.getByRole('button', { name: 'App: Äpfel · 536 g · bearbeiten', exact: true }).tap()
+  await row.getByLabel('Bon-Menge', { exact: true }).fill('531 g')
+  await expect(takeAmount).not.toBeChecked()
+  await row.getByLabel('Bon-Menge', { exact: true }).fill('532 g')
+  await takeAmount.check()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
+  await page.setViewportSize({ width: 320, height: 600 })
+  await audit.getByRole('button', { name: 'Änderungen & Prüfung speichern', exact: true }).tap()
+  await expect(audit).toHaveCount(0)
+  const state = await stored(page)
+  expect(state.completedTrips[0].items[0]).toMatchObject({ amount: '532 g', price: 2.3 })
+  expect(state.purchaseLog[0]).toMatchObject({ amount: '532 g', price: 2.3, pricePerKg: 4.32330827 })
+  expect(state.priceObservations[0]).toMatchObject({ basis: 'kg', price: { minor: 432, currency: 'CHF' } })
+  expect(state.completedTrips[0].receiptReview.status).toBe('matched')
+  expect(state.purchaseLog).toHaveLength(2)
+  expect(state.pantry[0].amount).toBe('2 Stück')
+})
+
+test('adds a missing purchased item and corrects the date in the receipt and price comparison after confirmation', async ({
+  page,
+}) => {
+  await openReceipt(page)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit
+    .getByLabel('Bon-Text', { exact: true })
+    .fill('MIGROS\nMilch 1.50\nBrot 2.00\nJoghurt 2 x 1.20\nTOTAL CHF 5.90')
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  const row = audit.getByRole('region', { name: 'Bonposition Joghurt', exact: true })
+  await row.getByRole('button', { name: 'Zum Einkauf hinzufügen', exact: true }).tap()
+  await row.getByLabel('Artikelname', { exact: true }).fill('Naturjoghurt')
+  await row.getByLabel('Bon-Menge', { exact: true }).fill('2 Becher')
+  await row.getByLabel('Kategorie', { exact: true }).selectOption('Milch & Käse')
+  await audit.getByLabel('Datum laut Bon', { exact: true }).fill('2026-10-10')
+  await audit.getByRole('checkbox', { name: 'Bon-Datum übernehmen', exact: true }).check()
+  expect((await stored(page)).completedTrips[0].items).toHaveLength(2)
+  expect((await stored(page)).purchaseLog).toHaveLength(2)
+  const save = audit.getByRole('button', { name: 'Änderungen & Prüfung speichern', exact: true })
+  await expect(save).toBeDisabled()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
+  await save.tap()
+  await expect(audit).toHaveCount(0)
+  await page.reload()
+  const state = await stored(page),
+    entry = state.purchaseLog[2]
+  expect(state.completedTrips[0].items[2]).toMatchObject({
+    name: 'Naturjoghurt',
+    amount: '2 Becher',
+    price: 2.4,
+    purchaseLogId: entry.id,
+  })
+  expect(entry).toMatchObject({
+    price: 2.4,
+    profilePrice: 1.2,
+    storeId: 'CH:migros',
+    currency: 'CHF',
+    date: '2026-10-10',
+  })
+  expect(state.purchaseLog.every((entry: { date: string }) => entry.date === '2026-10-10')).toBe(true)
+  expect(new Date(state.completedTrips[0].completedAt).toISOString().startsWith('2026-10-10')).toBe(true)
+  expect(state.catalog.find((product: { id: string }) => product.id === entry.productId).name).toBe(
+    'Naturjoghurt'
+  )
+  expect(
+    state.priceObservations.find(
+      (observation: { purchaseLogId: string }) => observation.purchaseLogId === entry.id
+    )
+  ).toMatchObject({ price: { minor: 120, currency: 'CHF' } })
+  expect(state.completedTrips[0].receiptReview.status).toBe('matched')
+  expect(state.pantry[0].amount).toBe('2 Stück')
+  expect(state.lists[0].items).toHaveLength(2)
+})
+
+test('cancels selected additions and a date correction without persisting any changes', async ({ page }) => {
+  await openReceipt(page)
+  const before = await stored(page)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit.getByLabel('Bon-Text', { exact: true }).fill('MIGROS\nExtra 1.20\nTOTAL CHF 1.20')
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  await audit.getByRole('button', { name: 'Zum Einkauf hinzufügen', exact: true }).tap()
+  await audit.getByLabel('Datum laut Bon', { exact: true }).fill('2026-10-10')
+  await audit.getByRole('checkbox', { name: 'Bon-Datum übernehmen', exact: true }).check()
+  await audit.getByRole('button', { name: 'Schließen', exact: true }).tap()
+  const after = await stored(page)
+  expect(after.completedTrips).toEqual(before.completedTrips)
+  expect(after.purchaseLog).toEqual(before.purchaseLog)
+  expect(after.priceObservations).toEqual(before.priceObservations)
+  expect(after.catalog).toEqual(before.catalog)
+})
 
 test('reads a native multi-page PDF locally, excludes loyalty points and persists confirmed corrections', async ({
   page,
@@ -230,9 +335,7 @@ test('supports a manual mapping after an unreadable image without inventing a pr
   await audit.getByLabel('Bon-Text', { exact: true }).fill('Vollmilch 1.70\nBrot 2.00\nTOTAL CHF 3.70')
   await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
   const row = audit.getByRole('region', { name: 'Bonposition Vollmilch', exact: true })
-  await expect(
-    row.getByRole('checkbox', { name: 'Preis für Vollmilch übernehmen', exact: true })
-  ).toBeDisabled()
+  await expect(row.getByRole('button', { name: 'Zum Einkauf hinzufügen', exact: true })).toBeVisible()
   await row.getByRole('button', { name: 'Produkt zuordnen · bearbeiten', exact: true }).tap()
   await row.getByRole('combobox', { name: 'App-Position', exact: true }).selectOption('milk')
   await row.getByRole('checkbox', { name: 'Preis für Vollmilch übernehmen', exact: true }).check()

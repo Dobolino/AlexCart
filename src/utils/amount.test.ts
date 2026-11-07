@@ -63,6 +63,9 @@ describe('priceQuantityFromAmount', () => {
     expect(priceQuantityFromAmount('2 Stk')).toBe(2)
     expect(priceQuantityFromAmount('3')).toBe(3)
     expect(priceQuantityFromAmount('2 Packungen')).toBe(2)
+    expect(priceQuantityFromAmount('2 Knollen')).toBe(2)
+    expect(priceQuantityFromAmount('2 Gläser')).toBe(2)
+    expect(priceQuantityFromAmount('2 Päckchen')).toBe(2)
   })
   it('nutzt Pack-Anzahl bei 2 × 400 g', () => {
     expect(priceQuantityFromAmount('2 × 400 g')).toBe(2)

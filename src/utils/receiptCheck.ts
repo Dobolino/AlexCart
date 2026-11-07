@@ -4,6 +4,9 @@ import { findRetailer } from '@/data/retailCatalog'
 import { baseQuantity } from './quantity'
 import { findReceiptDateInText, timestampToDateKey } from './date'
 import { fingerprint } from './fingerprint'
+import { parseAmount, isCountUnit } from './amount'
+import { CATEGORIES } from '@/data/products'
+import { dateKeyToTimestamp } from './date'
 
 export interface ReceiptCheckLine {
   id: string
@@ -12,6 +15,7 @@ export interface ReceiptCheckLine {
   minor: number
   occurrences: number
   discountMinor?: number
+  weighed?: boolean
 }
 export interface ReceiptCheckDocument {
   lines: ReceiptCheckLine[]
@@ -25,6 +29,13 @@ export interface ReceiptCheckDocument {
 export interface ReceiptCheckRow extends ReceiptCheckLine {
   targetId: string
   apply: boolean
+  applyAmount?: boolean
+  add?: boolean
+  newName?: string
+  category?: string
+  productId?: string
+  addAsWeight?: boolean
+  originalAmount?: string
 }
 export interface ReceiptCheckEvidence {
   rows: ReceiptCheckRow[]
@@ -33,6 +44,7 @@ export interface ReceiptCheckEvidence {
   currency: Currency
   store?: string
   date?: string
+  applyDate?: boolean
   warnings: string[]
   source: 'photo' | 'pdf' | 'text'
 }
@@ -206,10 +218,12 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
     if (!measuredAmount && quantity > 1) measuredAmount = hint ? `${quantity} × ${hint}` : `${quantity} Stück`
     else if (!measuredAmount) measuredAmount = hint
     const key = `${checkName(name)}|${checkName(hint)}`
+    const tableDiscount = cells?.[4] ? -(receiptPriceMinor(cells[4]) ?? 0) : 0
     const existing = grouped.get(key)
     if (existing) {
       existing.minor += price
       existing.occurrences += quantity
+      if (tableDiscount) existing.discountMinor = (existing.discountMinor ?? 0) + tableDiscount
       const oldMass = baseQuantity(existing.amount)
       const addedMass = baseQuantity(measuredAmount)
       existing.amount =
@@ -225,6 +239,8 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
         minor: price,
         amount: measuredAmount,
         occurrences: quantity,
+        weighed: !!cells && /[.,]/.test(cells[2]!),
+        ...(tableDiscount ? { discountMinor: tableDiscount } : {}),
       })
     lastProduct = { row: grouped.get(key)!, minor: price }
   }
@@ -247,16 +263,54 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
 
 export function suggestReceiptRows(document: ReceiptCheckDocument, trip: CompletedTrip): ReceiptCheckRow[] {
   return document.lines.map((line) => {
-    const exact = trip.items.filter((item) => checkName(item.name) === checkName(line.name))
-    return { ...line, targetId: exact.length === 1 ? exact[0]!.id : '', apply: false }
+    const receiptKey = receiptRowKey(line)
+    const linked = trip.items.filter((item) => item.receiptKey === receiptKey)
+    const exact = linked.length
+      ? linked
+      : trip.items.filter((item) => checkName(item.name) === checkName(line.name))
+    return {
+      ...line,
+      originalAmount: line.amount,
+      targetId: exact.length === 1 ? exact[0]!.id : '',
+      apply: false,
+    }
   })
 }
+export const receiptRowKey = (row: ReceiptCheckLine & { originalAmount?: string }) =>
+  fingerprint([checkName(row.name), checkName(row.originalAmount ?? row.amount)])
 export function quantityMismatch(receiptAmount: string, appAmount: string): boolean {
-  const a = baseQuantity(receiptAmount),
-    b = baseQuantity(appAmount)
+  const a = receiptQuantity(receiptAmount),
+    b = receiptQuantity(appAmount)
   return !!a && !!b && a.unit === b.unit && Math.abs(a.value - b.value) > 0.001
 }
+export function receiptQuantity(amount: string) {
+  const quantity = baseQuantity(amount)
+  if (quantity)
+    return quantity.value > 0 &&
+      quantity.value <= 1e9 &&
+      (quantity.unit !== 'piece' || Number.isInteger(quantity.value))
+      ? quantity
+      : null
+  const count = parseAmount(amount)
+  return count &&
+    Number.isInteger(count.value) &&
+    count.value > 0 &&
+    count.value <= 10000 &&
+    isCountUnit(count.unit)
+    ? { value: count.value, unit: 'piece' as const }
+    : null
+}
+export function validReceiptDate(date: string | undefined): date is string {
+  return (
+    !!date &&
+    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    dateKeyToTimestamp(date) >= 0 &&
+    timestampToDateKey(dateKeyToTimestamp(date)) === date
+  )
+}
 export function compareReceiptCheck(trip: CompletedTrip, evidence: ReceiptCheckEvidence) {
+  const existingNames = new Set(trip.items.map((item) => checkName(item.name)))
+  const existingReceiptKeys = new Set(trip.items.map((item) => item.receiptKey).filter(Boolean))
   const targets = evidence.rows.map((row) => row.targetId).filter(Boolean)
   const duplicateIds = new Set(targets.filter((id, index) => targets.indexOf(id) !== index))
   const rows = evidence.rows.map((row) => {
@@ -265,19 +319,40 @@ export function compareReceiptCheck(trip: CompletedTrip, evidence: ReceiptCheckE
     const appMinor =
       item?.price === undefined ? undefined : new Decimal(item.price).times(100).toDecimalPlaces(0).toNumber()
     const mismatch = !!item && quantityMismatch(row.amount, item.amount)
+    const quantity = receiptQuantity(row.amount)
+    const appQuantity = item ? receiptQuantity(item.amount) : null
+    const canApplyAmount =
+      !!item &&
+      !!quantity &&
+      !duplicateIds.has(row.targetId) &&
+      (!appQuantity || quantity.unit === appQuantity.unit) &&
+      row.amount.trim() !== item.amount.trim()
+    const canAdd =
+      !row.targetId &&
+      !invalidPrice &&
+      row.minor > 0 &&
+      !!quantity &&
+      !!row.newName?.trim() &&
+      row.newName.trim().length <= 300 &&
+      CATEGORIES.includes(row.category ?? '') &&
+      (!row.addAsWeight || quantity.unit === 'g') &&
+      !existingNames.has(checkName(row.newName ?? '')) &&
+      !existingReceiptKeys.has(receiptRowKey(row))
     return {
       ...row,
       item,
       appMinor,
       invalidPrice,
       quantityMismatch: mismatch,
+      canApplyAmount,
+      canAdd,
       duplicate: duplicateIds.has(row.targetId),
       equal: !!item && !invalidPrice && appMinor === row.minor,
       canApply:
         !!item &&
         !invalidPrice &&
         row.minor > 0 &&
-        !mismatch &&
+        (!mismatch || (!!row.applyAmount && canApplyAmount)) &&
         !duplicateIds.has(row.targetId) &&
         appMinor !== row.minor,
     }
@@ -286,9 +361,10 @@ export function compareReceiptCheck(trip: CompletedTrip, evidence: ReceiptCheckE
     evidence.rows.reduce((sum, row) => sum + (Number.isSafeInteger(row.minor) ? row.minor : 0), 0) +
     evidence.adjustments.reduce((sum, adjustment) => sum + adjustment.minor, 0)
   const missingItems = trip.items.filter((item) => !targets.includes(item.id))
-  const metadataMismatch =
-    (!!evidence.date && evidence.date !== timestampToDateKey(trip.completedAt)) ||
-    (!!evidence.store && !!trip.store && findRetailer(evidence.store)?.id !== findRetailer(trip.store)?.id)
+  const dateMismatch = !!evidence.date && evidence.date !== timestampToDateKey(trip.completedAt)
+  const storeMismatch =
+    !!evidence.store && !!trip.store && findRetailer(evidence.store)?.id !== findRetailer(trip.store)?.id
+  const metadataMismatch = dateMismatch || storeMismatch
   const unresolved =
     rows.filter((row) => !row.item || row.invalidPrice || row.quantityMismatch || row.duplicate).length +
     missingItems.length
@@ -310,6 +386,8 @@ export function compareReceiptCheck(trip: CompletedTrip, evidence: ReceiptCheckE
     lineSum,
     missingItems,
     metadataMismatch,
+    dateMismatch,
+    storeMismatch,
     unresolved,
     allEqual,
     totalMatches,

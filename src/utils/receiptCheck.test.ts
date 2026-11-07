@@ -4,6 +4,7 @@ import {
   suggestReceiptRows,
   compareReceiptCheck,
   quantityMismatch,
+  receiptQuantity,
   type ReceiptCheckEvidence,
 } from './receiptCheck'
 import type { CompletedTrip } from '@/types'
@@ -29,6 +30,14 @@ const evidence = (text: string): ReceiptCheckEvidence => {
   }
 }
 describe('receipt photo text comparison', () => {
+  it('validates editable receipt amounts including count units without treating fractional counts as whole packages', () => {
+    for (const amount of ['2 Packungen', '2 Becher', '2 Knollen', '2 Gläser', '2 Päckchen'])
+      expect(receiptQuantity(amount)).toEqual({ value: 2, unit: 'piece' })
+    expect(receiptQuantity('0 Stück')).toBeNull()
+    expect(receiptQuantity('1.5 Stück')).toBeNull()
+    expect(receiptQuantity('unbekannt')).toBeNull()
+    expect(receiptQuantity('0.532 kg')).toEqual({ value: 532, unit: 'g' })
+  })
   it('reads Migros table totals instead of unit prices, savings, tax groups or loyalty points', () => {
     // Fictional receipt with the same column structure as a digital Migros receipt.
     const parsed = parseReceiptCheck(`05:01 €

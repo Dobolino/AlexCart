@@ -6,11 +6,16 @@ import { uid } from '@/utils/id'
 import { fingerprint } from '@/utils/fingerprint'
 import { observationFromPurchase } from './catalogPurchase'
 import { repriceReceiptItems } from './receiptCheckCommit'
+import { appendReceiptCheckItems } from './receiptCheckAdditions'
 import {
   compareReceiptCheck,
   quantityMismatch,
   receiptTripSnapshot,
   receiptTripFingerprint,
+  receiptQuantity,
+  validReceiptDate,
+  checkName,
+  receiptRowKey,
   type ReceiptCheckEvidence,
 } from '@/utils/receiptCheck'
 import { activeShoppingDurationMs } from '@/utils/shoppingDuration'
@@ -364,7 +369,15 @@ interface AppState {
     snapshot: string,
     evidence: ReceiptCheckEvidence,
     confirmed: boolean
-  ) => { ok: boolean; error?: string; updated?: number; unlinked?: number }
+  ) => {
+    ok: boolean
+    error?: string
+    updated?: number
+    unlinked?: number
+    amountUpdated?: number
+    added?: number
+    dateUpdated?: boolean
+  }
   /** Einkaufszentrum/Filiale nachträglich auf der Quittung erfassen. */
   updateCompletedTripStore: (tripId: string, store: string | undefined) => void
   /** Einkaufsdatum der Quittung ändern (Kalender). */
@@ -1823,7 +1836,15 @@ export const useStore = create<AppState>()(
         }),
 
       saveReceiptCheck: (tripId, snapshot, evidence, confirmed) => {
-        let result: { ok: boolean; error?: string; updated?: number; unlinked?: number } = {
+        let result: {
+          ok: boolean
+          error?: string
+          updated?: number
+          unlinked?: number
+          amountUpdated?: number
+          added?: number
+          dateUpdated?: boolean
+        } = {
           ok: false,
           error: 'Bitte den Abgleich zuerst prüfen und bestätigen.',
         }
@@ -1833,12 +1854,23 @@ export const useStore = create<AppState>()(
           evidence.rows.length > 200 ||
           evidence.adjustments.length > 200 ||
           evidence.warnings.length > 100 ||
+          new Set(evidence.rows.map((row) => row.id)).size !== evidence.rows.length ||
+          (evidence.applyDate && !validReceiptDate(evidence.date)) ||
           !['photo', 'pdf', 'text'].includes(evidence.source)
         )
           return { ok: false, error: 'Bon-Daten sind nicht gültig.' }
         if (
           evidence.rows.some(
-            (row) => !Number.isSafeInteger(row.minor) || row.minor < 0 || row.minor > 100000000
+            (row) =>
+              !Number.isSafeInteger(row.minor) ||
+              row.minor < 0 ||
+              row.minor > 100000000 ||
+              row.amount.length > 1000 ||
+              row.name.length > 1000 ||
+              (row.originalAmount?.length ?? 0) > 1000 ||
+              [row.apply, row.applyAmount, row.add].some(
+                (flag) => flag !== undefined && typeof flag !== 'boolean'
+              )
           ) ||
           evidence.adjustments.some(
             (row) => !Number.isSafeInteger(row.minor) || Math.abs(row.minor) > 100000000
@@ -1867,20 +1899,61 @@ export const useStore = create<AppState>()(
             return state
           }
           const comparison = compareReceiptCheck(trip, evidence)
+          const additions = comparison.rows.filter((row) => row.add)
+          const dateUpdated = !!evidence.applyDate && evidence.date !== timestampToDateKey(trip.completedAt)
+          const date = dateUpdated ? evidence.date : undefined
+          const addNames = additions.map((row) => checkName(row.newName ?? ''))
+          const addKeys = additions.map(receiptRowKey)
           if (
             comparison.rows.some(
-              (row) => row.duplicate || (row.targetId && !row.item) || (row.apply && !row.canApply)
-            )
+              (row) =>
+                row.duplicate ||
+                (row.targetId && !row.item) ||
+                (row.apply && !row.canApply) ||
+                (row.applyAmount && !row.canApplyAmount) ||
+                (row.add &&
+                  (!row.canAdd ||
+                    row.apply ||
+                    row.applyAmount ||
+                    (row.productId && !state.catalog.some((product) => product.id === row.productId))))
+            ) ||
+            new Set(addNames).size !== additions.length ||
+            new Set(addKeys).size !== additions.length ||
+            trip.items.length + additions.length > 2000
           ) {
-            result = { ok: false, error: 'Bitte Zuordnungen, Mengen und ausgewählte Preisänderungen prüfen.' }
+            result = { ok: false, error: 'Bitte Zuordnungen, Mengen und ausgewählte Änderungen prüfen.' }
+            return state
+          }
+          if (additions.length && !trip.store?.trim()) {
+            result = { ok: false, error: 'Bitte zuerst den Einkaufsort des Bons wählen.' }
+            return state
+          }
+          const receiptStore = state.retailStores.find((store) => store.id === trip.storeId) ?? {
+            ...makeShoppingStore(
+              trip.store ?? '',
+              trip.country ?? (evidence.currency === 'CHF' ? 'CH' : 'DE')
+            ),
+            ...(trip.storeId ? { id: trip.storeId } : {}),
+          }
+          if (additions.length && receiptStore.currency !== evidence.currency) {
+            result = {
+              ok: false,
+              error: 'Geschäft und Bonwährung passen nicht zusammen. Bitte den Einkaufsort prüfen.',
+            }
             return state
           }
           const changes = new Map(
             comparison.rows.filter((row) => row.apply).map((row) => [row.targetId, row.minor / 100])
           )
-          const changing = trip.items.filter((item) => changes.has(item.id))
+          const amounts = new Map(
+            comparison.rows.filter((row) => row.applyAmount).map((row) => [row.targetId, row.amount.trim()])
+          )
+          const changing = trip.items.filter(
+            (item) => changes.has(item.id) || amounts.has(item.id) || dateUpdated
+          )
           const linked = new Set(changing.flatMap((item) => (item.purchaseLogId ? [item.purchaseLogId] : [])))
           if (
+            [...linked].some((id) => state.purchaseLog.filter((entry) => entry.id === id).length > 1) ||
             state.completedTrips.some(
               (other) =>
                 other.id !== tripId &&
@@ -1903,11 +1976,15 @@ export const useStore = create<AppState>()(
           if (
             changing.some((item) => {
               const entry = state.purchaseLog.find((entry) => entry.id === item.purchaseLogId)
-              const row = comparison.rows.find((row) => row.targetId === item.id)!
+              const row = comparison.rows.find((row) => row.targetId === item.id)
+              const nextQuantity = row ? receiptQuantity(row.amount) : null
+              const previousQuantity = entry ? receiptQuantity(entry.amount ?? '') : null
               return (
                 entry &&
                 ((entry.currency ?? 'CHF') !== evidence.currency ||
-                  quantityMismatch(row.amount, entry.amount ?? ''))
+                  (row?.apply && !row.applyAmount && quantityMismatch(row.amount, entry.amount ?? '')) ||
+                  (row?.applyAmount && entry.pricePerKg !== undefined && nextQuantity?.unit !== 'g') ||
+                  (row?.applyAmount && previousQuantity && nextQuantity?.unit !== previousQuantity.unit))
               )
             })
           ) {
@@ -1917,9 +1994,45 @@ export const useStore = create<AppState>()(
             }
             return state
           }
-          const patch = repriceReceiptItems(state, tripId, changes)
+          let patch: Partial<AppState> & ReturnType<typeof repriceReceiptItems> = repriceReceiptItems(
+            state,
+            tripId,
+            changes,
+            { amounts, date }
+          )
+          let reviewedEvidence = evidence
+          if (additions.length) {
+            const { addedItems, ...additionPatch } = appendReceiptCheckItems(
+              { ...state, ...patch },
+              tripId,
+              additions,
+              receiptStore
+            )
+            patch = { ...patch, ...additionPatch }
+            const addedIds = new Map(additions.map((row, index) => [row.id, addedItems[index]!.id]))
+            reviewedEvidence = {
+              ...evidence,
+              rows: evidence.rows.map((row) =>
+                addedIds.has(row.id) ? { ...row, targetId: addedIds.get(row.id)!, add: false } : row
+              ),
+            }
+          }
+          const correctedAmounts = new Map(
+            changing
+              .filter((item) => item.purchaseLogId && amounts.has(item.id))
+              .map((item) => [item.purchaseLogId!, amounts.get(item.id)!])
+          )
+          if (correctedAmounts.size)
+            patch.lists = state.lists.map((list) => ({
+              ...list,
+              items: list.items.map((item) =>
+                item.done && item.purchaseLogId && correctedAmounts.has(item.purchaseLogId)
+                  ? { ...item, amount: correctedAmounts.get(item.purchaseLogId)! }
+                  : item
+              ),
+            }))
           const updatedTrip = patch.completedTrips.find((trip) => trip.id === tripId)!
-          const after = compareReceiptCheck(updatedTrip, evidence)
+          const after = compareReceiptCheck(updatedTrip, reviewedEvidence)
           const reviewed = {
             checkedAt: Date.now(),
             status: after.status,
@@ -1934,6 +2047,9 @@ export const useStore = create<AppState>()(
           result = {
             ok: true,
             updated: changes.size,
+            amountUpdated: amounts.size,
+            added: additions.length,
+            dateUpdated,
             unlinked: changing.filter(
               (item) => !state.purchaseLog.some((entry) => entry.id === item.purchaseLogId)
             ).length,

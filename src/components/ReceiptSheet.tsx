@@ -179,11 +179,9 @@ export function ReceiptSheet({
           <ReceiptCheckSheet
             tripId={trip.id}
             onClose={() => setCheckOpen(false)}
-            onSaved={(updated, unlinked) => {
+            onSaved={(message) => {
               setCheckOpen(false)
-              setCheckMessage(
-                `Abgleich gespeichert · ${updated} Preise korrigiert.${unlinked ? ` ${unlinked} Positionen ohne eindeutige Kaufverknüpfung wurden nur im Bon korrigiert.` : ''}`
-              )
+              setCheckMessage(message)
             }}
           />
         </Suspense>

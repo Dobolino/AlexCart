@@ -5,6 +5,7 @@ import { baseQuantity } from '@/utils/quantity'
 import { priceQuantityFromAmount } from '@/utils/amount'
 import { refreshPurchaseProfiles } from '@/utils/priceProfiles'
 import { observationFromPurchase } from './catalogPurchase'
+import { dateKeyToTimestamp } from '@/utils/date'
 
 export function repriceReceiptItems(
   state: {
@@ -14,25 +15,35 @@ export function repriceReceiptItems(
     priceObservations: PriceObservation[]
   },
   tripId: string,
-  changes: ReadonlyMap<string, number | undefined>
+  changes: ReadonlyMap<string, number | undefined>,
+  options: { amounts?: ReadonlyMap<string, string>; date?: string } = {}
 ) {
   const trip = state.completedTrips.find((trip) => trip.id === tripId)!
   const logChanges = new Map(
     trip.items
-      .filter((item) => changes.has(item.id) && item.purchaseLogId)
-      .map((item) => [item.purchaseLogId!, changes.get(item.id)])
+      .filter(
+        (item) =>
+          (changes.has(item.id) || options.amounts?.has(item.id) || options.date) && item.purchaseLogId
+      )
+      .map((item) => [item.purchaseLogId!, item])
   )
   const affected = state.purchaseLog.filter((entry) => entry.id && logChanges.has(entry.id))
   const purchaseLog = state.purchaseLog.map((entry) => {
     if (!entry.id || !logChanges.has(entry.id)) return entry
-    const price = logChanges.get(entry.id)
-    const quantity = entry.amount ? baseQuantity(entry.amount) : null
+    const item = logChanges.get(entry.id)!
+    if (!changes.has(item.id) && !options.amounts?.has(item.id))
+      return { ...entry, date: options.date ?? entry.date }
+    const price = changes.has(item.id) ? changes.get(item.id) : entry.price
+    const amount = options.amounts?.get(item.id) ?? entry.amount
+    const quantity = amount ? baseQuantity(amount) : null
     const ratio =
       entry.pricePerKg !== undefined && quantity?.unit === 'g' && quantity.value > 0
         ? quantity.value / 1000
-        : entry.profilePrice && entry.price
-          ? new Decimal(entry.price).div(entry.profilePrice).toNumber()
-          : priceQuantityFromAmount(entry.amount ?? '')
+        : options.amounts?.has(item.id)
+          ? priceQuantityFromAmount(amount ?? '')
+          : entry.profilePrice && entry.price
+            ? new Decimal(entry.price).div(entry.profilePrice).toNumber()
+            : priceQuantityFromAmount(entry.amount ?? '')
     const profilePrice =
       price === undefined
         ? undefined
@@ -42,6 +53,8 @@ export function repriceReceiptItems(
             .toNumber()
     return {
       ...entry,
+      amount,
+      date: options.date ?? entry.date,
       price,
       profilePrice,
       pricePerKg: entry.pricePerKg === undefined ? undefined : profilePrice,
@@ -55,6 +68,9 @@ export function repriceReceiptItems(
     const entry = observation.purchaseLogId ? updated.get(observation.purchaseLogId) : undefined
     if (!entry) return [observation]
     observed.add(entry.id!)
+    const item = logChanges.get(entry.id!)!
+    if (!changes.has(item.id) && !options.amounts?.has(item.id))
+      return [{ ...observation, observedAt: new Date(`${entry.date}T12:00:00`).toISOString() }]
     const next = observationFromPurchase(entry)
     return next ? [{ ...observation, ...next }] : []
   })
@@ -72,8 +88,15 @@ export function repriceReceiptItems(
         ? entry
         : {
             ...entry,
+            completedAt: options.date ? dateKeyToTimestamp(options.date) : entry.completedAt,
             items: entry.items.map((item) =>
-              changes.has(item.id) ? { ...item, price: changes.get(item.id) } : item
+              changes.has(item.id) || options.amounts?.has(item.id)
+                ? {
+                    ...item,
+                    ...(changes.has(item.id) ? { price: changes.get(item.id) } : {}),
+                    ...(options.amounts?.has(item.id) ? { amount: options.amounts.get(item.id)! } : {}),
+                  }
+                : item
             ),
           }
     ),

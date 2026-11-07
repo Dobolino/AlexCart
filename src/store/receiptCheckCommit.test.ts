@@ -171,4 +171,208 @@ describe('confirmed receipt photo corrections', () => {
     expect(changed.receiptReview!.fingerprint).not.toBe(receiptTripFingerprint(changed))
     expect(useStore.getState().purchaseLog[0]).toMatchObject({ price: 6, profilePrice: 3 })
   })
+  it('changes a confirmed count at the same total price without another purchase or stock movement', () => {
+    const { trip, evidence, snapshot } = prepare('3 x Milch 4.00\nBrot 2.00\nTOTAL CHF 6.00')
+    evidence.rows[0]!.apply = false
+    evidence.rows[0]!.applyAmount = true
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true)).toMatchObject({
+      ok: true,
+      updated: 0,
+      amountUpdated: 1,
+    })
+    const state = useStore.getState()
+    expect(state.completedTrips[0]!.items[0]).toMatchObject({ amount: '3 Stück', price: 4 })
+    expect(state.purchaseLog[0]).toMatchObject({ amount: '3 Stück', price: 4, profilePrice: 1.33333333 })
+    expect(state.priceObservations[0]!.price).toEqual({ minor: 133, currency: 'CHF' })
+    expect(pricesForCurrency(state.priceProfiles[0]!.variants[0]!, 'CHF').purchaseCount).toBe(1)
+    expect(state.lists).toEqual(before.lists)
+    expect(state.purchaseLog).toHaveLength(2)
+    expect(state.pantry).toEqual(before.pantry)
+    expect(state.completedTrips[0]!.receiptReview!.status).toBe('matched')
+  })
+  it('recomputes the exact kilogram price when the confirmed weight changes but the price is correct', () => {
+    const state = useStore.getState(),
+      old = state.completedTrips[0]!
+    useStore.setState({
+      completedTrips: [
+        {
+          ...old,
+          items: old.items.map((item, index) => (index ? item : { ...item, amount: '536 g', price: 2.3 })),
+        },
+      ],
+      purchaseLog: state.purchaseLog.map((entry, index) =>
+        index
+          ? entry
+          : { ...entry, amount: '536 g', price: 2.3, pricePerKg: 4.29104478, profilePrice: 4.29104478 }
+      ),
+    })
+    const { trip, evidence, snapshot } = prepare('Milch 532 g 2.30\nBrot 2.00\nTOTAL CHF 4.30')
+    evidence.rows[0]!.apply = false
+    evidence.rows[0]!.applyAmount = true
+    expect(useStore.getState().saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    expect(useStore.getState().purchaseLog[0]).toMatchObject({
+      amount: '532 g',
+      price: 2.3,
+      pricePerKg: 4.32330827,
+      profilePrice: 4.32330827,
+    })
+    expect(useStore.getState().priceObservations[0]).toMatchObject({
+      basis: 'kg',
+      price: { minor: 432, currency: 'CHF' },
+    })
+    expect(useStore.getState().completedTrips[0]!.receiptReview!.status).toBe('matched')
+  })
+  it('adds a renamed receipt item with linked prices and recognizes it again without duplicates', () => {
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nBrot 2.00\nEnergy 2 x 1.20\nTOTAL CHF 8.40')
+    evidence.rows[0]!.apply = false
+    const extra = evidence.rows[2]!
+    Object.assign(extra, { add: true, newName: 'Test Energy', category: 'Getränke' })
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true)).toMatchObject({ ok: true, added: 1 })
+    const state = useStore.getState(),
+      added = state.completedTrips[0]!.items[2]!,
+      log = state.purchaseLog[2]!
+    expect(added).toMatchObject({ name: 'Test Energy', amount: '2 Stück', price: 2.4, purchaseLogId: log.id })
+    expect(log).toMatchObject({
+      price: 2.4,
+      profilePrice: 1.2,
+      currency: 'CHF',
+      storeId: 'CH:migros',
+      date: state.purchaseLog[0]!.date,
+    })
+    expect(state.catalog.find((product) => product.id === log.productId)?.name).toBe('Test Energy')
+    expect(state.priceObservations.find((row) => row.purchaseLogId === log.id)?.price).toEqual({
+      minor: 120,
+      currency: 'CHF',
+    })
+    expect(state.pantry).toEqual(before.pantry)
+    expect(state.lists).toEqual(before.lists)
+    expect(state.completedTrips[0]!.receiptReview).toMatchObject({
+      status: 'matched',
+      checkedItems: 3,
+      unresolved: 0,
+    })
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    const reread = suggestReceiptRows(
+      parseReceiptCheck('Energy 2 x 1.20\nTOTAL CHF 2.40'),
+      state.completedTrips[0]!
+    )
+    expect(reread[0]!.targetId).toBe(added.id)
+    expect(
+      state.saveReceiptCheck(trip.id, receiptTripSnapshot(state.completedTrips[0]!), evidence, true).ok
+    ).toBe(false)
+    expect(useStore.getState().purchaseLog).toHaveLength(3)
+    const backup = parseBackup(JSON.stringify({ state: useStore.getState(), version: STORAGE_VERSION }))
+    expect(backup.state.completedTrips?.[0]?.items?.[2]?.receiptKey).toBe(added.receiptKey)
+  })
+  it('uses an explicitly selected catalog product and keeps an item-bound discount and kilogram basis', () => {
+    const state = useStore.getState()
+    useStore.setState({
+      catalog: [
+        {
+          id: 'fruit',
+          name: 'Testfrucht',
+          category: 'Früchte & Gemüse',
+          source: 'manual',
+          gtins: [],
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    })
+    const { trip, evidence, snapshot } = prepare(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nTestfrucht 0.500 4.00 0.50 1.50 1\nTOTAL CHF 1.50'
+    )
+    Object.assign(evidence.rows[0]!, {
+      apply: false,
+      add: true,
+      newName: 'Testfrucht',
+      category: 'Früchte & Gemüse',
+      productId: 'fruit',
+      addAsWeight: true,
+    })
+    expect(state.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    expect(useStore.getState().catalog).toHaveLength(1)
+    expect(useStore.getState().purchaseLog[2]).toMatchObject({
+      productId: 'fruit',
+      amount: '500 g',
+      price: 1.5,
+      pricePerKg: 3,
+      wasSale: true,
+    })
+    expect(useStore.getState().priceObservations.slice(-1)[0]).toMatchObject({
+      productId: 'fruit',
+      basis: 'kg',
+      discounted: true,
+      price: { minor: 300, currency: 'CHF' },
+    })
+  })
+  it('corrects the date on every linked purchase and observation only after selecting the date change', () => {
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nBrot 2.00\nTOTAL CHF 6.00')
+    evidence.rows[0]!.apply = false
+    evidence.date = '2026-09-15'
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    expect(useStore.getState().completedTrips[0]!.completedAt).toBe(trip.completedAt)
+    expect(useStore.getState().purchaseLog).toEqual(before.purchaseLog)
+    evidence.applyDate = true
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true)).toMatchObject({
+      ok: true,
+      dateUpdated: true,
+      updated: 0,
+    })
+    const state = useStore.getState()
+    expect(state.purchaseLog.every((entry) => entry.date === '2026-09-15')).toBe(true)
+    expect(state.priceObservations.every((entry) => entry.observedAt.startsWith('2026-09-15'))).toBe(true)
+    expect(pricesForCurrency(state.priceProfiles[0]!.variants[0]!, 'CHF').lastPurchaseDate).toBe('2026-09-15')
+    expect(state.completedTrips[0]!.receiptReview!.status).toBe('matched')
+    expect(state.purchaseLog.map((entry) => entry.price)).toEqual(
+      before.purchaseLog.map((entry) => entry.price)
+    )
+    expect(state.pantry).toEqual(before.pantry)
+  })
+  it('rejects an invalid date, wrong dimensions, unknown product and mixed invalid batches atomically', () => {
+    const { trip, evidence, snapshot } = prepare('3 x Milch 4.00\nBrot 2.00\nNeu 1.20\nTOTAL CHF 7.20')
+    evidence.rows[0]!.apply = false
+    evidence.rows[0]!.applyAmount = true
+    Object.assign(evidence.rows[2]!, {
+      add: true,
+      newName: 'Neu',
+      category: 'Getränke',
+      amount: '1 Stück',
+      productId: 'missing',
+    })
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    evidence.rows[2]!.productId = undefined
+    evidence.date = '2026-02-31'
+    evidence.applyDate = true
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    evidence.applyDate = false
+    evidence.rows[0]!.amount = '300 g'
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    expect(useStore.getState().purchaseLog).toEqual(before.purchaseLog)
+    expect(useStore.getState().completedTrips).toEqual(before.completedTrips)
+    expect(useStore.getState().catalog).toEqual(before.catalog)
+  })
+  it('corrects the date of linked app positions absent from the scan and keeps the review partial', () => {
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nTOTAL CHF 4.00')
+    evidence.rows[0]!.apply = false
+    evidence.applyDate = true
+    evidence.date = '2026-09-14'
+    expect(useStore.getState().saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    expect(useStore.getState().purchaseLog.every((entry) => entry.date === '2026-09-14')).toBe(true)
+    expect(useStore.getState().completedTrips[0]!.receiptReview!.status).toBe('partial')
+  })
+  it('rejects a date correction touching another receipt through a shared purchase reference', () => {
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nTOTAL CHF 4.00')
+    evidence.rows[0]!.apply = false
+    evidence.applyDate = true
+    evidence.date = '2026-09-14'
+    useStore.setState({ completedTrips: [trip, { ...trip, id: 'other' }] })
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    expect(useStore.getState().purchaseLog).toEqual(before.purchaseLog)
+    expect(useStore.getState().completedTrips).toEqual(before.completedTrips)
+  })
 })

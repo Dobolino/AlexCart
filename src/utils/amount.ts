@@ -72,7 +72,9 @@ export function inferPackCount(amount: string, preset: string): number {
 
 export function parseAmount(str: string | undefined | null): ParsedAmount | null {
   if (!str) return null
-  const m = String(str).trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/)
+  const m = String(str)
+    .trim()
+    .match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/)
   if (!m) return null
   return { value: parseFloat(m[1].replace(',', '.')), unit: m[2].trim() }
 }
@@ -136,14 +138,21 @@ const COUNT_UNITS = new Set([
   'rollen',
   'flasche',
   'flaschen',
+  'knolle',
+  'knollen',
+  'bund',
+  'bunde',
+  'glas',
+  'glaser',
+  'packchen',
 ])
 
 function normalizeUnit(unit: string): string {
-  return unit
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
+  return unit.trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+}
+
+export function isCountUnit(unit: string): boolean {
+  return COUNT_UNITS.has(normalizeUnit(unit))
 }
 
 /** Anzahl für Preisberechnung – z. B. „2 Stk“ → 2, „2 × 400 g“ → 2, „500 g“ → 1. */
@@ -153,12 +162,13 @@ export function priceQuantityFromAmount(amount: string): number {
 
   const parsed = parseAmount(amount)
   if (!parsed) {
-    const bare = String(amount).trim().match(/^(\d+)$/)
+    const bare = String(amount)
+      .trim()
+      .match(/^(\d+)$/)
     if (bare) return Math.max(1, Number(bare[1]))
     return 1
   }
-  const unit = normalizeUnit(parsed.unit)
-  if (COUNT_UNITS.has(unit)) return Math.max(1, Math.round(parsed.value))
+  if (isCountUnit(parsed.unit)) return Math.max(1, Math.round(parsed.value))
   return 1
 }
 
