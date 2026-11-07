@@ -36,7 +36,7 @@ function drawReceipt(trip: CompletedTrip, currency: Currency): HTMLCanvasElement
   if (trip.store) h += 22
   h += 22 // Datum
   h += 24 // Trennlinie
-  for (const it of items) h += it.amount ? 42 : 26
+  for (const it of items) h += (it.amount ? 42 : 26) + (it.brandName ? 16 : 0)
   h += 24 // Trennlinie
   h += 40 // TOTAL
   h += 22 // Artikel-Zusammenfassung
@@ -103,6 +103,13 @@ function drawReceipt(trip: CompletedTrip, currency: Currency): HTMLCanvasElement
     ctx.textAlign = 'left'
     ctx.font = `700 14px ${MONO}`
     ctx.fillText(ellipsize(ctx, it.name, innerW - priceW - 12), padX, y)
+    if (it.brandName) {
+      y += 16
+      ctx.font = `11px ${MONO}`
+      ctx.fillStyle = '#555555'
+      ctx.fillText(ellipsize(ctx, it.brandName, innerW), padX, y)
+      ctx.fillStyle = '#111111'
+    }
     if (it.amount) {
       y += 18
       ctx.fillStyle = '#777777'

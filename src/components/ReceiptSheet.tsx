@@ -196,12 +196,17 @@ function ReceiptRow({
   onUpdatePrice,
   onRemove,
 }: {
-  item: { id: string; name: string; amount: string; price?: number }
+  item: { id: string; name: string; amount: string; price?: number; brandName?: string }
   currency: Currency
   onUpdatePrice: (itemId: string, price: number | undefined) => void
   onRemove: () => void
 }) {
   const [priceInput, setPriceInput] = useState(item.price !== undefined ? String(item.price) : '')
+  const [lastPrice, setLastPrice] = useState(item.price)
+  if (lastPrice !== item.price) {
+    setLastPrice(item.price)
+    setPriceInput(item.price === undefined ? '' : String(item.price))
+  }
 
   function save() {
     const parsed = priceInput.trim() ? parseMoneyInput(priceInput) : null
@@ -214,7 +219,12 @@ function ReceiptRow({
       style={{ borderColor: 'var(--border)' }}
     >
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-semibold">{item.name}</div>
+        <div className="break-words text-[14px] font-semibold">{item.name}</div>
+        {item.brandName && (
+          <div className="break-words text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            {item.brandName}
+          </div>
+        )}
         {item.amount && (
           <div className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
             {item.amount}
@@ -225,6 +235,7 @@ function ReceiptRow({
         <input
           type="text"
           inputMode="decimal"
+          aria-label={`Bonpreis ${item.name}`}
           className="input w-20 py-1.5 text-right text-[14px] tabular-nums"
           placeholder="–"
           value={priceInput}

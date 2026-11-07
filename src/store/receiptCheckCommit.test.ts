@@ -71,6 +71,178 @@ function prepare(text = 'MIGROS\nMilch 2 x 2.50\nBrot 2.00\nTOTAL CHF 7.00') {
   return { trip, evidence, snapshot: receiptTripSnapshot(trip) }
 }
 describe('confirmed receipt photo corrections', () => {
+  it('clears the brand of an unpriced purchase without leaving an old brand variant or inventing a price', () => {
+    const initial = prepare('Milch 2 x 2.00\nBrot 2.00\nTOTAL CHF 6.00')
+    Object.assign(initial.evidence.rows[0]!, { apply: false, applyBrand: true, brandName: 'Testmarke' })
+    expect(
+      useStore.getState().saveReceiptCheck(initial.trip.id, initial.snapshot, initial.evidence, true).ok
+    ).toBe(true)
+    useStore.getState().updateCompletedTripItemPrice(initial.trip.id, 'milk', undefined)
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nBrot 2.00\nTOTAL CHF 6.00')
+    Object.assign(evidence.rows[0]!, { apply: false, applyBrand: true, brandName: '' })
+    expect(useStore.getState().saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    const state = useStore.getState()
+    expect(state.purchaseLog[0]!.price).toBeUndefined()
+    expect(state.purchaseLog[0]!.variantId).toBeUndefined()
+    expect(state.completedTrips[0]!.items[0]!.brandName).toBeUndefined()
+    expect(state.purchaseLog).toHaveLength(2)
+    expect(
+      state.priceObservations.filter((row) => row.purchaseLogId === state.purchaseLog[0]!.id)
+    ).toHaveLength(0)
+  })
+  it('requires a known conflicting brand to be confirmed before changing its purchase price', () => {
+    const state = useStore.getState(),
+      entry = state.purchaseLog[0]!
+    const brandId = 'old-brand'
+    useStore.setState({
+      brands: [{ id: brandId, name: 'Alte Marke', createdAt: 1 }],
+      priceProfiles: state.priceProfiles.map((profile) => ({
+        ...profile,
+        variants: profile.variants.map((variant) =>
+          variant.id === entry.variantId ? { ...variant, brandId } : variant
+        ),
+      })),
+    })
+    const { trip, evidence, snapshot } = prepare()
+    evidence.rows[0]!.brandName = 'Neue Marke'
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    expect(useStore.getState().purchaseLog).toEqual(before.purchaseLog)
+    evidence.rows[0]!.applyBrand = true
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    expect(useStore.getState().completedTrips[0]!.items[0]!.brandName).toBe('Neue Marke')
+  })
+  it('moves only the confirmed purchase to a brand without retagging older purchases sharing its original variant', () => {
+    const initial = useStore.getState(),
+      oldMilk = initial.purchaseLog[0]!
+    useStore.setState({
+      purchaseLog: [
+        ...initial.purchaseLog,
+        { ...oldMilk, id: 'older-milk', itemId: 'older-item', date: '2026-01-01' },
+      ],
+      priceObservations: [
+        ...initial.priceObservations,
+        { ...initial.priceObservations[0]!, id: 'older-observation', purchaseLogId: 'older-milk' },
+      ],
+    })
+    const { trip, evidence, snapshot } = prepare('Kurzmilch 2 x 2.00\nBrot 2.00\nTOTAL CHF 6.00')
+    Object.assign(evidence.rows[0]!, {
+      targetId: 'milk',
+      apply: false,
+      applyBrand: true,
+      brandName: 'Testmarke',
+      remember: true,
+    })
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, false).ok).toBe(false)
+    expect(useStore.getState().brands).toEqual(before.brands)
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true)).toMatchObject({
+      ok: true,
+      brandUpdated: 1,
+    })
+    const state = useStore.getState(),
+      brand = state.brands.find((brand) => brand.name === 'Testmarke')!
+    const current = state.purchaseLog[0]!,
+      older = state.purchaseLog.find((entry) => entry.id === 'older-milk')!
+    expect(older.variantId).toBe(oldMilk.variantId)
+    expect(current.variantId).not.toBe(oldMilk.variantId)
+    const variants = state.priceProfiles[0]!.variants
+    expect(variants.find((variant) => variant.id === oldMilk.variantId)?.brandId).toBeUndefined()
+    expect(variants.find((variant) => variant.id === current.variantId)?.brandId).toBe(brand.id)
+    expect(variants.find((variant) => variant.id === current.variantId)?.purchaseCount).toBe(1)
+    expect(state.catalog.find((product) => product.id === current.productId)?.brand).toBe('Testmarke')
+    expect(state.completedTrips[0]!.items[0]!.brandName).toBe('Testmarke')
+    expect(state.priceObservations.find((row) => row.purchaseLogId === current.id)?.productId).toBe(
+      current.productId
+    )
+    expect(state.priceObservations.find((row) => row.id === 'older-observation')?.productId).toBe(
+      oldMilk.productId
+    )
+    expect(state.receiptAliases[0]).toMatchObject({
+      retailer: 'CHF:migros',
+      label: 'Kurzmilch',
+      name: 'Milch',
+      brandName: 'Testmarke',
+    })
+    const nextRows = suggestReceiptRows(
+      parseReceiptCheck('Kurzmilch 2 x 2.00'),
+      state.completedTrips[0]!,
+      state.receiptAliases
+    )
+    expect(nextRows[0]!.targetId).toBe('milk')
+    expect(state.pantry).toEqual(before.pantry)
+    const backup = parseBackup(JSON.stringify({ state, version: STORAGE_VERSION }))
+    expect(backup.state.receiptAliases).toHaveLength(1)
+    expect(backup.state.completedTrips?.[0]?.items?.[0]?.brandName).toBe('Testmarke')
+    evidence.rows[0]!.applyBrand = false
+    evidence.rows[0]!.remember = false
+    expect(
+      state.saveReceiptCheck(trip.id, receiptTripSnapshot(state.completedTrips[0]!), evidence, true).ok
+    ).toBe(true)
+    expect(useStore.getState().receiptAliases).toHaveLength(0)
+  })
+  it('adds a branded product and observation only once after confirmation', () => {
+    const { trip, evidence, snapshot } = prepare(
+      'Milch 2 x 2.00\nBrot 2.00\nMClass Testkeks 1.20\nTOTAL CHF 7.20'
+    )
+    evidence.rows[0]!.apply = false
+    Object.assign(evidence.rows[2]!, {
+      add: true,
+      newName: 'Testkeks',
+      amount: '1 Packung',
+      category: 'Süßes & Snacks',
+      brandName: 'M Classic',
+      remember: true,
+    })
+    expect(useStore.getState().saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    const state = useStore.getState(),
+      added = state.purchaseLog[2]!
+    expect(state.catalog.find((product) => product.id === added.productId)?.brand).toBe('M Classic')
+    expect(state.priceProfiles.find((profile) => profile.itemName === 'Testkeks')?.variants[0]?.brandId).toBe(
+      state.brands.find((brand) => brand.name === 'M Classic')?.id
+    )
+    expect(state.completedTrips[0]!.items[2]!.brandName).toBe('M Classic')
+    expect(state.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    expect(useStore.getState().purchaseLog).toHaveLength(3)
+  })
+  it('removes an explicitly excluded app-only purchase and its observations without changing stock', () => {
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nTOTAL CHF 4.00')
+    evidence.rows[0]!.apply = false
+    evidence.removeItemIds = ['bread']
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true)).toMatchObject({ ok: true, removed: 1 })
+    const state = useStore.getState()
+    expect(state.completedTrips[0]!.items.map((item) => item.id)).toEqual(['milk'])
+    expect(state.purchaseLog).toHaveLength(1)
+    expect(state.purchaseLog[0]!.name).toBe('Milch')
+    expect(currentWeekSpend(state.purchaseLog, new Date(), 'CHF')).toBe(4)
+    expect(state.pantry).toEqual(before.pantry)
+    expect(state.completedTrips[0]!.receiptReview!.status).toBe('matched')
+  })
+  it('rejects conflicting removals and oversized brands before changing purchases or learning aliases', () => {
+    const { trip, evidence, snapshot } = prepare('Milch 2 x 2.00\nBrot 2.00\nTOTAL CHF 6.00')
+    evidence.rows[0]!.apply = false
+    evidence.removeItemIds = ['milk']
+    const before = useStore.getState()
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    evidence.removeItemIds = []
+    evidence.rows[0]!.applyBrand = true
+    evidence.rows[0]!.brandName = 'x'.repeat(301)
+    evidence.rows[0]!.remember = true
+    expect(before.saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(false)
+    expect(useStore.getState().purchaseLog).toEqual(before.purchaseLog)
+    expect(useStore.getState().brands).toEqual(before.brands)
+    expect(useStore.getState().receiptAliases).toEqual(before.receiptAliases)
+  })
+  it('also keeps ordinary receipt-row deletion consistent with purchase history', () => {
+    const state = useStore.getState(),
+      trip = state.completedTrips[0]!
+    state.removeCompletedTripItem(trip.id, 'milk')
+    expect(useStore.getState().purchaseLog).toHaveLength(1)
+    expect(useStore.getState().priceObservations).toHaveLength(0)
+    expect(useStore.getState().completedTrips[0]!.items.map((item) => item.id)).toEqual(['bread'])
+    expect(useStore.getState().pantry).toEqual(state.pantry)
+  })
   it('stores the PDF review source in a valid versioned backup alongside linked corrections', () => {
     const { trip, evidence, snapshot } = prepare()
     evidence.source = 'pdf'

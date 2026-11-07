@@ -1,13 +1,15 @@
 import Decimal from 'decimal.js'
-import type { CompletedTrip, PurchaseLogEntry, ProductPriceProfile } from '@/types'
+import type { CompletedTrip, PurchaseLogEntry, ProductPriceProfile, GlobalBrand } from '@/types'
 import type { CatalogProduct, PriceObservation, RetailStore } from '@/types/catalog'
 import { receiptRowKey, type ReceiptCheckRow } from '@/utils/receiptCheck'
 import { uid } from '@/utils/id'
 import { timestampToDateKey } from '@/utils/date'
 import { parsePackAmount, priceQuantityFromAmount } from '@/utils/amount'
-import { baseQuantity, quantityText } from '@/utils/quantity'
+import { baseQuantity } from '@/utils/quantity'
 import { recordVariantPurchase, upsertPriceProfile, refreshPurchaseProfiles } from '@/utils/priceProfiles'
 import { observationFromPurchase } from './catalogPurchase'
+import { receiptVariantName } from './receiptBrandCommit'
+import { receiptBrandKey as brandSearchKey } from '@/data/receiptVocabulary'
 
 /** Append only explicitly selected rows to the historical trip. No current-list or stock movements. */
 export function appendReceiptCheckItems(
@@ -18,6 +20,7 @@ export function appendReceiptCheckItems(
     priceObservations: PriceObservation[]
     catalog: CatalogProduct[]
     retailStores: RetailStore[]
+    brands: GlobalBrand[]
   },
   tripId: string,
   rows: ReceiptCheckRow[],
@@ -46,6 +49,7 @@ export function appendReceiptCheckItems(
       product = {
         id: uid(),
         name,
+        brand: row.brandName?.trim() || undefined,
         category,
         gtins: [],
         netQuantity,
@@ -58,13 +62,22 @@ export function appendReceiptCheckItems(
     const divisor = row.addAsWeight ? quantity!.value / 1000 : priceQuantityFromAmount(amount)
     const unitPrice = new Decimal(price).div(divisor).toDecimalPlaces(8).toNumber()
     const packageSize = product.netQuantity ?? netQuantity
-    const variantName = `${trip.store ?? store.name} · ${row.addAsWeight ? 'pro kg' : packageSize ? quantityText(packageSize) : 'pro Stück'}`
+    const brand = state.brands.find(
+      (brand) => brandSearchKey(brand.name) === brandSearchKey(row.brandName ?? '')
+    )
+    const variantName = receiptVariantName(
+      trip.store ?? store.name,
+      row.brandName?.trim(),
+      packageSize,
+      !!row.addAsWeight
+    )
     const purchase = recordVariantPurchase(
       priceProfiles,
       name,
       category,
       {
         price,
+        brandId: brand?.id,
         unitPrice,
         pricePerKg: row.addAsWeight ? unitPrice : undefined,
         wasSale: (row.discountMinor ?? 0) < 0,
@@ -99,6 +112,7 @@ export function appendReceiptCheckItems(
       id: entry.itemId!,
       purchaseLogId: entry.id!,
       name,
+      brandName: row.brandName?.trim() || undefined,
       amount,
       price,
       receiptKey: receiptRowKey(row),

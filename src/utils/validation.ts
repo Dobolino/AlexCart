@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { productSchema, priceObservationSchema, retailStoreSchema, fxSchema } from './catalogSchemas'
 
-export const STORAGE_VERSION = 25
+export const STORAGE_VERSION = 26
 export const MAX_BACKUP_BYTES = 8 * 1024 * 1024
 const text = z.string().max(1000)
 const id = z.string().min(1).max(200)
@@ -89,6 +89,7 @@ const entry = z
   })
   .passthrough()
 const tripItem = z.object({
+  brandName: z.string().max(300).optional(),
   receiptKey: id.optional(),
   id,
   name: text,
@@ -148,6 +149,20 @@ const settings = z
 
 // Explicit top-level keys prevent restored JSON from replacing store actions.
 export const persistedStateSchema = z.object({
+  receiptAliases: z
+    .array(
+      z.object({
+        key: id,
+        retailer: text,
+        label: text,
+        amountKey: text,
+        name: text,
+        category: text,
+        brandName: z.string().max(300).optional(),
+      })
+    )
+    .max(1000)
+    .optional(),
   lists: z.array(list).min(1).max(500),
   activeListId: text.optional(),
   pantry: array(pantry).optional(),

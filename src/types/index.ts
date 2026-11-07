@@ -208,6 +208,7 @@ export interface AppStats {
 
 /** Einzelposten auf der Quittung eines abgeschlossenen Einkaufs. */
 export interface CompletedTripItem {
+  brandName?: string
   /** Identifies an explicitly added receipt row when its displayed name was edited. */
   receiptKey?: string
   id: string

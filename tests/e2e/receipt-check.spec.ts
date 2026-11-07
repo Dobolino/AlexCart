@@ -120,6 +120,120 @@ async function openReceipt(page: Page, active = false, weight = false) {
 }
 const stored = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('alexshop-store')!).state)
 
+test('captures a missing receipt row freely and stages a new brand until final confirmation', async ({
+  page,
+}) => {
+  await openReceipt(page)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit.getByLabel('Bon-Text', { exact: true }).fill('MIGROS\nMilch 1.50\nBrot 2.00\nTOTAL CHF 6.00')
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  await audit.getByRole('button', { name: 'Bonposition manuell erfassen', exact: true }).tap()
+  const manual = audit.getByRole('region', { name: /Bonposition/ }).last()
+  await manual.getByLabel('Artikelname', { exact: true }).fill('Testmüsli')
+  await manual.getByLabel('Bon-Menge', { exact: true }).fill('1 Packung')
+  await manual.getByLabel('Bonpreis gesamt', { exact: true }).fill('2.50')
+  await manual.getByLabel('Kategorie', { exact: true }).selectOption('Getreide & Beilagen')
+  await manual.getByRole('button', { name: 'Marke auswählen', exact: true }).tap()
+  const brand = page.getByRole('dialog', { name: 'Marke auswählen', exact: true })
+  await brand.getByRole('searchbox', { name: 'Markensuche', exact: true }).fill('Testbon Marke')
+  await brand.getByRole('button', { name: /als eigene Marke anlegen/ }).tap()
+  await expect(brand).toHaveCount(0)
+  expect((await stored(page)).brands.some((entry: { name: string }) => entry.name === 'Testbon Marke')).toBe(
+    false
+  )
+  expect((await stored(page)).purchaseLog).toHaveLength(2)
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
+  await audit.getByRole('button', { name: 'Änderungen & Prüfung speichern', exact: true }).tap()
+  await expect(audit).toHaveCount(0)
+  await page.reload()
+  const state = await stored(page),
+    added = state.purchaseLog[2]
+  expect(state.completedTrips[0].items[2]).toMatchObject({
+    name: 'Testmüsli',
+    price: 2.5,
+    brandName: 'Testbon Marke',
+  })
+  expect(state.catalog.find((product: { id: string }) => product.id === added.productId).brand).toBe(
+    'Testbon Marke'
+  )
+  expect(state.brands.filter((entry: { name: string }) => entry.name === 'Testbon Marke')).toHaveLength(1)
+  expect(state.purchaseLog).toHaveLength(3)
+})
+
+test('suggests a brand-prefixed receipt label, saves the verified mapping and reuses it on the next check', async ({
+  page,
+}) => {
+  await openReceipt(page)
+  let audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  const text = 'MIGROS\nMClass Milch 1.70\nBrot 2.00\nTOTAL CHF 3.70'
+  await audit.getByLabel('Bon-Text', { exact: true }).fill(text)
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  let milk = audit.getByRole('region', { name: 'Bonposition MClass Milch', exact: true })
+  await milk.getByRole('button', { name: 'Zuordnen: Milch · 1 Stück', exact: true }).tap()
+  await expect(
+    milk.getByRole('checkbox', { name: 'Marke für MClass Milch übernehmen', exact: true })
+  ).toBeChecked()
+  await milk.getByRole('checkbox', { name: 'Preis für MClass Milch übernehmen', exact: true }).check()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
+  await audit.getByRole('button', { name: 'Änderungen & Prüfung speichern', exact: true }).tap()
+  await expect(audit).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Bonpreis Milch', exact: true })).toHaveValue('1.7')
+  const state = await stored(page)
+  expect(state.completedTrips[0].items[0].brandName).toBe('M Classic')
+  expect(state.receiptAliases).toHaveLength(1)
+  await page.getByRole('button', { name: 'Mit Foto oder PDF prüfen', exact: true }).tap()
+  audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit.getByLabel('Bon-Text', { exact: true }).fill(text)
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  await audit
+    .getByRole('checkbox', { name: 'Nur Abweichungen und offene Zuordnungen', exact: true })
+    .uncheck()
+  milk = audit.getByRole('region', { name: 'Bonposition MClass Milch', exact: true })
+  await expect(
+    milk.getByRole('button', { name: 'App: Milch · 1 Stück · bearbeiten', exact: true })
+  ).toBeVisible()
+  await expect(milk.getByRole('button', { name: 'Zum Einkauf hinzufügen', exact: true })).toHaveCount(0)
+  expect((await stored(page)).purchaseLog).toHaveLength(2)
+})
+
+test('explicitly removes an app-only purchase while preserving the remaining prices and stock', async ({
+  page,
+}) => {
+  await openReceipt(page)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit.getByLabel('Bon-Text', { exact: true }).fill('MIGROS\nMilch 1.50\nTOTAL CHF 1.50')
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  await audit.locator('summary').filter({ hasText: 'App-Positionen im Bon nicht zugeordnet' }).tap()
+  await audit
+    .getByRole('checkbox', { name: 'Brot · 1 Stück · aus diesem Einkauf entfernen', exact: true })
+    .check()
+  expect((await stored(page)).purchaseLog).toHaveLength(2)
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
+  await audit.getByRole('button', { name: 'Änderungen & Prüfung speichern', exact: true }).tap()
+  await expect(audit).toHaveCount(0)
+  const state = await stored(page)
+  expect(state.purchaseLog).toHaveLength(1)
+  expect(state.completedTrips[0].items.map((item: { name: string }) => item.name)).toEqual(['Milch'])
+  expect(state.completedTrips[0].receiptReview.status).toBe('matched')
+  expect(state.pantry[0].amount).toBe('2 Stück')
+})
+
+test('does not overwrite a normal shopping trip with a negative refund receipt', async ({ page }) => {
+  await openReceipt(page)
+  const before = await stored(page)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit
+    .getByLabel('Bon-Text', { exact: true })
+    .fill(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nTestfrucht 0.200 10.00 2.00 1\n0.250 10.00- 2.50- 1\nTotal CHF -0.50\nZurück 0.50'
+    )
+  await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
+  await expect(audit.getByRole('alert')).toContainText('Rückerstattung')
+  await expect(audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ })).toBeDisabled()
+  await expect(audit.getByRole('button', { name: 'Prüfergebnis speichern', exact: true })).toBeDisabled()
+  expect((await stored(page)).purchaseLog).toEqual(before.purchaseLog)
+})
+
 test('edits and explicitly adopts a receipt weight without changing the already correct total price', async ({
   page,
 }) => {

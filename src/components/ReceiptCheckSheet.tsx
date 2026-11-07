@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Sheet } from './Sheet'
 import { StoreLayoutSheet } from './StoreLayoutSheet'
 import { useStore } from '@/store/useStore'
@@ -22,6 +22,13 @@ import type { Currency } from '@/types'
 import { CATEGORIES, PRODUCTS } from '@/data/products'
 import { timestampToDateKey, formatDateKeyDe } from '@/utils/date'
 import { baseQuantity } from '@/utils/quantity'
+import { BrandSelect } from './BrandSelect'
+import { uid } from '@/utils/id'
+import { fingerprint } from '@/utils/fingerprint'
+import { recognizeReceiptLabel, receiptNameScore, receiptRetailerKey } from '@/data/receiptVocabulary'
+import { retailSelection } from '@/data/retailCatalog'
+import { receiptBrandKey as brandSearchKey } from '@/data/receiptVocabulary'
+import type { GlobalBrand } from '@/types'
 
 type DraftRow = ReceiptCheckRow & { priceText: string }
 const editableMinor = (value: string) =>
@@ -39,6 +46,26 @@ export function ReceiptCheckSheet({
   const trip = useStore((state) => state.completedTrips.find((trip) => trip.id === tripId))
   const purchaseLog = useStore((state) => state.purchaseLog)
   const catalog = useStore((state) => state.catalog)
+  const brands = useStore((state) => state.brands)
+  const priceProfiles = useStore((state) => state.priceProfiles)
+  const aliases = useStore((state) => state.receiptAliases)
+  const settings = useStore((state) => state.settings)
+  const metadata = useMemo(
+    () => ({
+      logs: new Map(purchaseLog.flatMap((entry) => (entry.id ? [[entry.id, entry] as const] : []))),
+      variants: new Map(
+        priceProfiles.flatMap((profile) => profile.variants).map((variant) => [variant.id, variant])
+      ),
+      products: new Map(catalog.map((product) => [product.id, product])),
+      brands: new Map(brands.map((brand) => [brand.id, brand])),
+    }),
+    [purchaseLog, priceProfiles, catalog, brands]
+  )
+  const [brandContext, setBrandContext] = useState(() =>
+    retailSelection({ ...settings, currency: trip?.currency ?? settings.currency }, trip?.store)
+  )
+  const [draftBrands, setDraftBrands] = useState<GlobalBrand[]>([])
+  const newBrandNames = useRef(new Map<string, string>())
   const [locationOpen, setLocationOpen] = useState(false)
   const [text, setText] = useState('')
   const [document, setDocument] = useState<ReceiptCheckDocument | null>(null)
@@ -58,6 +85,7 @@ export function ReceiptCheckSheet({
   const [confirmed, setConfirmed] = useState(false)
   const [onlyDifferences, setOnlyDifferences] = useState(true)
   const [editingId, setEditingId] = useState('')
+  const [removeItemIds, setRemoveItemIds] = useState<string[]>([])
   const camera = useRef<HTMLInputElement>(null)
   const gallery = useRef<HTMLInputElement>(null)
   const controller = useRef<AbortController | null>(null)
@@ -74,6 +102,22 @@ export function ReceiptCheckSheet({
     [photoUrl]
   )
 
+  function existingBrand(itemId: string): string | undefined {
+    const item = trip?.items.find((item) => item.id === itemId)
+    const entry = metadata.logs.get(item?.purchaseLogId ?? '')
+    const variant = metadata.variants.get(entry?.variantId ?? '')
+    return (
+      item?.brandName ??
+      metadata.products.get(entry?.productId ?? '')?.brand ??
+      metadata.brands.get(variant?.brandId ?? '')?.name
+    )
+  }
+  function brandConflict(row: ReceiptCheckRow) {
+    const known = existingBrand(row.targetId)
+    return (
+      !!known && !!row.brandName && brandSearchKey(known) !== brandSearchKey(row.brandName) && !row.applyBrand
+    )
+  }
   function analyze(value = text, actualSource = source) {
     if (!trip) return
     setError('')
@@ -83,17 +127,43 @@ export function ReceiptCheckSheet({
       const parsed = parseReceiptCheck(value)
       setDocument(parsed)
       setRows(
-        suggestReceiptRows(parsed, trip).map((row) => ({
-          ...row,
-          priceText: (row.minor / 100).toFixed(2),
-          newName: row.name,
-          category:
-            catalog.find((product) => checkName(product.name) === checkName(row.name))?.category ??
-            PRODUCTS.find((product) => checkName(product.name) === checkName(row.name))?.category ??
-            'Sonstiges',
-          addAsWeight: !!row.weighed,
-        }))
+        suggestReceiptRows(parsed, trip, aliases).map((row) => {
+          const recognized = recognizeReceiptLabel(
+            row.name,
+            receiptRetailerKey(trip.store, trip.currency ?? 'CHF'),
+            aliases,
+            row.amount,
+            !!row.weighed
+          )
+          const item = trip.items.find((item) => item.id === row.targetId)
+          const log = purchaseLog.find((entry) => entry.id === item?.purchaseLogId)
+          const appBrand =
+            existingBrand(item?.id ?? '') ?? catalog.find((product) => product.id === log?.productId)?.brand
+          return {
+            ...row,
+            priceText: (row.minor / 100).toFixed(2),
+            newName: recognized.name,
+            brandName: recognized.brandName ?? appBrand ?? '',
+            brandOrigin:
+              recognized.source === 'explicit'
+                ? 'Bontext'
+                : recognized.source === 'remembered'
+                  ? 'Gemerkte Zuordnung'
+                  : appBrand
+                    ? 'App-Angabe'
+                    : undefined,
+            applyBrand: !!item && !!recognized.brandName && !appBrand,
+            remember: true,
+            category:
+              recognized.category ??
+              catalog.find((product) => checkName(product.name) === checkName(row.name))?.category ??
+              PRODUCTS.find((product) => checkName(product.name) === checkName(recognized.name))?.category ??
+              'Sonstiges',
+            addAsWeight: !!row.weighed,
+          }
+        })
       )
+      setRemoveItemIds([])
       setCurrency(parsed.currency ?? trip.currency ?? 'CHF')
       setTotalText(parsed.totalMinor === undefined ? '' : (parsed.totalMinor / 100).toFixed(2))
       setReceiptDate(parsed.date ?? '')
@@ -178,21 +248,47 @@ export function ReceiptCheckSheet({
     store: document?.store,
     date: receiptDate || undefined,
     applyDate,
+    removeItemIds,
     warnings: document?.warnings ?? [],
     source,
   }
-  const comparison = compareReceiptCheck(trip, evidence)
+  const comparison = compareReceiptCheck(
+    {
+      ...trip,
+      items: trip.items
+        .filter((item) => !removeItemIds.includes(item.id))
+        .map((item) => ({ ...item, brandName: existingBrand(item.id) })),
+    },
+    evidence
+  )
+  const unassignedAppItems = trip.items.filter((item) => !rows.some((row) => row.targetId === item.id))
+  const refund = (document?.totalMinor ?? 0) < 0
+  const brandOptions = [
+    ...brands,
+    ...draftBrands.filter(
+      (brand) => !brands.some((known) => brandSearchKey(known.name) === brandSearchKey(brand.name))
+    ),
+  ]
+  for (const row of rows)
+    if (
+      row.brandName?.trim() &&
+      !brandOptions.some((brand) => brandSearchKey(brand.name) === brandSearchKey(row.brandName!))
+    )
+      brandOptions.push({ id: `receipt:${fingerprint(row.brandName)}`, name: row.brandName, createdAt: 0 })
   const stale = snapshot !== receiptTripSnapshot(trip) || analyzedText !== text
   const currencyMismatch = currency !== (trip.currency ?? 'CHF')
   const appTotalMinor = Math.round(tripTotalSpent(trip) * 100)
   const selected = rows.filter((row) => row.apply).length
   const amountChanges = rows.filter((row) => row.applyAmount).length
   const additions = rows.filter((row) => row.add).length
+  const brandChanges = rows.filter((row) => row.applyBrand).length
   const dateChange = applyDate && receiptDate !== timestampToDateKey(trip.completedAt)
   const pendingSummary = [
     selected ? `${selected} ${selected === 1 ? 'Preis' : 'Preise'}` : '',
     amountChanges ? `${amountChanges} ${amountChanges === 1 ? 'Menge' : 'Mengen'}` : '',
     additions ? `${additions} Artikel` : '',
+    brandChanges ? `${brandChanges} Marken` : '',
+    removeItemIds.length ? `${removeItemIds.length} entfernen` : '',
     dateChange ? 'Datum' : '',
   ]
     .filter(Boolean)
@@ -204,6 +300,8 @@ export function ReceiptCheckSheet({
         row.duplicate ||
         (row.apply && !row.canApply) ||
         (row.applyAmount && !row.canApplyAmount) ||
+        (row.applyBrand && !row.canApplyBrand) ||
+        ((row.apply || row.applyAmount) && brandConflict(row)) ||
         (row.add && !row.canAdd)
     ) ||
     (applyDate && !validReceiptDate(receiptDate)) ||
@@ -213,14 +311,60 @@ export function ReceiptCheckSheet({
       !onlyDifferences ||
       !row.equal ||
       row.quantityMismatch ||
+      row.brandMismatch ||
       row.duplicate ||
       row.applyAmount ||
       row.add ||
-      row.apply
+      row.apply ||
+      row.applyBrand
   )
   function changeRow(id: string, patch: Partial<DraftRow>) {
     setRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))
     setConfirmed(false)
+  }
+  function addManualRow() {
+    if (!trip || rows.length >= 200 || busy || refund) return
+    const row: DraftRow = {
+      id: `manual-${uid()}`,
+      name: '',
+      newName: '',
+      amount: '',
+      priceText: '',
+      minor: NaN,
+      occurrences: 1,
+      targetId: '',
+      apply: false,
+      add: true,
+      manual: true,
+      remember: true,
+      category: 'Sonstiges',
+      brandName: '',
+    }
+    if (!document) {
+      setRemoveItemIds([])
+      setDocument({ lines: [], adjustments: [], warnings: [] })
+      setSnapshot(receiptTripSnapshot(trip))
+      setAnalyzedText(text)
+      setTotalText('')
+      setReceiptDate('')
+      setSource('text')
+    }
+    setRows((current) => (document ? [...current, row] : [row]))
+    setEditingId(row.id)
+    setConfirmed(false)
+  }
+  function candidates(row: ReceiptCheckRow) {
+    if (!trip || row.targetId || !row.name.trim()) return []
+    return trip.items
+      .filter((item) => !removeItemIds.includes(item.id) && !rows.some((other) => other.targetId === item.id))
+      .map((item) => ({
+        item,
+        score: receiptNameScore(row.name, item.name, receiptRetailerKey(trip.store, trip.currency ?? 'CHF')),
+      }))
+      .filter((candidate) => candidate.score >= 0.45)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((candidate) => candidate.item)
   }
   function save() {
     const result = useStore.getState().saveReceiptCheck(tripId, snapshot, evidence, confirmed)
@@ -232,6 +376,8 @@ export function ReceiptCheckSheet({
           ? `${result.amountUpdated} ${result.amountUpdated === 1 ? 'Menge' : 'Mengen'} korrigiert`
           : '',
         result.added ? `${result.added} Artikel ergänzt` : '',
+        result.brandUpdated ? `${result.brandUpdated} Marken übernommen` : '',
+        result.removed ? `${result.removed} App-Positionen entfernt` : '',
         result.dateUpdated ? 'Datum korrigiert' : '',
       ].filter(Boolean)
       onSaved(
@@ -243,7 +389,7 @@ export function ReceiptCheckSheet({
     <Sheet onClose={onClose} tall>
       <h2 className="mb-1 shrink-0 text-xl font-bold">Bon prüfen</h2>
       <p className="mb-3 shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
-        {trip.store ?? trip.listName} · gespeicherte Summe{' '}
+        {trip.store ?? trip.listName} · gespeicherte Warensumme{' '}
         {formatMoney(tripTotalSpent(trip), trip.currency ?? 'CHF')}
       </p>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
@@ -263,6 +409,13 @@ export function ReceiptCheckSheet({
             Bild oder PDF auswählen
           </button>
         </div>
+        <button
+          className="btn-soft mb-3 min-h-11 w-full px-2 text-sm"
+          disabled={busy || refund || rows.length >= 200}
+          onClick={addManualRow}
+        >
+          Bonposition manuell erfassen
+        </button>
         <input
           ref={camera}
           className="sr-only"
@@ -366,6 +519,12 @@ export function ReceiptCheckSheet({
         </details>
         {document && (
           <>
+            {refund && (
+              <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>
+                Dieser Bon enthält eine Rückerstattung mit negativem Endbetrag. Er darf keinen normalen
+                Einkauf überschreiben. Rückgaben bitte getrennt erfassen.
+              </p>
+            )}
             {stale && (
               <div role="alert" className="card-surface mb-3 p-3 text-sm">
                 Bon oder Text wurde verändert.{' '}
@@ -457,17 +616,35 @@ export function ReceiptCheckSheet({
             )}
             <section className="card-surface mb-3 p-3 text-sm">
               <p className="font-bold">
-                {comparison.rows.filter((row) => row.equal && !row.quantityMismatch && !row.duplicate).length}{' '}
+                {
+                  comparison.rows.filter(
+                    (row) => row.equal && !row.quantityMismatch && !row.brandMismatch && !row.duplicate
+                  ).length
+                }{' '}
                 von {rows.length} erkannten Positionen preisgleich
               </p>
               <p className="mt-1">
                 Erkannte Zeilen inkl. Zu-/Abschläge: {formatMoney(comparison.lineSum / 100, currency)}
               </p>
+              <p className="mt-1">
+                Waren auf dem Bon: {formatMoney(comparison.productSum / 100, currency)} · Gutscheine, Pfand
+                und Rundung: {formatMoney(comparison.adjustmentSum / 100, currency)}
+              </p>
+              {comparison.adjustmentSum !== 0 && (
+                <p className="mt-1 text-xs">
+                  Verglichen werden die Warenpreise. Der Zahlbetrag enthält zusätzlich die gesonderten
+                  Zu-/Abschläge. Gutscheine werden nicht als Artikelpreise verteilt.
+                </p>
+              )}
               {!currencyMismatch && totalMinor !== undefined && Number.isSafeInteger(totalMinor) && (
                 <p className="mt-1 font-semibold">
-                  {totalMinor === appTotalMinor
+                  {totalMinor === appTotalMinor && !comparison.adjustmentSum
                     ? 'Bon-Endbetrag und App-Summe sind gleich.'
-                    : `Bon-Endbetrag ist ${formatMoney(Math.abs(totalMinor - appTotalMinor) / 100, currency)} ${totalMinor > appTotalMinor ? 'höher' : 'niedriger'} als die App-Summe.`}
+                    : comparison.adjustmentSum
+                      ? comparison.productSum === appTotalMinor
+                        ? 'Bon-Warensumme und App-Summe sind gleich. Gutscheine, Pfand und Rundung erklären den anderen Zahlbetrag.'
+                        : `Bon-Warensumme ist ${formatMoney(Math.abs(comparison.productSum - appTotalMinor) / 100, currency)} ${comparison.productSum > appTotalMinor ? 'höher' : 'niedriger'} als die App-Summe. Den Zahlbetrag gesondert prüfen.`
+                      : `Bon-Endbetrag ist ${formatMoney(Math.abs(totalMinor - appTotalMinor) / 100, currency)} ${totalMinor > appTotalMinor ? 'höher' : 'niedriger'} als die App-Summe.`}
                 </p>
               )}
               <p className="mt-1 font-semibold">
@@ -522,11 +699,60 @@ export function ReceiptCheckSheet({
               <p className="mb-3 text-sm">Keine Preisabweichung bei den zugeordneten Positionen.</p>
             )}
             {visible.map((row) => (
-              <section key={row.id} className="card-surface mb-3 p-3" aria-label={`Bonposition ${row.name}`}>
+              <section
+                key={row.id}
+                className="card-surface mb-3 p-3"
+                aria-label={`Bonposition ${row.name || 'Manueller Artikel'}`}
+              >
                 <p className="font-bold">
-                  {row.name}
+                  {row.name || 'Manueller Artikel'}
                   {row.occurrences > 1 ? ` · ${row.occurrences} zusammengefasst` : ''}
                 </p>
+                {row.brandName && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Marke: {row.brandName}
+                    {row.brandOrigin ? ` · ${row.brandOrigin}` : ''}
+                    {row.applyBrand ? ' · zur Übernahme vorgemerkt' : ''}
+                  </p>
+                )}
+                {row.item && existingBrand(row.targetId) && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    App-Marke: {existingBrand(row.targetId)}
+                  </p>
+                )}
+                {brandConflict(row) && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--accent)' }}>
+                    Die Bon-Marke weicht ab. Bitte Zuordnung oder Marke bestätigen, bevor du Preis oder Menge
+                    änderst.
+                  </p>
+                )}
+                {row.cancelled && (
+                  <p className="mt-1 text-xs">Stornierte Bonmengen sind bereits verrechnet.</p>
+                )}
+                {!row.targetId && candidates(row).length > 0 && (
+                  <div className="my-2 text-xs">
+                    <p>Vielleicht bereits im Einkauf enthalten? Bitte Produkt und Variante prüfen.</p>
+                    {candidates(row).map((item) => (
+                      <button
+                        key={item.id}
+                        className="btn-soft my-1 min-h-11 w-full px-2 text-left"
+                        onClick={() => {
+                          changeRow(row.id, {
+                            targetId: item.id,
+                            add: false,
+                            apply: false,
+                            applyAmount: false,
+                            applyBrand: !!row.brandName && !existingBrand(item.id),
+                            remember: true,
+                          })
+                          setEditingId(row.id)
+                        }}
+                      >
+                        Zuordnen: {item.name} · {item.amount}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <p className="my-1 text-sm">
                   Bon: {row.invalidPrice ? 'Preis prüfen' : formatMoney(row.minor / 100, currency)} · App:{' '}
                   {row.appMinor === undefined
@@ -556,6 +782,14 @@ export function ReceiptCheckSheet({
                 </button>
                 {editingId === row.id && (
                   <div className="mb-2 space-y-2">
+                    {row.add && (
+                      <button
+                        className="btn-soft min-h-11 w-full px-2 text-xs"
+                        onClick={() => changeRow(row.id, { add: false })}
+                      >
+                        Vorhandenen Artikel zuordnen
+                      </button>
+                    )}
                     {!row.add && (
                       <label className="block text-xs font-semibold">
                         App-Position
@@ -563,27 +797,64 @@ export function ReceiptCheckSheet({
                           className="input mt-1 w-full"
                           aria-label="App-Position"
                           value={row.targetId}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const chosen = trip.items.find((item) => item.id === event.target.value)
                             changeRow(row.id, {
                               targetId: event.target.value,
                               apply: false,
                               applyAmount: false,
                               add: false,
+                              applyBrand: !!chosen && !!row.brandName && !existingBrand(chosen.id),
+                              remember: true,
+                              ...(row.manual && chosen
+                                ? { name: row.name || chosen.name, amount: row.amount || chosen.amount }
+                                : {}),
                             })
-                          }
+                          }}
                         >
                           <option value="">Nicht zugeordnet</option>
-                          {trip.items.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name} · {item.amount}
-                              {item.price === undefined
-                                ? ''
-                                : ` · ${formatMoney(item.price, trip.currency ?? 'CHF')}`}
-                            </option>
-                          ))}
+                          {trip.items
+                            .filter((item) => !removeItemIds.includes(item.id))
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name} · {item.amount}
+                                {item.price === undefined
+                                  ? ''
+                                  : ` · ${formatMoney(item.price, trip.currency ?? 'CHF')}`}
+                              </option>
+                            ))}
                         </select>
                       </label>
                     )}
+                    <BrandSelect
+                      label="Marke auf dem Bon"
+                      brands={brandOptions}
+                      value={
+                        brandOptions.find(
+                          (brand) => brandSearchKey(brand.name) === brandSearchKey(row.brandName ?? '')
+                        )?.id ?? ''
+                      }
+                      context={brandContext}
+                      onContextChange={setBrandContext}
+                      lockCountry
+                      onCreateBrand={(name) => {
+                        const brand = { id: uid(), name: name.trim(), createdAt: Date.now() }
+                        newBrandNames.current.set(brand.id, brand.name)
+                        setDraftBrands((current) => [...current, brand])
+                        return brand.id
+                      }}
+                      onChange={(id) => {
+                        const name =
+                          brandOptions.find((brand) => brand.id === id)?.name ??
+                          newBrandNames.current.get(id) ??
+                          ''
+                        changeRow(row.id, {
+                          brandName: name,
+                          brandOrigin: 'Auswahl',
+                          applyBrand: !!row.item && name !== (row.item.brandName ?? ''),
+                        })
+                      }}
+                    />
                     <label className="block text-xs font-semibold">
                       Bon-Menge
                       <input
@@ -612,7 +883,13 @@ export function ReceiptCheckSheet({
                               const product = catalog.find((product) => product.id === event.target.value)
                               changeRow(row.id, {
                                 productId: product?.id,
-                                ...(product ? { newName: product.name, category: product.category } : {}),
+                                ...(product
+                                  ? {
+                                      newName: product.name,
+                                      category: product.category,
+                                      brandName: product.brand ?? row.brandName,
+                                    }
+                                  : {}),
                               })
                             }}
                           >
@@ -631,7 +908,12 @@ export function ReceiptCheckSheet({
                             className="input mt-1 w-full"
                             maxLength={300}
                             value={row.newName ?? ''}
-                            onChange={(event) => changeRow(row.id, { newName: event.target.value })}
+                            onChange={(event) =>
+                              changeRow(row.id, {
+                                newName: event.target.value,
+                                ...(row.manual ? { name: event.target.value } : {}),
+                              })
+                            }
                           />
                         </label>
                         <label className="block text-xs font-semibold">
@@ -660,7 +942,7 @@ export function ReceiptCheckSheet({
                       </>
                     )}
                     <label className="block text-xs font-semibold">
-                      Erkannter Bonpreis
+                      {row.manual ? 'Bonpreis gesamt' : 'Erkannter Bonpreis'}
                       <input
                         className="input mt-1 w-full"
                         inputMode="decimal"
@@ -674,6 +956,25 @@ export function ReceiptCheckSheet({
                         }
                       />
                     </label>
+                    <label className="flex min-h-11 items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={!!row.remember}
+                        onChange={(event) => changeRow(row.id, { remember: event.target.checked })}
+                      />
+                      Bestätigte Zuordnung für diesen Supermarkt merken
+                    </label>
+                    {row.manual && (
+                      <button
+                        className="btn-soft min-h-11 w-full text-xs"
+                        onClick={() => {
+                          setRows((current) => current.filter((entry) => entry.id !== row.id))
+                          setConfirmed(false)
+                        }}
+                      >
+                        Manuelle Position entfernen
+                      </button>
+                    )}
                   </div>
                 )}
                 {row.quantityMismatch && !row.applyAmount && (
@@ -705,7 +1006,7 @@ export function ReceiptCheckSheet({
                       <input
                         type="checkbox"
                         checked={!!row.applyAmount}
-                        disabled={!row.canApplyAmount || currencyMismatch}
+                        disabled={!row.canApplyAmount || currencyMismatch || refund || brandConflict(row)}
                         onChange={(event) =>
                           changeRow(row.id, { applyAmount: event.target.checked, apply: false })
                         }
@@ -758,35 +1059,55 @@ export function ReceiptCheckSheet({
                     <input
                       type="checkbox"
                       checked={row.apply}
-                      disabled={!row.canApply || currencyMismatch}
+                      disabled={!row.canApply || currencyMismatch || refund || brandConflict(row)}
                       onChange={(event) => changeRow(row.id, { apply: event.target.checked })}
                     />
                     Preis für {row.name} übernehmen
                   </label>
                 )}
+                {row.item && (row.canApplyBrand || row.applyBrand) && (
+                  <label className="flex min-h-11 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!!row.applyBrand}
+                      disabled={!row.canApplyBrand || currencyMismatch || refund}
+                      onChange={(event) => changeRow(row.id, { applyBrand: event.target.checked })}
+                    />
+                    Marke für {row.name} übernehmen
+                  </label>
+                )}
               </section>
             ))}
-            {!!comparison.missingItems.length && (
-              <details className="mb-3 text-xs">
+            {!!unassignedAppItems.length && (
+              <details className="mb-3 text-xs" open={removeItemIds.length > 0 || undefined}>
                 <summary className="min-h-11 cursor-pointer font-semibold">
-                  {comparison.missingItems.length} App-Positionen im Bon nicht zugeordnet
+                  {unassignedAppItems.length} App-Positionen im Bon nicht zugeordnet
                 </summary>
-                {comparison.missingItems.map((item) => (
-                  <p key={item.id} className="py-1">
-                    {item.name} · {item.amount}
-                  </p>
+                <p className="mb-2">
+                  Möglicherweise anders benannt oder nicht gekauft. Bitte am Bon prüfen. Entfernen korrigiert
+                  auch den verknüpften Preisverlauf; den aktuellen Vorrat bei Bedarf separat prüfen.
+                </p>
+                {unassignedAppItems.map((item) => (
+                  <label key={item.id} className="my-1 flex min-h-11 items-start gap-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={removeItemIds.includes(item.id)}
+                      disabled={currencyMismatch || refund}
+                      onChange={(event) => {
+                        setRemoveItemIds((current) =>
+                          event.target.checked
+                            ? [...current, item.id]
+                            : current.filter((id) => id !== item.id)
+                        )
+                        setConfirmed(false)
+                      }}
+                    />
+                    {item.name} · {item.amount} · aus diesem Einkauf entfernen
+                  </label>
                 ))}
               </details>
             )}
-            <label className="my-3 flex min-h-12 items-start gap-2 text-sm font-semibold">
-              <input
-                className="mt-1"
-                type="checkbox"
-                checked={confirmed}
-                onChange={(event) => setConfirmed(event.target.checked)}
-              />
-              Dieser Bon gehört zu diesem Einkauf. Beträge, Mengen und Zuordnungen sind geprüft.
-            </label>
           </>
         )}
         {error && (
@@ -800,17 +1121,24 @@ export function ReceiptCheckSheet({
           Beim Speichern: {pendingSummary}
         </p>
       )}
-      {document && !confirmed && (
-        <p className="mt-1 shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
-          Zum Speichern am Ende des Abgleichs bestätigen, dass dieser Bon geprüft ist.
-        </p>
+      {document && (
+        <label className="mt-1 flex min-h-11 shrink-0 items-center gap-2 text-sm font-semibold">
+          <input
+            aria-label="Dieser Bon gehört zu diesem Einkauf. Bon und Änderungen geprüft."
+            type="checkbox"
+            checked={confirmed}
+            disabled={busy || refund}
+            onChange={(event) => setConfirmed(event.target.checked)}
+          />
+          Bon und Änderungen geprüft
+        </label>
       )}
       <button
         className="btn-primary mt-3 min-h-12 shrink-0 px-2"
-        disabled={busy || !document || stale || !confirmed || currencyMismatch || invalid}
+        disabled={busy || refund || !document || stale || !confirmed || currencyMismatch || invalid}
         onClick={save}
       >
-        {amountChanges || additions || dateChange
+        {amountChanges || additions || dateChange || brandChanges || removeItemIds.length
           ? 'Änderungen & Prüfung speichern'
           : selected
             ? `${selected} Preisänderung${selected === 1 ? '' : 'en'} & Prüfung speichern`

@@ -31,8 +31,10 @@ Foto und PDF werden auf dem Gerät verarbeitet und nicht an einen KI-Dienst oder
 
 Fotos und PDFs werden nicht dauerhaft archiviert. Gespeichert werden Datum und Umfang des Abgleichs, berichtete Währung und Endsumme sowie der Ergebnisstatus. Für einen späteren Abgleich die Datei erneut auswählen. Dateien sind auf 25 MB und PDFs auf 20 Seiten begrenzt; die OCR-Arbeitsgröße wird verkleinert. Die Erkennung ist abbrechbar und beendet ihren Worker beim Schließen. Die Fotoerkennung hat ein Zeitlimit von zwei Minuten; gescannte PDF-Seiten teilen sich einen OCR-Worker.
 
-Das lokale Speicherformat ist Version 25. Eine optionale Bonzeilenkennung verhindert doppelte Ergänzungen beim erneuten Abgleich. Vorhandene Einkäufe und Preise werden nicht automatisch verändert.
+Das lokale Speicherformat ist Version 26. Eine optionale Bonzeilenkennung verhindert doppelte Ergänzungen beim erneuten Abgleich. Vorhandene Einkäufe und Preise werden nicht automatisch verändert.
 
 Validierung: Parser- und Zuordnungstests für CH/DE, atomare Preiskorrekturen, Mengen- und Währungsschutz, Abbruch der OCR sowie Browsertests für Vergleich, manuelle Zuordnung, Fehlerfälle und den Einstieg nach Einkaufsabschluss. Zusätzlich wurde die reale Tesseract-Erkennung im Browser mit einem erzeugten Testbon geprüft; Erkennungsdateien kamen dabei unverändert aus den installierten Paketen beziehungsweise dem offiziellen Sprachpaket. Kameraaufnahme und Qualität realer zerknitterter Bons bleiben geräteabhängig.
 
 PDF-Regressionen verwenden ausschließlich künstliche Testbons. Die zwei bereitgestellten Original-PDFs wurden zusätzlich lokal mit derselben PDF-Zeilenrekonstruktion und demselben Parser geprüft: Artikel inklusive Rabatten und Pfand ergeben jeweils exakt den ausgewiesenen CHF-/EUR-Endbetrag, ohne Erkennungswarnungen. Persönliche Belege und Bon-Texte werden nicht im Repository gespeichert. Ein Browsertest prüft den vollständigen Ablauf mit einem erzeugten zweiseitigen PDF, einschließlich Preisfreigabe und Speicherung nach Neuladen; fehlerhafte PDFs bleiben ohne Preisänderung.
+
+Markenerkennung, freie Bonpositionen und gemerkte Zuordnungen: [Bedienung, Datenbasis und Grenzen](Bon-Erkennung-Marken.md).

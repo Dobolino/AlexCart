@@ -30,6 +30,86 @@ const evidence = (text: string): ReceiptCheckEvidence => {
   }
 }
 describe('receipt photo text comparison', () => {
+  it('does not report equal prices as a verified match when the known product brands differ', () => {
+    const input = evidence('Milch 1.50\nBrot 2.00\nTOTAL CHF 3.50')
+    input.rows[0]!.brandName = 'Neue Marke'
+    const result = compareReceiptCheck(
+      {
+        ...trip,
+        items: trip.items.map((item) =>
+          item.id === 'milk' ? { ...item, brandName: 'Bisherige Marke' } : item
+        ),
+      },
+      input
+    )
+    expect(result.rows[0]).toMatchObject({ equal: true, brandMismatch: true })
+    expect(result.status).toBe('partial')
+  })
+  it('does not multiply a table line total by a pack count printed in the product label', () => {
+    const parsed = parseReceiptCheck(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nTestpapier 12x 1 8.00 8.00 2\nTotal CHF 8.00'
+    )
+    expect(parsed.lines).toMatchObject([{ name: 'Testpapier 12x', minor: 800, occurrences: 1 }])
+    expect(parsed.totalMinor).toBe(800)
+  })
+  it('excludes individual point multipliers even if OCR loses the loyalty heading', () => {
+    const parsed = parseReceiptCheck(
+      'Testbrot 2.00\n+3xPkt. Ges.Sort. 6.00\nBonus-Coupon 2x 4.00\nCUM_5xPkt Test 10.00\n10x Cumulus gesamte SM 20.00\nTotal CHF 2.00'
+    )
+    expect(parsed.lines.map((line) => line.name)).toEqual(['Testbrot'])
+    expect(parsed.adjustments).toEqual([])
+    expect(parsed.warnings).toEqual([])
+  })
+  it('excludes the whole loyalty section, and keeps monetary Cumulus vouchers and rounding separate', () => {
+    const parsed = parseReceiptCheck(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nTestbrot 1 12.03 12.03 1\nZwischentotal 12.03\nCumulus Bons\nCUMULUS BON 5.- 5.00- 9\nCumulus Bonuspunkte\n+3xPkt. Ges.Sort. 36.09\nBonus-Coupon 2x 24.06\n10x Cumulus gesamte SM 120.30\nRundungsvorteil 0.03-\nTotal CHF 7.00'
+    )
+    expect(parsed.lines.map((line) => line.name)).toEqual(['Testbrot'])
+    expect(parsed.adjustments.map((line) => line.minor)).toEqual([-500, -3])
+    expect(parsed.totalMinor).toBe(700)
+    expect(parsed.warnings).toEqual([])
+  })
+  it('reads marked price columns and the summary of additional discounts without double counting details', () => {
+    const parsed = parseReceiptCheck(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nGemüse 1 4.20 * 4.20 S1\nZwischentotal 4.20\n* weitere Rabatte\n1 CHF Coupon 1.00\nTotal weitere Rabatte 1.00-\nTotal CHF 3.20'
+    )
+    expect(parsed.lines[0]!.minor).toBe(420)
+    expect(parsed.adjustments).toEqual([{ name: 'Weitere Rabatte', minor: -100 }])
+    expect(parsed.totalMinor).toBe(320)
+    expect(parsed.warnings).toEqual([])
+  })
+  it('uses an EDEKA final total after explained promotion/coupon reductions and ignores tax appendices and tender vouchers', () => {
+    const parsed = parseReceiptCheck(
+      'EDEKA\nTestchips 6.00 A\nSumme 6.00\nTestchips 3 fuer 2 -1.00\nSUMME € 5.00\nCoupon Testchips € 0.50\nSUMME € 4.50\nApp Gutschein € 1.00\nVisa 3.50\nMwSt NETTO MwSt UMSATZ\nSumme 6.00 0.50 5.50'
+    )
+    expect(parsed.lines).toHaveLength(1)
+    expect(parsed.totalMinor).toBe(450)
+    expect(parsed.adjustments.map((line) => line.minor)).toEqual([-100, -50])
+    expect(parsed.warnings).toEqual([])
+  })
+  it('nets explicit table cancellations without losing products starting with Bar', () => {
+    const parsed = parseReceiptCheck(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nKarotten 2 1.50 3.00 1\nKarotten -2 1.50 3.00- 1\nKarotten 1 1.50 1.50 1\nBar Vanille 1 2.00 2.00 1\nTotal CHF 3.50\nBAR 4.00\nRückgeld 0.50'
+    )
+    expect(parsed.lines).toMatchObject([
+      { name: 'Karotten', minor: 150, occurrences: 1 },
+      { name: 'Bar Vanille', minor: 200 },
+    ])
+    expect(new Set(parsed.lines.map((line) => line.id)).size).toBe(parsed.lines.length)
+    expect(parsed.totalMinor).toBe(350)
+    expect(parsed.warnings).toEqual([])
+  })
+  it('recognizes a negative refund total without inventing a product for an unnamed return', () => {
+    const parsed = parseReceiptCheck(
+      'Artikelbezeichnung Menge Preis Gespart Total #\nTestfrucht 0.200 10.00 2.00 1\n0.250 10.00- 2.50- 1\nTotal CHF -0.50\nZurück 0.50'
+    )
+    expect(parsed.totalMinor).toBe(-50)
+    expect(
+      parsed.lines.reduce((sum, line) => sum + line.minor, 0) +
+        parsed.adjustments.reduce((sum, line) => sum + line.minor, 0)
+    ).toBe(-50)
+    expect(parsed.warnings).toEqual([])
+  })
   it('validates editable receipt amounts including count units without treating fractional counts as whole packages', () => {
     for (const amount of ['2 Packungen', '2 Becher', '2 Knollen', '2 Gläser', '2 Päckchen'])
       expect(receiptQuantity(amount)).toEqual({ value: 2, unit: 'piece' })

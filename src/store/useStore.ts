@@ -7,6 +7,15 @@ import { fingerprint } from '@/utils/fingerprint'
 import { observationFromPurchase } from './catalogPurchase'
 import { repriceReceiptItems } from './receiptCheckCommit'
 import { appendReceiptCheckItems } from './receiptCheckAdditions'
+import { resolveReceiptBrands, correctReceiptBrands, receiptTripWithBrands } from './receiptBrandCommit'
+import { removeReceiptItems } from './receiptCheckRemoval'
+import {
+  receiptRetailerKey,
+  receiptAmountKey,
+  receiptAliasKey,
+  type ReceiptAlias,
+} from '@/data/receiptVocabulary'
+import { receiptBrandKey as brandSearchKey } from '@/data/receiptVocabulary'
 import {
   compareReceiptCheck,
   quantityMismatch,
@@ -180,6 +189,7 @@ interface FilteredEntry {
 }
 
 interface AppState {
+  receiptAliases: ReceiptAlias[]
   catalog: CatalogProduct[]
   priceObservations: PriceObservation[]
   retailStores: RetailStore[]
@@ -374,6 +384,8 @@ interface AppState {
     error?: string
     updated?: number
     unlinked?: number
+    removed?: number
+    brandUpdated?: number
     amountUpdated?: number
     added?: number
     dateUpdated?: boolean
@@ -401,6 +413,7 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       catalog: [],
+      receiptAliases: [],
       priceObservations: [],
       retailStores: [],
       fxSnapshot: null,
@@ -1567,6 +1580,7 @@ export const useStore = create<AppState>()(
           const list = newList('Wocheneinkauf')
           return {
             catalog: [],
+            receiptAliases: [],
             priceObservations: [],
             retailStores: [],
             fxSnapshot: null,
@@ -1841,6 +1855,8 @@ export const useStore = create<AppState>()(
           error?: string
           updated?: number
           unlinked?: number
+          removed?: number
+          brandUpdated?: number
           amountUpdated?: number
           added?: number
           dateUpdated?: boolean
@@ -1856,6 +1872,9 @@ export const useStore = create<AppState>()(
           evidence.warnings.length > 100 ||
           new Set(evidence.rows.map((row) => row.id)).size !== evidence.rows.length ||
           (evidence.applyDate && !validReceiptDate(evidence.date)) ||
+          (evidence.removeItemIds !== undefined &&
+            (!Array.isArray(evidence.removeItemIds) ||
+              evidence.removeItemIds.some((id) => typeof id !== 'string' || id.length > 200))) ||
           !['photo', 'pdf', 'text'].includes(evidence.source)
         )
           return { ok: false, error: 'Bon-Daten sind nicht gültig.' }
@@ -1868,7 +1887,8 @@ export const useStore = create<AppState>()(
               row.amount.length > 1000 ||
               row.name.length > 1000 ||
               (row.originalAmount?.length ?? 0) > 1000 ||
-              [row.apply, row.applyAmount, row.add].some(
+              (row.brandName?.length ?? 0) > 300 ||
+              [row.apply, row.applyAmount, row.applyBrand, row.add, row.remember, row.manual].some(
                 (flag) => flag !== undefined && typeof flag !== 'boolean'
               )
           ) ||
@@ -1898,8 +1918,22 @@ export const useStore = create<AppState>()(
             }
             return state
           }
-          const comparison = compareReceiptCheck(trip, evidence)
+          const removedIds = new Set(evidence.removeItemIds ?? [])
+          if (
+            removedIds.size > 2000 ||
+            [...removedIds].some((id) => !trip.items.some((item) => item.id === id)) ||
+            evidence.rows.some((row) => removedIds.has(row.targetId))
+          ) {
+            result = { ok: false, error: 'Bitte die zu entfernenden App-Positionen prüfen.' }
+            return state
+          }
+          const currentTrip = receiptTripWithBrands(state, trip)
+          const comparison = compareReceiptCheck(
+            { ...currentTrip, items: currentTrip.items.filter((item) => !removedIds.has(item.id)) },
+            evidence
+          )
           const additions = comparison.rows.filter((row) => row.add)
+          const brandChanges = comparison.rows.filter((row) => row.applyBrand)
           const dateUpdated = !!evidence.applyDate && evidence.date !== timestampToDateKey(trip.completedAt)
           const date = dateUpdated ? evidence.date : undefined
           const addNames = additions.map((row) => checkName(row.newName ?? ''))
@@ -1911,11 +1945,18 @@ export const useStore = create<AppState>()(
                 (row.targetId && !row.item) ||
                 (row.apply && !row.canApply) ||
                 (row.applyAmount && !row.canApplyAmount) ||
+                (row.applyBrand && !row.canApplyBrand) ||
                 (row.add &&
                   (!row.canAdd ||
                     row.apply ||
                     row.applyAmount ||
-                    (row.productId && !state.catalog.some((product) => product.id === row.productId))))
+                    (row.productId &&
+                      !state.catalog.some(
+                        (product) =>
+                          product.id === row.productId &&
+                          (!product.brand ||
+                            brandSearchKey(product.brand) === brandSearchKey(row.brandName ?? ''))
+                      ))))
             ) ||
             new Set(addNames).size !== additions.length ||
             new Set(addKeys).size !== additions.length ||
@@ -1949,7 +1990,12 @@ export const useStore = create<AppState>()(
             comparison.rows.filter((row) => row.applyAmount).map((row) => [row.targetId, row.amount.trim()])
           )
           const changing = trip.items.filter(
-            (item) => changes.has(item.id) || amounts.has(item.id) || dateUpdated
+            (item) =>
+              changes.has(item.id) ||
+              amounts.has(item.id) ||
+              removedIds.has(item.id) ||
+              brandChanges.some((row) => row.targetId === item.id) ||
+              dateUpdated
           )
           const linked = new Set(changing.flatMap((item) => (item.purchaseLogId ? [item.purchaseLogId] : [])))
           if (
@@ -1977,11 +2023,26 @@ export const useStore = create<AppState>()(
             changing.some((item) => {
               const entry = state.purchaseLog.find((entry) => entry.id === item.purchaseLogId)
               const row = comparison.rows.find((row) => row.targetId === item.id)
+              const variant = state.priceProfiles
+                .flatMap((profile) => profile.variants)
+                .find((variant) => variant.id === entry?.variantId)
+              const knownBrand =
+                item.brandName ??
+                state.catalog.find((product) => product.id === entry?.productId)?.brand ??
+                state.brands.find((brand) => brand.id === variant?.brandId)?.name
+              const wrongBrand =
+                !!row &&
+                (row.apply || row.applyAmount) &&
+                !!knownBrand &&
+                !!row.brandName &&
+                brandSearchKey(knownBrand) !== brandSearchKey(row.brandName) &&
+                !row.applyBrand
               const nextQuantity = row ? receiptQuantity(row.amount) : null
               const previousQuantity = entry ? receiptQuantity(entry.amount ?? '') : null
               return (
                 entry &&
                 ((entry.currency ?? 'CHF') !== evidence.currency ||
+                  wrongBrand ||
                   (row?.apply && !row.applyAmount && quantityMismatch(row.amount, entry.amount ?? '')) ||
                   (row?.applyAmount && entry.pricePerKg !== undefined && nextQuantity?.unit !== 'g') ||
                   (row?.applyAmount && previousQuantity && nextQuantity?.unit !== previousQuantity.unit))
@@ -1990,7 +2051,8 @@ export const useStore = create<AppState>()(
           ) {
             result = {
               ok: false,
-              error: 'Menge oder Währung des verknüpften Kaufs weicht ab. Bitte zuerst den Einkauf prüfen.',
+              error:
+                'Marke, Menge oder Währung des verknüpften Kaufs weicht ab. Bitte zuerst den Einkauf prüfen.',
             }
             return state
           }
@@ -2000,6 +2062,9 @@ export const useStore = create<AppState>()(
             changes,
             { amounts, date }
           )
+          patch.brands = resolveReceiptBrands(state.brands, evidence.rows)
+          if (brandChanges.length)
+            patch = { ...patch, ...correctReceiptBrands({ ...state, ...patch }, tripId, evidence.rows) }
           let reviewedEvidence = evidence
           if (additions.length) {
             const { addedItems, ...additionPatch } = appendReceiptCheckItems(
@@ -2031,16 +2096,41 @@ export const useStore = create<AppState>()(
                   : item
               ),
             }))
+          if (removedIds.size)
+            patch = { ...patch, ...removeReceiptItems({ ...state, ...patch }, tripId, removedIds) }
           const updatedTrip = patch.completedTrips.find((trip) => trip.id === tripId)!
-          const after = compareReceiptCheck(updatedTrip, reviewedEvidence)
+          const reviewedTrip = receiptTripWithBrands({ ...state, ...patch }, updatedTrip)
+          const after = compareReceiptCheck(reviewedTrip, reviewedEvidence)
+          const aliases = new Map(state.receiptAliases.map((alias) => [alias.key, alias]))
+          const retailer = receiptRetailerKey(updatedTrip.store, updatedTrip.currency ?? 'CHF')
+          for (const row of reviewedEvidence.rows.filter((row) => row.remember !== undefined)) {
+            const item = reviewedTrip.items.find((item) => item.id === row.targetId)
+            if (!item || !row.name.trim() || row.name.length > 1000) continue
+            const log = patch.purchaseLog.find((entry) => entry.id === item.purchaseLogId)
+            const amountKey = receiptAmountKey(row.originalAmount ?? row.amount, row.weighed)
+            const key = receiptAliasKey(retailer, row.name, amountKey)
+            aliases.delete(key)
+            if (!row.remember || (checkName(row.name) === checkName(item.name) && !item.brandName)) continue
+            aliases.set(key, {
+              key,
+              retailer,
+              label: row.name,
+              amountKey,
+              name: item.name,
+              category: log?.category ?? row.category ?? 'Sonstiges',
+              brandName: item.brandName,
+            })
+          }
+          patch.receiptAliases = [...aliases.values()].slice(-1000)
           const reviewed = {
             checkedAt: Date.now(),
             status: after.status,
             source: evidence.source,
             currency: evidence.currency,
             receiptTotalMinor: evidence.totalMinor,
-            checkedItems: after.rows.filter((row) => row.item && !row.quantityMismatch && !row.duplicate)
-              .length,
+            checkedItems: after.rows.filter(
+              (row) => row.item && !row.quantityMismatch && !row.brandMismatch && !row.duplicate
+            ).length,
             unresolved: after.unresolved,
             fingerprint: receiptTripFingerprint(updatedTrip),
           }
@@ -2048,6 +2138,8 @@ export const useStore = create<AppState>()(
             ok: true,
             updated: changes.size,
             amountUpdated: amounts.size,
+            brandUpdated: brandChanges.length,
+            removed: removedIds.size,
             added: additions.length,
             dateUpdated,
             unlinked: changing.filter(
@@ -2119,11 +2211,22 @@ export const useStore = create<AppState>()(
         })),
 
       removeCompletedTripItem: (tripId, itemId) =>
-        set((state) => ({
-          completedTrips: state.completedTrips.map((trip) =>
-            trip.id !== tripId ? trip : { ...trip, items: trip.items.filter((item) => item.id !== itemId) }
-          ),
-        })),
+        set((state) => {
+          const trip = state.completedTrips.find((trip) => trip.id === tripId)
+          const item = trip?.items.find((item) => item.id === itemId)
+          if (!trip || !item) return state
+          if (
+            item.purchaseLogId &&
+            (state.purchaseLog.filter((entry) => entry.id === item.purchaseLogId).length > 1 ||
+              state.completedTrips.some(
+                (other) =>
+                  other.id !== tripId && other.items.some((row) => row.purchaseLogId === item.purchaseLogId)
+              ) ||
+              trip.items.some((other) => other.id !== itemId && other.purchaseLogId === item.purchaseLogId))
+          )
+            return state
+          return removeReceiptItems(state, tripId, new Set([itemId]))
+        }),
     }),
     {
       name: STORE_NAME,
@@ -2310,6 +2413,7 @@ export const useStore = create<AppState>()(
         }
       },
       partialize: (state) => ({
+        receiptAliases: state.receiptAliases,
         catalog: state.catalog,
         priceObservations: state.priceObservations,
         retailStores: state.retailStores,
@@ -2366,6 +2470,7 @@ export const useStore = create<AppState>()(
               priceProfiles: persisted.priceProfiles ?? [],
               brands: persisted.brands ?? [],
               completedTrips: persisted.completedTrips ?? [],
+              receiptAliases: persisted.receiptAliases ?? [],
               calculatorExcludedPurchaseIds: persisted.calculatorExcludedPurchaseIds ?? [],
             }
           }
