@@ -29,6 +29,67 @@ const evidence = (text: string): ReceiptCheckEvidence => {
   }
 }
 describe('receipt photo text comparison', () => {
+  it('reads Migros table totals instead of unit prices, savings, tax groups or loyalty points', () => {
+    // Fictional receipt with the same column structure as a digital Migros receipt.
+    const parsed = parseReceiptCheck(`05:01 €
+GENOSSENSCHAFT MIGROS TEST
+Artikelbezeichnung Menge Preis Gespart Total #
+Birnen 0.400 4.00 0.20 1.40 1
+Trauben 0.250 8.00 2.00 1
+Saft 500ml 2 1.10 2.20 1
+Zwischentotal 5.60
+Cumulus 20-Fach. 120.00
+Sie sparen total 0.20
+Total CHF 5.60
+Visa 5.60
+Total EFT CHF: 5.60
+Punktestand per 01.01.2026 100.00
+Erhaltene Punkte 20.00
+# MWST.-Nummer CHE-000.000.000 MWST
+Gr Satz Total MWST
+1 2.60 % 5.60 0.14`)
+    expect(parsed).toMatchObject({ currency: 'CHF', store: 'Migros', totalMinor: 560, warnings: [] })
+    expect(parsed.lines).toMatchObject([
+      { name: 'Birnen', minor: 140, amount: '400 g' },
+      { name: 'Trauben', minor: 200, amount: '250 g' },
+      { name: 'Saft', minor: 220, amount: '2 × 500ml', occurrences: 2 },
+    ])
+    expect(parsed.adjustments).toEqual([])
+  })
+  it('reads EDEKA tax flags, quantity totals and item-bound app discounts exactly once', () => {
+    const parsed = parseReceiptCheck(`EDEKA
+Saft 0,5L1,20 € x 2 2,40 B
+PFAND 0,25 € x 2 0,50*B
+Tofu 2,00 AW
+App Preis / Rabatt -0,30
+Tofu 2,00 AW
+App Preis / Rabatt -0,30
+Coupon -0,20
+SUMME € 6,10
+Visa € 6,10
+A 7% 3,18 0,22 3,40
+Für den Einkauf von 5,60 EUR auf
+Punktestand entspricht: 12,00 EUR
+2026-01-01T10:11:12.000Z2026-01-01T10:11
+:15.000Z`)
+    expect(parsed).toMatchObject({ totalMinor: 610, currency: 'EUR', warnings: [] })
+    expect(parsed.lines).toMatchObject([
+      { name: 'Saft', minor: 240, amount: '2 × 0,5L', occurrences: 2 },
+      { name: 'Tofu', minor: 340, occurrences: 2, discountMinor: -60 },
+    ])
+    expect(parsed.adjustments.map((a) => a.minor)).toEqual([50, -20])
+    expect(
+      parsed.lines.reduce((sum, line) => sum + line.minor, 0) +
+        parsed.adjustments.reduce((sum, line) => sum + line.minor, 0)
+    ).toBe(610)
+  })
+  it('never allocates an oversized, separated or generic discount to a product', () => {
+    const parsed = parseReceiptCheck(
+      'Milch 1.50\nApp Preis / Rabatt -2.00\nBrot 2.00\nHinweis\nApp Preis / Rabatt -0.50\nRabatt -0.20\nTOTAL CHF 0.80'
+    )
+    expect(parsed.lines.map((line) => line.minor)).toEqual([150, 200])
+    expect(parsed.adjustments.map((line) => line.minor)).toEqual([-200, -50, -20])
+  })
   it('reads CHF totals and tax suffixes, excluding payment, change and tax lines', () => {
     const result = evidence(
       'MIGROS\n31.10.2026\nMilch 1.50 A\nBrot 2.00 B\nTOTAL CHF3.50\nBAR 4.00\nRückgeld 0.50\nMWST 0.20'

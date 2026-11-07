@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mock = vi.hoisted(() => ({ createWorker: vi.fn() }))
-vi.mock('tesseract.js', () => ({ createWorker: mock.createWorker }))
+vi.mock('tesseract.js', () => ({ createWorker: mock.createWorker, PSM: { SINGLE_BLOCK: '6' } }))
 import { createReceiptOcr, ocrReceiptImage } from './receiptOcr'
 const worker = () => ({
   recognize: vi.fn().mockResolvedValue({ data: { text: 'Milch 1.50' } }),
@@ -15,6 +15,7 @@ describe('receipt OCR lifetime', () => {
     const engine = worker()
     mock.createWorker.mockResolvedValue(engine)
     expect(await ocrReceiptImage(new Blob(['image']))).toBe('Milch 1.50')
+    expect(engine.setParameters).toHaveBeenCalledWith(expect.objectContaining({ tessedit_pageseg_mode: '6' }))
     expect(engine.terminate).toHaveBeenCalledTimes(1)
   })
   it('terminates recognition when the user cancels', async () => {

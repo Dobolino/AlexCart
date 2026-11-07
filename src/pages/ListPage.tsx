@@ -283,7 +283,7 @@ export function ListPage() {
                   className="mt-1 block min-h-11 font-bold underline"
                   onClick={() => setCheckTripId(finishedTripId)}
                 >
-                  Bon mit Foto prüfen
+                  Bon prüfen
                 </button>
               )}
             </span>

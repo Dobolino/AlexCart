@@ -11,6 +11,7 @@ export interface ReceiptCheckLine {
   amount: string
   minor: number
   occurrences: number
+  discountMinor?: number
 }
 export interface ReceiptCheckDocument {
   lines: ReceiptCheckLine[]
@@ -33,7 +34,7 @@ export interface ReceiptCheckEvidence {
   store?: string
   date?: string
   warnings: string[]
-  source: 'photo' | 'text'
+  source: 'photo' | 'pdf' | 'text'
 }
 export const checkName = (name: string) =>
   name
@@ -62,7 +63,7 @@ export const receiptTripFingerprint = (trip: CompletedTrip) => fingerprint(recei
 
 /** Conservative line parser: payment/tax lines never become products. No inferred currencies or prices. */
 export function parseReceiptCheck(text: string): ReceiptCheckDocument {
-  if (!text.trim()) throw new Error('Bitte ein Bonfoto wählen oder Bon-Text einfügen.')
+  if (!text.trim()) throw new Error('Bitte ein Bonfoto oder PDF wählen oder Bon-Text einfügen.')
   if (text.length > 100000) throw new Error('Der Bon-Text ist zu lang (maximal 100.000 Zeichen).')
   const source = text
     .split(/\r?\n/)
@@ -79,12 +80,30 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
     date: findReceiptDateInText(text) ?? undefined,
     warnings: [],
   }
-  if (currencies.size > 1) result.warnings.push('Mehrere Währungen erkannt. Die Bonwährung bitte prüfen.')
+  const totalCurrencies = new Set<Currency>()
   const totals: number[] = []
   let afterTotal = false
   let unparsed = 0
+  let table = false
+  let lastProduct: { row: ReceiptCheckLine; minor: number } | undefined
   const grouped = new Map<string, ReceiptCheckLine>()
   for (const raw of source) {
+    const previousProduct = lastProduct
+    lastProduct = undefined
+    if (/artikelbezeichnung.*menge.*preis.*total/i.test(raw)) {
+      table = true
+      continue
+    }
+    // Metadata is excluded BEFORE monetary parsing, including multi-column footer rows.
+    if (
+      /^(?:zwischen\s*(?:summe|total)|subtotal|#?\s*mwst|ust\b|steuer|vat\b|(?:[A-D]|\d+)?\s*\d+[.,]?\d*\s*%|bar(?:zahlung)?\b|gegeben\b|r(?:ü|ue|u)ckgeld|restgeld|wechselgeld|ec[- ]?cash|karte(?:nzahlung)?\b|twint\b|visa\b|mastercard|maestro|zahlung\b|bezahlt\b|kontaktlos|girocard|cash\b|debit|credit|ersparnis|gespart|sie (?:haben gespart|sparen)|cumulus\b|(?:erhaltene?\s+)?punkte(?:stand)?\b|total\s+EFT\b|CHE-\d)/i.test(
+        raw
+      ) ||
+      (afterTotal &&
+        (/^für den einkauf von\b/i.test(raw) ||
+          /\d{2}[./]\d{2}[./]\d{2,4}.*\d{2}:\d{2}|\d{4}-\d{2}-\d{2}T|^:?\d{2}\.\d{3}Z/.test(raw)))
+    )
+      continue
     const line = raw
       .replace(/\s+/g, ' ')
       .replace(/\b(?:CHF|SFR|EUR)(?=\s*[-\d])/gi, ' ')
@@ -92,11 +111,20 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
       .replace(/€/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-    const match = line.match(/^(.*?)\s+(-?(?:\d{1,3}(?:['’]\d{3})+|\d{1,7})[.,]\d{2}-?)\s*[A-D*]?\s*$/i)
+    // Migros digital receipts: label, quantity, unit price, optional savings, PAID total, tax group.
+    const cells =
+      table && !afterTotal
+        ? line.match(
+            /^(.*?)\s+(\d+(?:[.,]\d{3})?)\s+(\d+[.,]\d{2})\s+(?:(\d+[.,]\d{2})\s+)?(\d+[.,]\d{2})(?:\s+#?\d+)?$/
+          )
+        : null
+    const match = cells
+      ? [cells[0], cells[1], cells[5]]
+      : line.match(/^(.*?)\s+(-?(?:\d{1,3}(?:['’]\d{3})+|\d{1,7})[.,]\d{2}-?)\s*(?:\*?[A-D]W?|\*)?\s*$/i)
     if (!match) {
       if (!result.store && !/\d[.,]\d{2}/.test(line))
         result.store = findRetailer(
-          line,
+          line.replace(/^genossenschaft\s+/i, ''),
           result.currency === 'EUR' ? 'DE' : result.currency === 'CHF' ? 'CH' : undefined
         )?.name
       if (
@@ -113,14 +141,10 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
       unparsed++
       continue
     }
-    if (
-      /^(?:zwischen\s*summe|subtotal|mwst|ust|steuer|vat|\d+[.,]?\d*\s*%|bar(?:zahlung)?\b|gegeben\b|r(?:ü|ue|u)ckgeld|restgeld|wechselgeld|ec[- ]?cash|karte(?:nzahlung)?\b|twint\b|visa\b|mastercard|maestro|zahlung\b|bezahlt\b|kontaktlos|girocard|cash\b|debit|credit|ersparnis|gespart|sie haben gespart|punkte\b)/i.test(
-        head
-      )
-    )
-      continue
     if (/^(?:total(?:betrag)?|summe|gesamt(?:betrag)?|zu zahlen|zahlbetrag|endsumme|betrag)\b/i.test(head)) {
       totals.push(minor)
+      if (/\b(?:CHF|SFR)\b/i.test(raw)) totalCurrencies.add('CHF')
+      if (/\bEUR\b|€/i.test(raw)) totalCurrencies.add('EUR')
       afterTotal = true
       continue
     }
@@ -130,14 +154,35 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
     }
     if (/^(?:\d+[.,]?\d*\s*(?:kg|g|l|ml)\b|\d+\s*[x×*]\s*$)/i.test(head)) continue
     if (minor < 0 || /rabatt|coupon|gutschein|pfand|rundung|retoure?/i.test(head)) {
+      // Only this explicitly item-bound EDEKA/Marktkauf format is allocated to the preceding item.
+      // Generic coupons and ambiguous discounts remain separate adjustments.
+      if (
+        /^App Preis\s*\/\s*Rabatt$/i.test(head) &&
+        minor < 0 &&
+        previousProduct &&
+        previousProduct.minor + minor >= 0
+      ) {
+        previousProduct.row.minor += minor
+        previousProduct.row.discountMinor = (previousProduct.row.discountMinor ?? 0) + minor
+        continue
+      }
       result.adjustments.push({ name: head, minor })
       continue
     }
-    let quantity = 1
+    let quantity = cells && !/[.,]/.test(cells[2]!) ? Number(cells[2]) : 1
+    let measuredAmount =
+      cells && /[.,]/.test(cells[2]!)
+        ? `${new Decimal(cells[2]!.replace(',', '.')).times(1000).toNumber()} g`
+        : ''
+    // EDEKA prints both unit price × count and the final line total. Never multiply twice.
+    const unitTimesCount = head.match(/^(.*?)\s*(\d+[.,]\d{2})\s*[x×*]\s*(\d+)$/i)
     const trailing = head.match(/^(.+?)\s+(\d+)\s*[x×*]$/i)
     const leading = head.match(/^(\d+)\s*[x×*]\s+(.+)$/i)
     let price = minor
-    if (trailing) {
+    if (unitTimesCount) {
+      head = unitTimesCount[1]!.trim()
+      quantity = Number(unitTimesCount[3])
+    } else if (trailing) {
       head = trailing[1]!
       quantity = Number(trailing[2])
       price *= quantity
@@ -158,28 +203,37 @@ export function parseReceiptCheck(text: string): ReceiptCheckDocument {
     const pack = head.match(/^(.+?)\s+(\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|l))$/i)
     const name = (pack?.[1] ?? head).trim()
     const hint = pack?.[2] ?? ''
+    if (!measuredAmount && quantity > 1) measuredAmount = hint ? `${quantity} × ${hint}` : `${quantity} Stück`
+    else if (!measuredAmount) measuredAmount = hint
     const key = `${checkName(name)}|${checkName(hint)}`
     const existing = grouped.get(key)
     if (existing) {
       existing.minor += price
       existing.occurrences += quantity
-      existing.amount = hint ? `${existing.occurrences} × ${hint}` : `${existing.occurrences} Stück`
+      const oldMass = baseQuantity(existing.amount)
+      const addedMass = baseQuantity(measuredAmount)
+      existing.amount =
+        oldMass?.unit === 'g' && addedMass?.unit === 'g' && cells && /[.,]/.test(cells[2]!)
+          ? `${new Decimal(oldMass.value).plus(addedMass.value).toNumber()} g`
+          : hint
+            ? `${existing.occurrences} × ${hint}`
+            : `${existing.occurrences} Stück`
     } else
       grouped.set(key, {
         id: `line-${grouped.size}`,
         name,
         minor: price,
-        amount: hint
-          ? quantity > 1
-            ? `${quantity} × ${hint}`
-            : hint
-          : quantity > 1
-            ? `${quantity} Stück`
-            : '',
+        amount: measuredAmount,
         occurrences: quantity,
       })
+    lastProduct = { row: grouped.get(key)!, minor: price }
   }
   result.lines = [...grouped.values()]
+  // A labelled receipt total is stronger evidence than phone chrome or foreign-currency footnotes.
+  const effectiveCurrencies = totalCurrencies.size ? totalCurrencies : currencies
+  result.currency = effectiveCurrencies.size === 1 ? [...effectiveCurrencies][0] : undefined
+  if (effectiveCurrencies.size > 1)
+    result.warnings.push('Mehrere Währungen erkannt. Die Bonwährung bitte prüfen.')
   if (result.lines.length > 200)
     throw new Error('Bitte höchstens 200 unterschiedliche Bonpositionen auf einmal prüfen.')
   if (totals.length && new Set(totals).size === 1) result.totalMinor = totals[0]

@@ -5,7 +5,7 @@ export async function createReceiptOcr(onProgress?: (pct: number) => void, signa
       ? signal.reason
       : new DOMException('Texterkennung abgebrochen.', 'AbortError')
   if (signal?.aborted) throw abortReason()
-  const { createWorker } = await import('tesseract.js')
+  const { createWorker, PSM } = await import('tesseract.js')
   if (signal?.aborted) throw abortReason()
   const pending = createWorker('deu', 1, {
     logger: (message) => {
@@ -32,7 +32,12 @@ export async function createReceiptOcr(onProgress?: (pct: number) => void, signa
   try {
     worker = await Promise.race([pending, aborted])
     await Promise.race([
-      worker.setParameters({ preserve_interword_spaces: '1', user_defined_dpi: '300' }),
+      worker.setParameters({
+        preserve_interword_spaces: '1',
+        user_defined_dpi: '300',
+        // Receipts are one block of rows, even when each row contains several price columns.
+        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+      }),
       aborted,
     ])
     return {

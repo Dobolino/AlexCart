@@ -9,6 +9,7 @@ import {
 } from '@/utils/receiptCheck'
 import { pricesForCurrency } from '@/utils/priceProfiles'
 import { currentWeekSpend } from '@/utils/budget'
+import { parseBackup, STORAGE_VERSION } from '@/utils/validation'
 
 beforeEach(() => {
   const data = new Map<string, string>()
@@ -70,6 +71,14 @@ function prepare(text = 'MIGROS\nMilch 2 x 2.50\nBrot 2.00\nTOTAL CHF 7.00') {
   return { trip, evidence, snapshot: receiptTripSnapshot(trip) }
 }
 describe('confirmed receipt photo corrections', () => {
+  it('stores the PDF review source in a valid versioned backup alongside linked corrections', () => {
+    const { trip, evidence, snapshot } = prepare()
+    evidence.source = 'pdf'
+    expect(useStore.getState().saveReceiptCheck(trip.id, snapshot, evidence, true).ok).toBe(true)
+    const backup = parseBackup(JSON.stringify({ state: useStore.getState(), version: STORAGE_VERSION }))
+    expect(backup.state.completedTrips?.[0]?.receiptReview?.source).toBe('pdf')
+    expect(backup.state.completedTrips?.[0]?.items?.[0]?.price).toBe(5)
+  })
   it('does not modify a purchase reference that is shared ambiguously with another historical receipt', () => {
     const { trip, evidence, snapshot } = prepare()
     const before = useStore.getState()

@@ -1833,7 +1833,7 @@ export const useStore = create<AppState>()(
           evidence.rows.length > 200 ||
           evidence.adjustments.length > 200 ||
           evidence.warnings.length > 100 ||
-          !['photo', 'text'].includes(evidence.source)
+          !['photo', 'pdf', 'text'].includes(evidence.source)
         )
           return { ok: false, error: 'Bon-Daten sind nicht gültig.' }
         if (

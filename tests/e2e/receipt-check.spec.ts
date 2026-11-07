@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { receiptPdfFixture } from './fixtures/receiptPdf'
 
 test.use({ hasTouch: true })
 async function openReceipt(page: Page, active = false) {
@@ -112,17 +113,68 @@ async function openReceipt(page: Page, active = false) {
   await page.goto(active ? '/AlexCart/' : '/AlexCart/#/stats')
   if (!active) {
     await page.getByRole('button').filter({ hasText: 'Kassenbon-Test · Migros' }).tap()
-    await page.getByRole('button', { name: 'Mit Kassenbonfoto prüfen', exact: true }).tap()
-    await expect(page.getByRole('dialog', { name: 'Bon mit Foto prüfen', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Mit Foto oder PDF prüfen', exact: true }).tap()
+    await expect(page.getByRole('dialog', { name: 'Bon prüfen', exact: true })).toBeVisible()
   }
 }
 const stored = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('alexshop-store')!).state)
+
+test('reads a native multi-page PDF locally, excludes loyalty points and persists confirmed corrections', async ({
+  page,
+}) => {
+  await openReceipt(page)
+  const ocrRequests: string[] = []
+  page.on('request', (request) => {
+    if (/tesseract|traineddata/.test(request.url())) ocrRequests.push(request.url())
+  })
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit.getByLabel('Bondatei auswählen', { exact: true }).setInputFiles({
+    name: 'testbon.pdf',
+    mimeType: 'application/pdf',
+    buffer: receiptPdfFixture(),
+  })
+  await expect(audit).toContainText('PDF: testbon.pdf')
+  await expect(audit).toContainText('1 von 2 erkannten Positionen preisgleich')
+  await expect(audit).toContainText('Erkannte Zeilensumme entspricht dem Endbetrag.')
+  await expect(audit.getByRole('region', { name: /Bonposition (?:Zwischentotal|Cumulus)/ })).toHaveCount(0)
+  expect(ocrRequests).toEqual([])
+  expect((await stored(page)).purchaseLog[0].price).toBe(1.5)
+  await audit.getByRole('checkbox', { name: 'Preis für Milch übernehmen', exact: true }).check()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
+  await audit.getByRole('button', { name: '1 Preisänderung & Prüfung speichern', exact: true }).tap()
+  await expect(audit).toHaveCount(0)
+  await page.reload()
+  const state = await stored(page)
+  expect(state.completedTrips[0].receiptReview).toMatchObject({
+    source: 'pdf',
+    status: 'matched',
+    receiptTotalMinor: 370,
+  })
+  expect(state.purchaseLog[0].price).toBe(1.7)
+  expect(state.priceObservations[0].price).toEqual({ minor: 170, currency: 'CHF' })
+  expect(state.purchaseLog).toHaveLength(2)
+  expect(state.pantry[0].amount).toBe('2 Stück')
+})
+
+test('shows a broken PDF as an error and leaves saved prices intact', async ({ page }) => {
+  await openReceipt(page)
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
+  await audit.getByLabel('Bondatei auswählen', { exact: true }).setInputFiles({
+    name: 'broken.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('invalid PDF'),
+  })
+  await expect(audit.getByRole('alert')).toContainText('PDF ist beschädigt')
+  await expect(audit.getByLabel('Bon-Text', { exact: true })).toBeEditable()
+  await expect(audit.getByRole('button', { name: 'Prüfergebnis speichern', exact: true })).toBeDisabled()
+  expect((await stored(page)).purchaseLog[0].price).toBe(1.5)
+})
 
 test('compares receipt text, requires explicit price selection and confirmation, and updates linked prices once', async ({
   page,
 }) => {
   await openReceipt(page)
-  const audit = page.getByRole('dialog', { name: 'Bon mit Foto prüfen', exact: true })
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
   await audit
     .getByLabel('Bon-Text', { exact: true })
     .fill('MIGROS\nMilch 1.70 A\nBrot 2.00 B\nTOTAL CHF 3.70')
@@ -135,7 +187,7 @@ test('compares receipt text, requires explicit price selection and confirmation,
   await row.getByRole('checkbox', { name: 'Preis für Milch übernehmen', exact: true }).check()
   const save = audit.getByRole('button', { name: '1 Preisänderung & Prüfung speichern', exact: true })
   await expect(save).toBeDisabled()
-  await audit.getByRole('checkbox', { name: /^Das Foto bzw/ }).check()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
   expect((await stored(page)).purchaseLog[0].price).toBe(1.5)
   await page.setViewportSize({ width: 390, height: 540 })
   await save.tap()
@@ -154,12 +206,12 @@ test('keeps currency mismatches and incomplete scans visibly unresolved and neve
   page,
 }) => {
   await openReceipt(page)
-  const audit = page.getByRole('dialog', { name: 'Bon mit Foto prüfen', exact: true })
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
   await audit.getByLabel('Bon-Text', { exact: true }).fill('EDEKA\nMilch 1,70\nRabatt 0,20-\nTOTAL EUR 8,00')
   await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
   await expect(audit).toContainText('Zeilensumme und Endbetrag weichen ab')
   await expect(audit).toContainText('Der Einkauf ist in CHF gespeichert, der Bon in EUR')
-  await audit.getByRole('checkbox', { name: /^Das Foto bzw/ }).check()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
   await expect(audit.getByRole('button', { name: 'Prüfergebnis speichern', exact: true })).toBeDisabled()
   await audit.getByRole('button', { name: 'Schließen', exact: true }).tap()
   expect((await stored(page)).purchaseLog[0].price).toBe(1.5)
@@ -170,9 +222,9 @@ test('supports a manual mapping after an unreadable image without inventing a pr
   page,
 }) => {
   await openReceipt(page)
-  const audit = page.getByRole('dialog', { name: 'Bon mit Foto prüfen', exact: true })
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
   await audit
-    .getByLabel('Bonbild auswählen', { exact: true })
+    .getByLabel('Bondatei auswählen', { exact: true })
     .setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('not an image') })
   await expect(audit.getByRole('alert')).toContainText('Bild nicht lesbar')
   await audit.getByLabel('Bon-Text', { exact: true }).fill('Vollmilch 1.70\nBrot 2.00\nTOTAL CHF 3.70')
@@ -184,7 +236,7 @@ test('supports a manual mapping after an unreadable image without inventing a pr
   await row.getByRole('button', { name: 'Produkt zuordnen · bearbeiten', exact: true }).tap()
   await row.getByRole('combobox', { name: 'App-Position', exact: true }).selectOption('milk')
   await row.getByRole('checkbox', { name: 'Preis für Vollmilch übernehmen', exact: true }).check()
-  await audit.getByRole('checkbox', { name: /^Das Foto bzw/ }).check()
+  await audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ }).check()
   await audit.getByRole('button', { name: '1 Preisänderung & Prüfung speichern', exact: true }).tap()
   expect((await stored(page)).purchaseLog[0].price).toBe(1.7)
 })
@@ -194,15 +246,15 @@ test('offers the photo check directly after finishing a shopping trip', async ({
   await page.getByRole('button', { name: 'Einkauf abschließen', exact: true }).tap()
   const finish = page.getByRole('dialog', { name: 'Einkauf abschließen?', exact: true })
   await finish.getByRole('button', { name: 'Abschließen & neue Liste', exact: true }).tap()
-  await page.getByRole('button', { name: 'Bon mit Foto prüfen', exact: true }).tap()
-  await expect(page.getByRole('dialog', { name: 'Bon mit Foto prüfen', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Bon prüfen', exact: true }).tap()
+  await expect(page.getByRole('dialog', { name: 'Bon prüfen', exact: true })).toBeVisible()
   expect((await stored(page)).shoppingSession).toBeNull()
   expect((await stored(page)).completedTrips).toHaveLength(1)
 })
 
 test('requires a fresh comparison after explicitly correcting the receipt currency', async ({ page }) => {
   await openReceipt(page)
-  const audit = page.getByRole('dialog', { name: 'Bon mit Foto prüfen', exact: true })
+  const audit = page.getByRole('dialog', { name: 'Bon prüfen', exact: true })
   await audit.getByLabel('Bon-Text', { exact: true }).fill('EDEKA\nMilch 1,70\nBrot 2,00\nTOTAL EUR 3,70')
   await audit.getByRole('button', { name: 'Text abgleichen', exact: true }).tap()
   await audit.getByRole('button', { name: 'Einkaufsort oder Währung ändern', exact: true }).tap()
@@ -215,7 +267,7 @@ test('requires a fresh comparison after explicitly correcting the receipt curren
   await expect(audit).toContainText('Bon oder Text wurde verändert')
   await expect(audit.getByRole('button', { name: 'Prüfergebnis speichern', exact: true })).toBeDisabled()
   await audit.getByRole('button', { name: 'Abgleich neu erstellen', exact: true }).tap()
-  await expect(audit.getByRole('checkbox', { name: /^Das Foto bzw/ })).not.toBeChecked()
+  await expect(audit.getByRole('checkbox', { name: /^Dieser Bon gehört/ })).not.toBeChecked()
   const state = await stored(page)
   expect(state.purchaseLog[0]).toMatchObject({ currency: 'EUR', price: 1.5 })
   expect(state.completedTrips[0].receiptReview).toBeUndefined()

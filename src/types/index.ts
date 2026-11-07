@@ -224,7 +224,7 @@ export interface CompletedTrip {
   receiptReview?: {
     checkedAt: number
     status: 'matched' | 'partial' | 'differences'
-    source: 'photo' | 'text'
+    source: 'photo' | 'pdf' | 'text'
     currency: Currency
     receiptTotalMinor?: number
     checkedItems: number

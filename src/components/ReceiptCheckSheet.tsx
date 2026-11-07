@@ -4,6 +4,7 @@ import { StoreLayoutSheet } from './StoreLayoutSheet'
 import { useStore } from '@/store/useStore'
 import { ocrReceiptImage, isReceiptImageFile } from '@/utils/receiptOcr'
 import { prepareReceiptPhoto } from '@/utils/receiptPhoto'
+import { extractReceiptFromPdf, isPdfFile } from '@/utils/receiptPdf'
 import {
   parseReceiptCheck,
   compareReceiptCheck,
@@ -41,7 +42,8 @@ export function ReceiptCheckSheet({
   const [snapshot, setSnapshot] = useState('')
   const [analyzedText, setAnalyzedText] = useState('')
   const [photoUrl, setPhotoUrl] = useState('')
-  const [source, setSource] = useState<'photo' | 'text'>('text')
+  const [pdfName, setPdfName] = useState('')
+  const [source, setSource] = useState<ReceiptCheckEvidence['source']>('text')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
@@ -85,7 +87,7 @@ export function ReceiptCheckSheet({
       setError(error instanceof Error ? error.message : 'Bon nicht lesbar.')
     }
   }
-  async function readPhoto(file?: File) {
+  async function readDocument(file?: File) {
     if (!file) return
     controller.current?.abort()
     setDocument(null)
@@ -93,32 +95,37 @@ export function ReceiptCheckSheet({
     setText('')
     setError('')
     setPhotoUrl('')
-    if (!isReceiptImageFile(file)) {
-      setError('Bitte ein Bonfoto als Bild auswählen.')
+    setPdfName('')
+    const pdf = isPdfFile(file)
+    if (!pdf && !isReceiptImageFile(file)) {
+      setError('Bitte ein Bonfoto oder eine PDF-Datei auswählen.')
       return
     }
     if (file.size > 25 * 1024 * 1024) {
-      setError('Das Bild ist zu groß (maximal 25 MB).')
+      setError('Die Datei ist zu groß (maximal 25 MB).')
       return
     }
     const current = new AbortController()
     controller.current = current
-    setPhotoUrl(URL.createObjectURL(file))
-    setSource('photo')
+    if (pdf) setPdfName(file.name)
+    else setPhotoUrl(URL.createObjectURL(file))
+    setSource(pdf ? 'pdf' : 'photo')
     setBusy(true)
     setProgress(0)
     try {
-      const prepared = await prepareReceiptPhoto(file, current.signal)
-      const result = await ocrReceiptImage(
-        prepared,
-        (value) => {
-          if (!current.signal.aborted) setProgress(value)
-        },
-        current.signal
-      )
+      const reportProgress = (value: number) => {
+        if (!current.signal.aborted) setProgress(value)
+      }
+      const result = pdf
+        ? await extractReceiptFromPdf(file, reportProgress, current.signal)
+        : await ocrReceiptImage(
+            await prepareReceiptPhoto(file, current.signal),
+            reportProgress,
+            current.signal
+          )
       if (!current.signal.aborted) {
         setText(result)
-        analyze(result, 'photo')
+        analyze(result, pdf ? 'pdf' : 'photo')
       }
     } catch (error) {
       if (!current.signal.aborted) {
@@ -126,7 +133,7 @@ export function ReceiptCheckSheet({
         setError(
           error instanceof Error
             ? error.message
-            : 'Foto konnte nicht gelesen werden. Bitte den Bon-Text manuell einfügen.'
+            : 'Bon konnte nicht gelesen werden. Bitte den Bon-Text manuell einfügen.'
         )
       }
     } finally {
@@ -176,7 +183,7 @@ export function ReceiptCheckSheet({
   }
   return (
     <Sheet onClose={onClose} tall>
-      <h2 className="mb-1 shrink-0 text-xl font-bold">Bon mit Foto prüfen</h2>
+      <h2 className="mb-1 shrink-0 text-xl font-bold">Bon prüfen</h2>
       <p className="mb-3 shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
         {trip.store ?? trip.listName} · gespeicherte Summe{' '}
         {formatMoney(tripTotalSpent(trip), trip.currency ?? 'CHF')}
@@ -195,7 +202,7 @@ export function ReceiptCheckSheet({
             disabled={busy}
             onClick={() => gallery.current?.click()}
           >
-            Bild auswählen
+            Bild oder PDF auswählen
           </button>
         </div>
         <input
@@ -209,7 +216,7 @@ export function ReceiptCheckSheet({
           capture="environment"
           disabled={busy}
           onChange={(event) => {
-            void readPhoto(event.target.files?.[0])
+            void readDocument(event.target.files?.[0])
             event.target.value = ''
           }}
         />
@@ -218,19 +225,25 @@ export function ReceiptCheckSheet({
           className="sr-only"
           aria-hidden="true"
           tabIndex={-1}
-          aria-label="Bonbild auswählen"
+          aria-label="Bondatei auswählen"
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf,.pdf"
           disabled={busy}
           onChange={(event) => {
-            void readPhoto(event.target.files?.[0])
+            void readDocument(event.target.files?.[0])
             event.target.value = ''
           }}
         />
         <p className="mb-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-          Das Foto bleibt auf deinem Gerät. Beim ersten Mal lädt die Texterkennung Sprachdateien aus dem
-          Internet. Bitte den ganzen Bon scharf, gerade und ohne Spiegelungen fotografieren.
+          Foto und PDF bleiben auf deinem Gerät. Digitale PDFs werden direkt gelesen; bei Scans und Fotos
+          hilft die Texterkennung. Sie lädt beim ersten Mal Sprachdateien aus dem Internet. Maximal 25 MB und
+          20 PDF-Seiten. Fotos bitte scharf, gerade und ohne Spiegelungen aufnehmen.
         </p>
+        {pdfName && (
+          <p className="card-surface mb-3 break-words p-3 text-sm" role="status">
+            PDF: {pdfName}
+          </p>
+        )}
         {photoUrl && (
           <details className="mb-3">
             <summary className="min-h-11 cursor-pointer text-sm font-semibold">Bonfoto ansehen</summary>
@@ -256,7 +269,7 @@ export function ReceiptCheckSheet({
                 controller.current?.abort()
                 setBusy(false)
                 setSource('text')
-                setError('Erkennung abgebrochen. Du kannst ein anderes Foto wählen oder Bon-Text einfügen.')
+                setError('Erkennung abgebrochen. Du kannst eine andere Datei wählen oder Bon-Text einfügen.')
               }}
             >
               Erkennung abbrechen
@@ -363,13 +376,13 @@ export function ReceiptCheckSheet({
               )}
               <p className="mt-1 font-semibold">
                 {totalMinor === undefined
-                  ? 'Endbetrag fehlt – bitte am Foto prüfen.'
+                  ? 'Endbetrag fehlt – bitte am Bon prüfen.'
                   : comparison.totalMatches
                     ? 'Erkannte Zeilensumme entspricht dem Endbetrag.'
                     : 'Zeilensumme und Endbetrag weichen ab – Erkennung prüfen.'}
               </p>
               <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Preisgleichheit gilt nur für den erkannten Text. Foto, Mengen und Produkte bitte gegenlesen.
+                Preisgleichheit gilt nur für den erkannten Text. Bon, Mengen und Produkte bitte gegenlesen.
               </p>
             </section>
             {comparison.metadataMismatch && (
@@ -423,6 +436,11 @@ export function ReceiptCheckSheet({
                 {row.amount && (
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Bonmenge: {row.amount} · App: {row.item?.amount || 'nicht erfasst'}
+                  </p>
+                )}
+                {row.discountMinor !== undefined && (
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Artikelrabatt {formatMoney(row.discountMinor / 100, currency)} bereits berücksichtigt.
                   </p>
                 )}
                 <button
@@ -508,7 +526,7 @@ export function ReceiptCheckSheet({
             {!!comparison.missingItems.length && (
               <details className="mb-3 text-xs">
                 <summary className="min-h-11 cursor-pointer font-semibold">
-                  {comparison.missingItems.length} App-Positionen auf dem Foto nicht zugeordnet
+                  {comparison.missingItems.length} App-Positionen im Bon nicht zugeordnet
                 </summary>
                 {comparison.missingItems.map((item) => (
                   <p key={item.id} className="py-1">
@@ -524,7 +542,7 @@ export function ReceiptCheckSheet({
                 checked={confirmed}
                 onChange={(event) => setConfirmed(event.target.checked)}
               />
-              Das Foto bzw. der Text gehört zu diesem Einkauf. Beträge, Mengen und Zuordnungen sind geprüft.
+              Dieser Bon gehört zu diesem Einkauf. Beträge, Mengen und Zuordnungen sind geprüft.
             </label>
           </>
         )}

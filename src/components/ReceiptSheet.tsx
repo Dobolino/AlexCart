@@ -106,7 +106,7 @@ export function ReceiptSheet({
             className="btn-primary mb-3 min-h-12 w-full px-2 text-sm"
             onClick={() => setCheckOpen(true)}
           >
-            Mit Kassenbonfoto prüfen
+            Mit Foto oder PDF prüfen
           </button>
           {trip.receiptReview && (
             <p className="card-surface mb-3 p-3 text-xs">
