@@ -12,22 +12,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('safeStorage.getItem', () => {
-  it('passes through a value that fails strict schema validation but is valid JSON', () => {
-    // z. B. eine ältere Form mit einer leeren Listen-Liste, die persistedStateSchema ablehnt,
-    // migrate()/merge() in useStore.ts aber tolerieren sollte statt alles zurückzusetzen.
-    const odd = JSON.stringify({ state: { lists: [] }, version: 1 })
-    localStorage.setItem('alexshop-store', odd)
-    expect(safeStorage.getItem('alexshop-store')).toBe(odd)
-    expect(storageStatus.getSnapshot().recovery).toBe(false)
-  })
-
   it('returns the validated value unchanged for well-formed state', () => {
     const good = JSON.stringify({ state: { lists: [{ id: 'l', name: 'Liste', weekLabel: '', createdAt: 1, items: [] }] }, version: 1 })
     localStorage.setItem('alexshop-store', good)
     expect(JSON.parse(safeStorage.getItem('alexshop-store')!).state.lists).toHaveLength(1)
+    expect(storageStatus.getSnapshot().recovery).toBe(false)
   })
 
-  it('returns null and flags recovery for genuinely unparseable JSON', () => {
+  it('flags recovery and leaves the raw data untouched for data that fails schema validation', () => {
+    // z. B. ein Artikel, der statt eines Objekts null ist - liesse man das ungeprüft durch,
+    // würde es später an anderer Stelle crashen (item.name etc.). Die Originaldaten in
+    // localStorage bleiben unverändert erhalten, damit sie exportiert/wiederhergestellt werden
+    // können (siehe tests/e2e/shopping.spec.ts: "storage failures are visible...").
+    const malformed = JSON.stringify({ version: 20, state: { lists: [{ id: 'broken', items: [null] }] } })
+    localStorage.setItem('alexshop-store', malformed)
+    expect(safeStorage.getItem('alexshop-store')).toBeNull()
+    expect(storageStatus.getSnapshot().recovery).toBe(true)
+    expect(localStorage.getItem('alexshop-store')).toBe(malformed)
+  })
+
+  it('flags recovery for genuinely unparseable JSON', () => {
     localStorage.setItem('alexshop-store', '{not json')
     expect(safeStorage.getItem('alexshop-store')).toBeNull()
     expect(storageStatus.getSnapshot().recovery).toBe(true)
