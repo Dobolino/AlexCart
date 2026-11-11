@@ -24,6 +24,21 @@ describe('searchProducts', () => {
     expect(result.map((row) => row.amount)).toEqual(['500 ml', '1000 ml'])
     expect(searchProducts('milch', [], 20, catalog).some((row) => row.productId === 'milk-500')).toBe(true)
   })
+  it('deduplicates catalog products that are exact duplicates (same name/brand/size, different id)', () => {
+    const catalog: CatalogProduct[] = ['scan-a', 'scan-b'].map((id) => ({
+      id,
+      name: 'Milch',
+      brand: 'Testmarke',
+      category: 'Milch & Käse',
+      gtins: [],
+      netQuantity: { value: 500, unit: 'ml' },
+      source: 'manual',
+      updatedAt: '2026-01-01T12:00:00.000Z',
+    }))
+    const result = searchProducts('Testmarke Milch', [], 8, catalog)
+    expect(result).toHaveLength(1)
+    expect(result[0].productId).toBe('scan-a')
+  })
   it('returns nothing for an empty query', () => {
     expect(searchProducts('', customProducts)).toEqual([])
   })

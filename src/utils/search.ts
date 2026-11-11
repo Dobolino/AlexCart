@@ -58,7 +58,12 @@ export function searchProducts(
   const seen = new Set<string>()
 
   for (const p of pool) {
-    const key = p.productId ? `catalog:${p.productId}` : normalize(p.name)
+    // Katalog-Produkte tragen Marke/Packungsgrösse und bleiben deshalb von gleichnamigen
+    // Standard-/eigenen Produkten unberührt; sie werden nur gegen exakt identische Katalog-
+    // Einträge (gleicher Name+Marke+Menge, z. B. aus zwei Bon-Scans) dedupliziert.
+    const key = p.productId
+      ? `catalog:${normalize(p.name)}|${normalize(p.brand ?? '')}|${p.amount ?? ''}`
+      : normalize(p.name)
     if (seen.has(key)) continue
     const searchable = normalize([p.brand, p.name].filter(Boolean).join(' '))
     if (normalize(p.name).startsWith(q) || searchable.startsWith(q)) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  amountToCents,
   applyPurchaseToVariant,
   buildProfilesFromPurchaseLog,
   ensureBrandVariant,
@@ -12,6 +13,15 @@ import {
   recordVariantPurchase,
 } from './priceProfiles'
 import type { ProductPriceProfile, ShoppingItem } from '@/types'
+
+describe('amountToCents', () => {
+  it('rounds correctly even where plain floating-point multiplication would drift', () => {
+    // 2.675 * 100 === 267.49999999999997 in plain JS floats, rounding down to 267 instead of 268.
+    expect(amountToCents(2.675)).toBe(268)
+    expect(amountToCents(1.95)).toBe(195)
+    expect(amountToCents(0)).toBe(0)
+  })
+})
 
 const item = (patch: Partial<ShoppingItem> = {}): ShoppingItem => ({
   id: '1',

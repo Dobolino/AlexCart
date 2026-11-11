@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js'
 import type { CompletedTrip, Currency } from '@/types'
 import { findRetailer } from '@/data/retailCatalog'
+import { normalize } from './text'
 import { baseQuantity } from './quantity'
 import { findReceiptDateInText, timestampToDateKey } from './date'
 import { fingerprint } from './fingerprint'
@@ -494,7 +495,10 @@ export function compareReceiptCheck(trip: CompletedTrip, evidence: ReceiptCheckE
   const adjustmentSum = evidence.adjustments.reduce((sum, row) => sum + row.minor, 0)
   const dateMismatch = !!evidence.date && evidence.date !== timestampToDateKey(trip.completedAt)
   const storeMismatch =
-    !!evidence.store && !!trip.store && findRetailer(evidence.store)?.id !== findRetailer(trip.store)?.id
+    !!evidence.store &&
+    !!trip.store &&
+    (findRetailer(evidence.store)?.id ?? normalize(evidence.store)) !==
+      (findRetailer(trip.store)?.id ?? normalize(trip.store))
   const metadataMismatch = dateMismatch || storeMismatch
   const unresolved =
     rows.filter(

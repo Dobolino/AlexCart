@@ -1,10 +1,11 @@
-import type { CompletedTrip, GlobalBrand, ProductPriceProfile, PurchaseLogEntry } from '@/types'
+import type { CompletedTrip, CompletedTripItem, Currency, GlobalBrand, ProductPriceProfile, PurchaseLogEntry } from '@/types'
 import type { CatalogProduct, PriceObservation } from '@/types/catalog'
 import type { ReceiptCheckRow } from '@/utils/receiptCheck'
 import { receiptBrandKey as brandSearchKey } from '@/data/receiptVocabulary'
 import { uid } from '@/utils/id'
 import { baseQuantity, quantityText } from '@/utils/quantity'
 import { parsePackAmount } from '@/utils/amount'
+import { quantityMismatch, receiptQuantity } from '@/utils/receiptCheck'
 import {
   recordVariantPurchase,
   ensureBrandVariant,
@@ -12,6 +13,69 @@ import {
   upsertPriceProfile,
 } from '@/utils/priceProfiles'
 import { observationFromPurchase } from './catalogPurchase'
+
+/** Trip-Positionen, die ein Bon-Abgleich tatsächlich verändert - Preis/Menge/Marke je Zeile,
+ *  Entfernungen, oder jede Position, wenn das Bon-Datum rückwirkend auf den Einkauf übernommen wird. */
+export function receiptChangingItems(
+  trip: CompletedTrip,
+  comparisonRows: ReceiptCheckRow[],
+  removedIds: Set<string>,
+  dateUpdated: boolean
+): CompletedTripItem[] {
+  const changes = new Set(comparisonRows.filter((row) => row.apply).map((row) => row.targetId))
+  const amounts = new Set(comparisonRows.filter((row) => row.applyAmount).map((row) => row.targetId))
+  const brandChanges = comparisonRows.filter((row) => row.applyBrand)
+  return trip.items.filter(
+    (item) =>
+      changes.has(item.id) ||
+      amounts.has(item.id) ||
+      removedIds.has(item.id) ||
+      brandChanges.some((row) => row.targetId === item.id) ||
+      dateUpdated
+  )
+}
+
+/** Ob das Übernehmen der Bon-Zeile für diese Trip-Position mit der verknüpften Kaufhistorie
+ *  kollidiert (Marke, Menge oder Währung weicht ab) - einzige Quelle für diese Prüfung, von
+ *  Commit-Guard (useStore.ts) und Speichern-Button-Sperre (ReceiptCheckSheet.tsx) gleichermassen
+ *  genutzt, damit die UI nie etwas als unbedenklich zeigt, das der Commit ablehnt. */
+export function findReceiptCommitConflict(
+  state: {
+    purchaseLog: PurchaseLogEntry[]
+    priceProfiles: ProductPriceProfile[]
+    catalog: CatalogProduct[]
+    brands: GlobalBrand[]
+  },
+  item: CompletedTripItem,
+  row: ReceiptCheckRow | undefined,
+  evidenceCurrency: Currency
+): boolean {
+  const entry = state.purchaseLog.find((entry) => entry.id === item.purchaseLogId)
+  if (!entry) return false
+  const variant = state.priceProfiles
+    .flatMap((profile) => profile.variants)
+    .find((variant) => variant.id === entry.variantId)
+  const knownBrand =
+    item.brandName ??
+    state.catalog.find((product) => product.id === entry.productId)?.brand ??
+    state.brands.find((brand) => brand.id === variant?.brandId)?.name
+  const wrongBrand =
+    !!row &&
+    (row.apply || row.applyAmount) &&
+    !!knownBrand &&
+    !!row.brandName &&
+    brandSearchKey(knownBrand) !== brandSearchKey(row.brandName) &&
+    !row.applyBrand
+  const nextQuantity = row ? receiptQuantity(row.amount) : null
+  const previousQuantity = receiptQuantity(entry.amount ?? '')
+  return (
+    (entry.currency ?? 'CHF') !== evidenceCurrency ||
+    wrongBrand ||
+    !!(row?.apply && !row.applyAmount && quantityMismatch(row.amount, entry.amount ?? '')) ||
+    !!(row?.applyAmount && entry.pricePerKg !== undefined && nextQuantity?.unit !== 'g') ||
+    !!(row?.applyAmount && previousQuantity && nextQuantity?.unit !== previousQuantity.unit)
+  )
+}
 
 export function receiptTripWithBrands(
   state: {

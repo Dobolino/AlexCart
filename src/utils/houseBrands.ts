@@ -1,10 +1,12 @@
 import { HOUSE_BRAND_PRESETS } from '@/constants/houseBrands'
 import type { GlobalBrand } from '@/types'
-import { normalize } from '@/utils/text'
+import { receiptBrandKey } from '@/data/receiptVocabulary'
 
+/** Einzige Quelle für Marken-Gleichheit (gleiche Faltung wie beim Bon-Abgleich), damit eine
+ *  manuell angelegte Marke nie von einer aus einem Kassenbon erkannten abweicht. */
 export function isBrandNameTaken(brands: GlobalBrand[], name: string): boolean {
-  const key = normalize(name)
-  return brands.some((b) => normalize(b.name) === key)
+  const key = receiptBrandKey(name)
+  return brands.some((b) => receiptBrandKey(b.name) === key)
 }
 
 /** Fehlende Hausmarken zur globalen Markenliste hinzufügen. */

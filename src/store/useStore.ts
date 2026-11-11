@@ -8,7 +8,13 @@ import { observationFromPurchase } from './catalogPurchase'
 import { preparePriceArchiveImport, type PriceArchive } from '@/utils/priceArchive'
 import { repriceReceiptItems } from './receiptCheckCommit'
 import { appendReceiptCheckItems } from './receiptCheckAdditions'
-import { resolveReceiptBrands, correctReceiptBrands, receiptTripWithBrands } from './receiptBrandCommit'
+import {
+  resolveReceiptBrands,
+  correctReceiptBrands,
+  receiptTripWithBrands,
+  receiptChangingItems,
+  findReceiptCommitConflict,
+} from './receiptBrandCommit'
 import { removeReceiptItems } from './receiptCheckRemoval'
 import {
   receiptRetailerKey,
@@ -19,10 +25,8 @@ import {
 import { receiptBrandKey as brandSearchKey } from '@/data/receiptVocabulary'
 import {
   compareReceiptCheck,
-  quantityMismatch,
   receiptTripSnapshot,
   receiptTripFingerprint,
-  receiptQuantity,
   validReceiptDate,
   checkName,
   receiptRowKey,
@@ -91,6 +95,8 @@ import type {
 
 const STORE_VERSION = BACKUP_VERSION
 const STORE_NAME = 'alexshop-store'
+/** Verhindert unbegrenztes Wachstum des Einkaufsverlaufs (Speicherplatz, v. a. iOS PWA-Quota). */
+const MAX_COMPLETED_TRIPS = 100
 
 function defaultSettings(): AppSettings {
   return {
@@ -1040,7 +1046,7 @@ export const useStore = create<AppState>()(
             priceProfiles,
             purchaseLog,
             settings: nextSettings,
-            completedTrips: [trip, ...state.completedTrips],
+            completedTrips: [trip, ...state.completedTrips].slice(0, MAX_COMPLETED_TRIPS),
             stats: {
               ...state.stats,
               importsCount: state.stats.importsCount + 1,
@@ -1484,14 +1490,14 @@ export const useStore = create<AppState>()(
         const trimmed = name.trim()
         if (!trimmed) return
         set((state) => {
-          if (state.brands.some((b) => normalize(b.name) === normalize(trimmed))) return state
+          if (state.brands.some((b) => brandSearchKey(b.name) === brandSearchKey(trimmed))) return state
           return { brands: [...state.brands, { id: uid(), name: trimmed, createdAt: Date.now() }] }
         })
       },
       ensureBrand: (name) => {
         const trimmed = name.trim()
         if (!trimmed) return ''
-        const existing = get().brands.find((b) => normalize(b.name) === normalize(trimmed))
+        const existing = get().brands.find((b) => brandSearchKey(b.name) === brandSearchKey(trimmed))
         if (existing) return existing.id
         const brand = { id: uid(), name: trimmed, createdAt: Date.now() }
         set((state) => ({ brands: [...state.brands, brand] }))
@@ -1845,7 +1851,9 @@ export const useStore = create<AppState>()(
           if (next) nextCurrency = remembered.currency
           result = { ok: true, tripId: trip?.id, nextListId: next?.id }
           return {
-            completedTrips: trip ? [...state.completedTrips, trip] : state.completedTrips,
+            completedTrips: trip
+              ? [...state.completedTrips, trip].slice(-MAX_COMPLETED_TRIPS)
+              : state.completedTrips,
             // Bought rows leave the working list; prices and inventory remain historical facts.
             lists: [
               ...state.lists.map((entry) =>
@@ -2032,14 +2040,7 @@ export const useStore = create<AppState>()(
           const amounts = new Map(
             comparison.rows.filter((row) => row.applyAmount).map((row) => [row.targetId, row.amount.trim()])
           )
-          const changing = trip.items.filter(
-            (item) =>
-              changes.has(item.id) ||
-              amounts.has(item.id) ||
-              removedIds.has(item.id) ||
-              brandChanges.some((row) => row.targetId === item.id) ||
-              dateUpdated
-          )
+          const changing = receiptChangingItems(trip, comparison.rows, removedIds, dateUpdated)
           const linked = new Set(changing.flatMap((item) => (item.purchaseLogId ? [item.purchaseLogId] : [])))
           if (
             [...linked].some((id) => state.purchaseLog.filter((entry) => entry.id === id).length > 1) ||
@@ -2063,34 +2064,14 @@ export const useStore = create<AppState>()(
             return state
           }
           if (
-            changing.some((item) => {
-              const entry = state.purchaseLog.find((entry) => entry.id === item.purchaseLogId)
-              const row = comparison.rows.find((row) => row.targetId === item.id)
-              const variant = state.priceProfiles
-                .flatMap((profile) => profile.variants)
-                .find((variant) => variant.id === entry?.variantId)
-              const knownBrand =
-                item.brandName ??
-                state.catalog.find((product) => product.id === entry?.productId)?.brand ??
-                state.brands.find((brand) => brand.id === variant?.brandId)?.name
-              const wrongBrand =
-                !!row &&
-                (row.apply || row.applyAmount) &&
-                !!knownBrand &&
-                !!row.brandName &&
-                brandSearchKey(knownBrand) !== brandSearchKey(row.brandName) &&
-                !row.applyBrand
-              const nextQuantity = row ? receiptQuantity(row.amount) : null
-              const previousQuantity = entry ? receiptQuantity(entry.amount ?? '') : null
-              return (
-                entry &&
-                ((entry.currency ?? 'CHF') !== evidence.currency ||
-                  wrongBrand ||
-                  (row?.apply && !row.applyAmount && quantityMismatch(row.amount, entry.amount ?? '')) ||
-                  (row?.applyAmount && entry.pricePerKg !== undefined && nextQuantity?.unit !== 'g') ||
-                  (row?.applyAmount && previousQuantity && nextQuantity?.unit !== previousQuantity.unit))
+            changing.some((item) =>
+              findReceiptCommitConflict(
+                state,
+                item,
+                comparison.rows.find((row) => row.targetId === item.id),
+                evidence.currency
               )
-            })
+            )
           ) {
             result = {
               ok: false,

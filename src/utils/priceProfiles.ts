@@ -679,5 +679,7 @@ export function buildProfilesFromPurchaseLog(
 }
 
 export function amountToCents(amount: number): number {
-  return Math.round(amount * 100)
+  // Decimal statt amount * 100, da Gleitkomma-Multiplikation knapp unter einem Rappenwert landen
+  // kann (z. B. 2.675 * 100 === 267.49999999999997) und dann falsch abrundet.
+  return new Decimal(amount).times(100).toDecimalPlaces(0).toNumber()
 }

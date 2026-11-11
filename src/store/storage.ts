@@ -20,14 +20,23 @@ function status(error: string | null, recovery = false) {
 }
 export const safeStorage = {
   getItem(name: string): string | null {
+    const value = localStorage.getItem(name)
+    if (!value) return null
     try {
-      const value = localStorage.getItem(name)
-      if (!value) return null
       const parsed = parseBackup(value)
       return JSON.stringify(parsed)
     } catch {
-      status('Gespeicherte Daten konnten nicht geladen werden. Die Originaldaten bleiben erhalten.', true)
-      return null
+      // Schema-Validierung ist strenger als das, was ältere/abweichende gespeicherte Formen
+      // haben können - die Rohdaten trotzdem durchreichen, damit zustand-persists migrate()/
+      // merge() (für genau solche Fälle gebaut) noch eine Chance bekommt, statt die ganze
+      // Sitzung als "keine Daten vorhanden" zu behandeln und auf den Standardzustand zurückzufallen.
+      try {
+        JSON.parse(value)
+        return value
+      } catch {
+        status('Gespeicherte Daten konnten nicht geladen werden. Die Originaldaten bleiben erhalten.', true)
+        return null
+      }
     }
   },
   setItem(name: string, value: string): void {

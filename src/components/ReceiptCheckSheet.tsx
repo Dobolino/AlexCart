@@ -28,6 +28,7 @@ import { fingerprint } from '@/utils/fingerprint'
 import { recognizeReceiptLabel, receiptNameScore, receiptRetailerKey } from '@/data/receiptVocabulary'
 import { retailSelection } from '@/data/retailCatalog'
 import { receiptBrandKey as brandSearchKey } from '@/data/receiptVocabulary'
+import { receiptChangingItems, findReceiptCommitConflict } from '@/store/receiptBrandCommit'
 import type { GlobalBrand } from '@/types'
 
 type DraftRow = ReceiptCheckRow & { priceText: string }
@@ -232,13 +233,6 @@ export function ReceiptCheckSheet({
       }
     }
   }
-  if (!trip)
-    return (
-      <Sheet onClose={onClose}>
-        <h2 className="text-xl font-bold">Bon nicht gefunden</h2>
-        <p>Dieser Einkauf wurde entfernt.</p>
-      </Sheet>
-    )
   const totalMinor = totalText.trim() ? editableMinor(totalText) : undefined
   const evidence: ReceiptCheckEvidence = {
     rows,
@@ -252,16 +246,40 @@ export function ReceiptCheckSheet({
     warnings: document?.warnings ?? [],
     source,
   }
-  const comparison = compareReceiptCheck(
-    {
-      ...trip,
-      items: trip.items
-        .filter((item) => !removeItemIds.includes(item.id))
-        .map((item) => ({ ...item, brandName: existingBrand(item.id) })),
-    },
-    evidence
+  // compareReceiptCheck tut O(rows² × items) Arbeit (Duplikat-Erkennung, Marken-/Mengen-Abgleich je
+  // Zeile) - memoisiert, damit ein Tastendruck in einem Preis-/Mengenfeld (changeRow, unten) nicht
+  // bei jedem Zeichen den kompletten Bon neu abgleicht. Hooks müssen vor dem "Bon nicht gefunden"-
+  // Return weiter unten stehen, daher hier die Variante ohne Trip selbst behandeln.
+  const comparison = useMemo(
+    () =>
+      trip
+        ? compareReceiptCheck(
+            {
+              ...trip,
+              items: trip.items
+                .filter((item) => !removeItemIds.includes(item.id))
+                .map((item) => ({ ...item, brandName: existingBrand(item.id) })),
+            },
+            evidence
+          )
+        : null,
+    // evidence ist pro Render neu gebaut; die tatsächlichen Eingaben sind rows/document/
+    // totalMinor/currency/receiptDate/applyDate/removeItemIds/source (daraus abgeleitet) plus
+    // trip/metadata (von existingBrand genutzt).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trip, rows, document, totalMinor, currency, receiptDate, applyDate, removeItemIds, source, metadata]
   )
-  const unassignedAppItems = trip.items.filter((item) => !rows.some((row) => row.targetId === item.id))
+  const unassignedAppItems = useMemo(
+    () => trip?.items.filter((item) => !rows.some((row) => row.targetId === item.id)) ?? [],
+    [trip, rows]
+  )
+  if (!trip || !comparison)
+    return (
+      <Sheet onClose={onClose}>
+        <h2 className="text-xl font-bold">Bon nicht gefunden</h2>
+        <p>Dieser Einkauf wurde entfernt.</p>
+      </Sheet>
+    )
   const refund = (document?.totalMinor ?? 0) < 0
   const brandOptions = [
     ...brands,
@@ -293,6 +311,7 @@ export function ReceiptCheckSheet({
   ]
     .filter(Boolean)
     .join(' · ')
+  const changingItems = receiptChangingItems(trip, comparison.rows, new Set(removeItemIds), dateChange)
   const invalid =
     comparison.rows.some(
       (row) =>
@@ -303,6 +322,14 @@ export function ReceiptCheckSheet({
         (row.applyBrand && !row.canApplyBrand) ||
         ((row.apply || row.applyAmount) && brandConflict(row)) ||
         (row.add && !row.canAdd)
+    ) ||
+    changingItems.some((item) =>
+      findReceiptCommitConflict(
+        { purchaseLog, priceProfiles, catalog, brands },
+        item,
+        comparison.rows.find((row) => row.targetId === item.id),
+        currency
+      )
     ) ||
     (applyDate && !validReceiptDate(receiptDate)) ||
     (totalMinor !== undefined && !Number.isSafeInteger(totalMinor))
@@ -729,30 +756,35 @@ export function ReceiptCheckSheet({
                 {row.cancelled && (
                   <p className="mt-1 text-xs">Stornierte Bonmengen sind bereits verrechnet.</p>
                 )}
-                {!row.targetId && candidates(row).length > 0 && (
-                  <div className="my-2 text-xs">
-                    <p>Vielleicht bereits im Einkauf enthalten? Bitte Produkt und Variante prüfen.</p>
-                    {candidates(row).map((item) => (
-                      <button
-                        key={item.id}
-                        className="btn-soft my-1 min-h-11 w-full px-2 text-left"
-                        onClick={() => {
-                          changeRow(row.id, {
-                            targetId: item.id,
-                            add: false,
-                            apply: false,
-                            applyAmount: false,
-                            applyBrand: !!row.brandName && !existingBrand(item.id),
-                            remember: true,
-                          })
-                          setEditingId(row.id)
-                        }}
-                      >
-                        Zuordnen: {item.name} · {item.amount}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {!row.targetId &&
+                  (() => {
+                    const rowCandidates = candidates(row)
+                    if (!rowCandidates.length) return null
+                    return (
+                      <div className="my-2 text-xs">
+                        <p>Vielleicht bereits im Einkauf enthalten? Bitte Produkt und Variante prüfen.</p>
+                        {rowCandidates.map((item) => (
+                          <button
+                            key={item.id}
+                            className="btn-soft my-1 min-h-11 w-full px-2 text-left"
+                            onClick={() => {
+                              changeRow(row.id, {
+                                targetId: item.id,
+                                add: false,
+                                apply: false,
+                                applyAmount: false,
+                                applyBrand: !!row.brandName && !existingBrand(item.id),
+                                remember: true,
+                              })
+                              setEditingId(row.id)
+                            }}
+                          >
+                            Zuordnen: {item.name} · {item.amount}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 <p className="my-1 text-sm">
                   Bon: {row.invalidPrice ? 'Preis prüfen' : formatMoney(row.minor / 100, currency)} · App:{' '}
                   {row.appMinor === undefined

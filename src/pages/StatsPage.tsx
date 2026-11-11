@@ -123,10 +123,10 @@ export function StatsPage() {
               onSelectDate={(dateKey) => setCalendarDate((prev) => (prev === dateKey ? null : dateKey))}
             />
             <div className="mb-4.5 grid grid-cols-3 gap-2.5">
-              <StatTile value={completedTrips.length} label="Abgeschlossene Einkäufe" />
-              <StatTile value={avgItemsPerCompletedTrip(completedTrips).toFixed(1)} label="Ø Artikel/Liste" />
+              <StatTile value={currencyTrips.length} label="Abgeschlossene Einkäufe" />
+              <StatTile value={avgItemsPerCompletedTrip(currencyTrips).toFixed(1)} label="Ø Artikel/Liste" />
               <StatTile
-                value={formatMoney(avgSpendPerCompletedTrip(completedTrips, currency), currency)}
+                value={formatMoney(avgSpendPerCompletedTrip(currencyTrips, currency), currency)}
                 label="Ø Wert/Liste"
               />
             </div>

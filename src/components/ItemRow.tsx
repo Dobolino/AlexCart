@@ -4,6 +4,7 @@ import { Icon } from './Icon'
 import { ProductIconSlot } from './ProductIconSlot'
 import { ItemAmountColumn } from './ItemAmountColumn'
 import { ItemActionSheet } from './ItemActionSheet'
+import { Sheet } from './Sheet'
 import { SwipeDeleteAction } from './SwipeDeleteAction'
 import { ICON_PATHS } from '@/constants/icons'
 import { getIconKey } from '@/utils/icon'
@@ -60,6 +61,7 @@ export function ItemRow({
 }: ItemRowProps) {
   const togglePending = useRef(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [amountOpen, setAmountOpen] = useState(false)
 
   const iconKey = getIconKey(item.name, item.category)
   const color = getCategoryColor(item.category, item.done)
@@ -204,7 +206,7 @@ export function ItemRow({
             className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[13px] tabular-nums"
             style={{ color: 'var(--text-muted)' }}
           >
-            {showStepper || showProduceWeight ? (
+            {showProduceWeight ? (
               <ItemAmountColumn
                 item={item}
                 showStepper={false}
@@ -212,6 +214,19 @@ export function ItemRow({
                 onProduceWeightChange={onProduceWeightChange}
                 variant="row"
               />
+            ) : showStepper ? (
+              <button
+                type="button"
+                className="tap-scale font-bold"
+                style={{ color: item.done ? 'var(--text-muted)' : 'var(--text)' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setAmountOpen(true)
+                }}
+                aria-label={`${item.name} Menge ändern`}
+              >
+                {item.amount}
+              </button>
             ) : display.detailLine ? (
               <span className="font-medium">{display.detailLine}</span>
             ) : null}
@@ -284,6 +299,20 @@ export function ItemRow({
             onDelete(item.id)
           }}
         />
+      )}
+      {amountOpen && (
+        <Sheet onClose={() => setAmountOpen(false)}>
+          <h2 className="mb-1 text-lg font-bold">Menge ändern</h2>
+          <p className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+            {productDisplayName(item.name)}
+          </p>
+          <div className="mb-4 flex justify-center">
+            <ItemAmountColumn item={item} showStepper={true} onAdjustAmount={onAdjustAmount} variant="row" />
+          </div>
+          <button className="btn-primary min-h-12" onClick={() => setAmountOpen(false)}>
+            Fertig
+          </button>
+        </Sheet>
       )}
     </motion.div>
   )
