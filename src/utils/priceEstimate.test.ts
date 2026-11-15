@@ -365,4 +365,25 @@ describe('historical receipt price estimates', () => {
       oldPriceItemCount: 1,
     })
   })
+
+  it('matches a free-typed item by its exact name even when it was filed under another category', () => {
+    const other = item({ category: 'Sonstiges' })
+    // Stage 3: catalog reference observations
+    expect(estimateItemPrice([], other, 'CHF', context())).toBe(1.5)
+    // Stage 2: price profile of the same name
+    expect(estimateItemPrice([profile()], other, 'CHF', context({ observations: [] }))).toBe(2.4)
+    // Stage 1: own purchases
+    expect(
+      estimateItemPrice([profile()], other, 'CHF', context({ observations: [], purchaseLog: [purchase()] }))
+    ).toBe(1.8)
+    // Still no fuzzy names, and no guessing between two categories with the same name
+    expect(
+      estimateItemPrice([], item({ name: 'Hafermilch', category: 'Sonstiges' }), 'CHF', context())
+    ).toBeNull()
+    const twice = [
+      profile(),
+      { ...profile(), id: 'p2', category: 'Getränke', baseKey: profileBaseKey('Milch', 'Getränke') },
+    ]
+    expect(estimateItemPrice(twice, other, 'CHF', context({ observations: [] }))).toBeNull()
+  })
 })

@@ -39,6 +39,13 @@ export function findPriceProfile(
   return profiles.find((p) => p.baseKey === key)
 }
 
+/** Exactly one profile with this name in another category - an unambiguous match for a free-typed item. */
+function findProfileByNameOnly(profiles: ProductPriceProfile[], itemName: string) {
+  const name = normalize(itemName)
+  const matches = profiles.filter((p) => normalize(p.itemName) === name)
+  return matches.length === 1 ? matches[0] : undefined
+}
+
 export function findVariant(profile: ProductPriceProfile, variantId: string): ProductVariant | undefined {
   return profile.variants.find((v) => v.id === variantId)
 }
@@ -568,8 +575,11 @@ function estimateItemDetails(
   if (!hasEstimateQuantity(item.amount)) return { price: null, reference: false, date: undefined }
   const now = (context.now ?? new Date()).getTime()
   if (!Number.isFinite(now)) return { price: null, reference: false, date: undefined }
-  const nameProfile = findPriceProfile(profiles, item.name, item.category)
-  const personal = estimatePersonalPrice(item, currency, context, nameProfile?.preferredVariantId)
+  const nameProfile =
+    findPriceProfile(profiles, item.name, item.category) ?? findProfileByNameOnly(profiles, item.name)
+  // When the profile was only found by name, read its prices under the category they were filed in.
+  const personalItem = nameProfile && !item.productId ? { ...item, category: nameProfile.category } : item
+  const personal = estimatePersonalPrice(personalItem, currency, context, nameProfile?.preferredVariantId)
   if (personal) return { price: personal.price, reference: false, date: personal.observedAt }
   // A name-only profile does not prove the brand or package of an explicit catalog product.
   // Its linked personal purchases are also available as exact receipt observations.
@@ -586,9 +596,9 @@ function estimateItemDetails(
       )
     }),
   }
-  const price = estimateProfileItemPrice(candidates ? [candidates] : [], item, currency)
+  const price = estimateProfileItemPrice(candidates ? [candidates] : [], personalItem, currency)
   if (price !== null) {
-    const variant = pickVariantForEstimate(candidates, item, currency)
+    const variant = pickVariantForEstimate(candidates, personalItem, currency)
     return {
       price,
       reference: false,

@@ -211,11 +211,18 @@ export function estimateReferencePrice(
   if (!hasEstimateQuantity(item.amount) || (item.variantId && !item.productId)) return null
   const now = (context.now ?? new Date()).getTime()
   if (!Number.isFinite(now)) return null
-  const products = context.catalog.filter((product) =>
-    item.productId
-      ? product.id === item.productId
-      : key(product.name) === key(item.name) && key(product.category) === key(item.category)
-  )
+  const sameName = item.productId
+    ? []
+    : context.catalog.filter((product) => key(product.name) === key(item.name))
+  const sameCategory = sameName.filter((product) => key(product.category) === key(item.category))
+  // A free-typed item is often filed under another category than the catalog product of the
+  // same name. The exact name alone is then enough; the identity check below still refuses
+  // to choose between different brands or packages.
+  const products = item.productId
+    ? context.catalog.filter((product) => product.id === item.productId)
+    : sameCategory.length
+      ? sameCategory
+      : sameName
   let candidates = context.observations.flatMap((observation) => {
     const product = products.find((entry) => entry.id === observation.productId)
     const date = Date.parse(observation.observedAt)
