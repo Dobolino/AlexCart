@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { productSchema, priceObservationSchema, retailStoreSchema, fxSchema } from './catalogSchemas'
 
-export const STORAGE_VERSION = 26
+export const STORAGE_VERSION = 27
 export const MAX_BACKUP_BYTES = 8 * 1024 * 1024
 const text = z.string().max(1000)
 const id = z.string().min(1).max(200)

@@ -32,3 +32,19 @@ describe('cross-border retail context', () => {
     expect(catalogBrand('Gut & Günstig')?.retailerIds).toEqual(['edeka', 'marktkauf'])
   })
 })
+
+describe('brand country scoping', () => {
+  it('treats manufacturer brands as international and own brands as country-bound', async () => {
+    const { brandCountries, isBrandAvailableIn, catalogBrand } = await import('./retailCatalog')
+    expect(brandCountries(catalogBrand('Barilla')!)).toEqual(['CH', 'DE'])
+    expect(brandCountries(catalogBrand('Lindt')!)).toEqual(['CH', 'DE'])
+    expect(brandCountries(catalogBrand('M-Budget')!)).toEqual(['CH'])
+    expect(brandCountries(catalogBrand('Elan')!)).toEqual(['CH'])
+    expect(brandCountries(catalogBrand('Gut & Günstig')!)).toEqual(['DE'])
+    expect(brandCountries(catalogBrand('Elkos')!)).toEqual(['DE'])
+    // Lidl/Aldi-Eigenmarken gibt es in beiden Ländern, aber getrennt je Händler
+    expect(brandCountries(catalogBrand('Milbona')!)).toEqual(['CH', 'DE'])
+    expect(isBrandAvailableIn(catalogBrand('M Classic')!, 'DE')).toBe(false)
+    expect(isBrandAvailableIn(catalogBrand('Colgate')!, 'DE')).toBe(true)
+  })
+})

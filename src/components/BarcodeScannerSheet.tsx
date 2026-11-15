@@ -3,7 +3,7 @@ import { Sheet } from './Sheet'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES } from '@/data/products'
 import { normalizeGtin, expandUpce } from '@/utils/barcode'
-import { lookupProduct } from '@/services/products'
+import { lookupProduct, ProductLookupUnavailable } from '@/services/products'
 import { quantityText } from '@/utils/quantity'
 import { uid } from '@/utils/id'
 import type { CatalogProduct } from '@/types/catalog'
@@ -74,10 +74,13 @@ export function BarcodeScannerSheet({
           'Noch nicht im Katalog. Trage den Namen ein; das Produkt bleibt danach auch offline verfügbar.'
         )
     } catch (error) {
-      if (!controller.current.signal.aborted)
-        setMessage(
-          `${error instanceof Error ? error.message : 'Produktsuche nicht erreichbar.'} Du kannst das Produkt manuell speichern.`
-        )
+      if (controller.current.signal.aborted) return
+      setProduct(null)
+      setMessage(
+        error instanceof ProductLookupUnavailable
+          ? 'Noch nicht im Katalog (Online-Suche gerade nicht verfügbar). Trage den Namen ein – das Produkt wird lokal gespeichert und ist danach auch offline bekannt.'
+          : `${error instanceof Error ? error.message : 'Produktsuche fehlgeschlagen.'} Du kannst das Produkt manuell speichern.`
+      )
     } finally {
       setBusy(false)
     }

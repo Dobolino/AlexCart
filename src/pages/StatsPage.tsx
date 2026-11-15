@@ -61,10 +61,12 @@ export function StatsPage() {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
   const [calendarDate, setCalendarDate] = useState<string | null>(null)
 
-  const top = topItems(purchaseLog)
-  const categories = categoryBreakdown(purchaseLog)
+  // Zählstatistiken nur für das aktive Land - CH- und DE-Einkäufe nie vermischen.
+  const currencyLog = purchaseLog.filter((e) => (e.currency ?? 'CHF') === currency)
+  const top = topItems(currencyLog)
+  const categories = categoryBreakdown(currencyLog)
   const categorySpend = categorySpendBreakdown(purchaseLog, currency)
-  const weeks = productsPerWeek(purchaseLog, 8)
+  const weeks = productsPerWeek(currencyLog, 8)
   const maxCategoryCount = categories[0]?.count ?? 1
   const maxTopCount = top[0]?.count ?? 1
   const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count))
@@ -75,9 +77,9 @@ export function StatsPage() {
   const spendWeeks = spendPerWeek(purchaseLog, 8, currency)
   const maxSpendWeek = Math.max(0.01, ...spendWeeks.map((w) => w.amount))
   const hasCompletedTrips = completedTrips.length > 0
-  const tripWeeks = completedTripsPerWeek(completedTrips, 8)
-  const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
   const currencyTrips = completedTrips.filter((t) => (t.currency ?? 'CHF') === currency)
+  const tripWeeks = completedTripsPerWeek(currencyTrips, 8)
+  const maxTripWeekCount = Math.max(1, ...tripWeeks.map((w) => w.count))
   const filteredTrips = calendarDate
     ? currencyTrips.filter((t) => timestampToDateKey(t.completedAt) === calendarDate)
     : currencyTrips
@@ -109,7 +111,7 @@ export function StatsPage() {
           Statistik entsteht beim Abhaken von Artikeln. Weitere Listen: auf der Liste den Titel oben antippen.
         </p>
         <div className="mb-4.5 grid grid-cols-3 gap-2.5">
-          <StatTile value={avgItemsPerTrip(purchaseLog).toFixed(1)} label="Ø pro Einkauf" />
+          <StatTile value={avgItemsPerTrip(currencyLog).toFixed(1)} label="Ø pro Einkauf" />
           <StatTile value={stats.importsCount} label="Importierte Listen" />
           <StatTile value={stats.manualProductsCreated} label="Eigene Produkte" />
         </div>
@@ -362,8 +364,8 @@ export function StatsPage() {
             </div>
 
             <p className="mb-4 px-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              An {distinctShoppingDays(purchaseLog)} Tagen eingekauft
-              {hasPriceData ? ` · ${pricedPurchaseCount(purchaseLog)} Preise erfasst` : ''}.
+              An {distinctShoppingDays(currencyLog)} Tagen eingekauft
+              {hasPriceData ? ` · ${pricedPurchaseCount(purchaseLog, currency)} Preise erfasst` : ''}.
             </p>
 
             <button

@@ -346,3 +346,21 @@ describe('priceProfiles', () => {
     expect(estimateOpenListCost([item()], profiles, 'EUR').total).toBe(1.99)
   })
 })
+
+describe('country isolation of estimates', () => {
+  it('never uses a price learned in Germany (EUR) for a Swiss (CHF) estimate, and vice versa', () => {
+    let n = 0
+    const id = () => `id-${++n}`
+    const de = recordVariantPurchase([], 'Barilla Spaghetti', 'Getreide & Beilagen', { price: 1.49, variantName: 'Edeka · Barilla' }, '2026-10-01', id, 'EUR')
+    const profiles = [de.profile]
+    const item: ShoppingItem = {
+      id: 'i', name: 'Barilla Spaghetti', amount: '1 Stück', category: 'Getreide & Beilagen', done: false, addedAt: 1,
+    }
+    expect(estimateItemPrice(profiles, item, 'EUR')).toBe(1.49)
+    expect(estimateItemPrice(profiles, item, 'CHF')).toBeNull()
+    const ch = recordVariantPurchase(profiles, 'Barilla Spaghetti', 'Getreide & Beilagen', { price: 2.2, variantName: 'Migros · Barilla' }, '2026-10-02', id, 'CHF')
+    const both = [ch.profile]
+    expect(estimateItemPrice(both, item, 'CHF')).toBe(2.2)
+    expect(estimateItemPrice(both, item, 'EUR')).toBe(1.49)
+  })
+})

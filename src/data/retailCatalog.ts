@@ -100,11 +100,12 @@ const entries: CatalogBrand[] = [
     'M Classic|M-Budget|Migros Bio|M-Bio|Aus der Region. Für die Region.|Sélection|V-Love|Aha!|YOU|Léger'
   ),
   ...own(['migros'], 'Lebensmittel', 'Anna’s Best|Farmer|Blévita|Pasta Premium'),
-  ...own(['migros'], 'Milch & Kühlung', 'Valflora|Soja Line'),
-  ...own(['migros'], 'Fleisch & Fisch', 'Don Pollo|Optigal'),
+  ...own(['migros'], 'Lebensmittel', 'Jowa|Bischofszell'),
+  ...own(['migros'], 'Milch & Kühlung', 'Valflora|Soja Line|Elsa|Heidi|Mifroma'),
+  ...own(['migros'], 'Fleisch & Fisch', 'Don Pollo|Optigal|Micarna'),
   ...own(['migros'], 'Süßes & Snacks', 'Frey|Sun Queen|Crème d’Or'),
   ...own(['migros'], 'Getränke', 'Café Royal|Exquisito|Delizio|Aproz|Passaia'),
-  ...own(['migros'], 'Haushalt', 'Handy|Total|Potz|Oeco Power|Mio Star|Linsoft'),
+  ...own(['migros'], 'Haushalt', 'Handy|Total|Elan|Potz|Oeco Power|Mio Star|Linsoft'),
   ...own(['migros'], 'Pflege & Kosmetik', 'I am|Candida|Zoé|Sun Look|Exelia'),
   ...own(['migros'], 'Baby & Kind', 'Milette'),
   ...own(['migros'], 'Tierbedarf', 'Exelcat|Exelpet'),
@@ -187,6 +188,9 @@ const entries: CatalogBrand[] = [
   ...own(['rossmann'], 'Haushalt', 'Domol|Flink & Sauber'),
   ...own(['rossmann'], 'Lebensmittel', 'EnerBio|Altapharma'),
   ...own(['rossmann'], 'Baby & Kind', 'Babydream'),
+  ...general('Lebensmittel', 'Alnatura|Galbani'),
+  ...general('Süßes & Snacks', 'Funny-frisch|Wrigley’s'),
+  ...general('Pflege & Kosmetik', 'Signal|Sanex'),
   ...general(
     'Lebensmittel',
     'Barilla|De Cecco|Rummo|Garofalo|Buitoni|Knorr|Maggi|Thomy|Heinz|Kühne|Hengstenberg|Bonduelle|Mutti|Oro di Parma|D’Aucy|Hak|Cirio|Ben’s Original|Oryza|Reis-Fit|Tipiak|Kikkoman|Lee Kum Kee|Blue Dragon|Thai Kitchen|Patak’s|Sharwood’s|Old El Paso|Santa Maria|Alnatura|Rapunzel|Davert|Bauck Mühle|Spielberger|Seeberger|Kölln|Kellogg’s|Weetabix|Nestlé|Schär|Hammermühle|Schnitzer|Harry|Golden Toast|Mestemacher|Wasa|Finn Crisp|Leimer|Dr. Oetker|Ruf|Alsa|Maizena|Mondamin|Diamant|Aurora|Rosenmehl|Driscoll’s|Chiquita|Dole|Zespri|Pink Lady|SanLucar|Chirat|Hero|St. Dalfour|Bonne Maman|Schwartau|Darbo|Zentis|Südzucker|Bertolli|Monini|Filippo Berio|Mazola|Rapso|Albaöl|Maille|Tabasco|Flying Goose'
@@ -232,6 +236,17 @@ const entries: CatalogBrand[] = [
     'Gardena|Fiskars|Wolf-Garten|Compo|Neudorff|Substral|Seramis|Westland|Bosch|Einhell|Makita|Metabo|Kärcher|Stihl|Black+Decker|DeWalt|Wagner|Ryobi|Dremel|Stanley|Wera|Knipex|Fischer|Spax|Alpina|Schöner Wohnen Farbe|Brennenstuhl|Hama|Philips|Panasonic|Sony|Samsung|Logitech|Sandisk|Intenso|Ansmann|ABUS|Burg-Wächter|Weber|Campingaz|Enders|Severin|Tefal|Krups|Rowenta|Russell Hobbs|WMF|Fissler|Silit|Zwilling|Victorinox'
   ),
 ]
+/** Länder, in denen eine Marke erhältlich ist: Eigenmarken über ihre Händler, Herstellermarken
+ *  (ohne Händlerbindung) international in CH und DE. Preise bleiben trotzdem je Land getrennt. */
+export function brandCountries(brand: Pick<CatalogBrand, 'retailerIds'>): RetailCountry[] {
+  if (!brand.retailerIds.length) return ['CH', 'DE']
+  const countries = new Set(
+    brand.retailerIds.flatMap((id) => RETAILERS.filter((r) => r.id === id).map((r) => r.country))
+  )
+  return (['CH', 'DE'] as const).filter((c) => countries.has(c))
+}
+export const isBrandAvailableIn = (brand: Pick<CatalogBrand, 'retailerIds'>, country: RetailCountry) =>
+  brandCountries(brand).includes(country)
 export const BRAND_CATALOG = [...new Map(entries.map((b) => [normalize(b.name), b])).values()]
 export const brandSearchKey = (name: string) =>
   normalize(name)

@@ -2430,6 +2430,52 @@ export const useStore = create<AppState>()(
               customStores: (state.settings as Partial<AppSettings>)?.customStores ?? [],
             }
           }
+          if (version < 27) {
+            // Einmaliger Nachtrag: Kaufverlauf-Einträge, die vor dieser Version ohne storeId
+            // oder ohne verknüpfte Preisprofil-Variante blieben (z. B. preislos abgehakt und der
+            // Preis erst später über den Bon-Abgleich nachgetragen), ließen die Vorkalkulation
+            // der Einkaufsliste den gelernten Preis für immer übersehen - siehe
+            // estimatePersonalPrice (verlangt storeId) und repriceReceiptItems (legte vor dem
+            // zugehörigen Fix keine neue Variante an).
+            const tripStoreByLogId = new Map<string, string>()
+            for (const trip of state.completedTrips ?? []) {
+              if (!trip.storeId) continue
+              for (const item of trip.items ?? []) {
+                if (item.purchaseLogId) tripStoreByLogId.set(item.purchaseLogId, trip.storeId)
+              }
+            }
+            let profiles = state.priceProfiles ?? []
+            state.purchaseLog = (state.purchaseLog ?? []).map((entry) => {
+              let next = entry
+              if (!next.storeId && next.id) {
+                const storeId = tripStoreByLogId.get(next.id)
+                if (storeId) next = { ...next, storeId }
+              }
+              if ((next.price ?? 0) > 0 && !next.variantId) {
+                const result = recordVariantPurchase(
+                  profiles,
+                  next.name,
+                  next.category,
+                  {
+                    price: next.price!,
+                    unitPrice: next.profilePrice,
+                    pricePerKg: next.pricePerKg,
+                    variantName: next.variantName,
+                    wasSale: next.wasSale,
+                  },
+                  next.date,
+                  uid,
+                  next.currency ?? 'CHF'
+                )
+                profiles = result.createdNewProfile
+                  ? [...profiles, result.profile]
+                  : upsertPriceProfile(profiles, result.profile)
+                next = { ...next, variantId: result.variantId, variantName: result.variantName }
+              }
+              return next
+            })
+            state.priceProfiles = profiles
+          }
           return state as AppState
         } catch (err) {
           console.error('AlexShop: Store-Migration fehlgeschlagen', err)

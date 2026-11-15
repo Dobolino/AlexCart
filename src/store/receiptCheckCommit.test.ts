@@ -548,3 +548,56 @@ describe('confirmed receipt photo corrections', () => {
     expect(useStore.getState().completedTrips).toEqual(before.completedTrips)
   })
 })
+
+describe('receipt-check price corrections on items checked off without a price', () => {
+  it('learns a price profile variant from a receipt correction even though the checkoff had no price', () => {
+    useStore.getState().resetAll()
+    useStore.setState({
+      lists: [
+        {
+          id: 'list',
+          name: 'Migros',
+          weekLabel: '',
+          createdAt: 1,
+          items: [
+            { id: 'milk', name: 'Milch', amount: '1 Stück', category: 'Milch & Käse', done: false, addedAt: 1 },
+          ],
+        },
+      ],
+      activeListId: 'list',
+    })
+    const actions = useStore.getState()
+    actions.startShoppingSession('list')
+    actions.setListShoppingStore('list', 'Migros', 'CH')
+    actions.toggleItemDone('milk')
+    actions.finishShopping('list', { createNewList: false })
+
+    expect(useStore.getState().purchaseLog[0]!.price).toBeUndefined()
+    expect(useStore.getState().purchaseLog[0]!.variantId).toBeUndefined()
+    expect(useStore.getState().priceProfiles).toHaveLength(0)
+
+    const trip = useStore.getState().completedTrips[0]!
+    const doc = parseReceiptCheck('MIGROS\nMilch 2.50\nTOTAL CHF 2.50')
+    const evidence: ReceiptCheckEvidence = {
+      ...doc,
+      rows: suggestReceiptRows(doc, trip),
+      currency: 'CHF',
+      source: 'photo',
+    }
+    evidence.rows[0]!.apply = true
+    const snapshot = receiptTripSnapshot(trip)
+
+    const result = useStore.getState().saveReceiptCheck(trip.id, snapshot, evidence, true)
+    expect(result.ok).toBe(true)
+
+    const state = useStore.getState()
+    const entry = state.purchaseLog.find((e) => e.name === 'Milch')!
+    expect(entry.price).toBe(2.5)
+    expect(entry.variantId).toBeDefined()
+    expect(state.priceProfiles).toHaveLength(1)
+    expect(pricesForCurrency(state.priceProfiles[0]!.variants[0]!, 'CHF')).toMatchObject({
+      lastPrice: 2.5,
+      purchaseCount: 1,
+    })
+  })
+})

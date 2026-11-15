@@ -54,6 +54,13 @@ export function offProduct(raw: unknown, code: string): CatalogProduct | null {
     updatedAt: new Date().toISOString(),
   })
 }
+/** Online-Produktsuche nicht verfügbar (offline oder kein Server). Lokale Suche lief bereits. */
+export class ProductLookupUnavailable extends Error {
+  constructor() {
+    super('Online-Produktsuche nicht verfügbar.')
+    this.name = 'ProductLookupUnavailable'
+  }
+}
 export async function lookupProduct(
   code: string,
   configured: string,
@@ -69,10 +76,17 @@ export async function lookupProduct(
   if (owned) return owned
   const cached = await cachedValue<CatalogProduct | { missing: true }>(`product:${gtin}`)
   if (cached) return 'missing' in cached ? null : productSchema.parse(cached)
-  const product = offProduct(
-    await apiRequest<unknown>(apiBase(configured), `/products/${code}`, { signal }),
-    code
-  )
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new ProductLookupUnavailable()
+  let payload: unknown
+  try {
+    payload = await apiRequest<unknown>(apiBase(configured), `/products/${code}`, { signal })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    // Kein (erreichbarer) Produktserver - z. B. statisches Hosting ohne /api. Das ist ein
+    // erwarteter Zustand, kein Fehler: das Produkt wird einfach lokal angelegt.
+    throw new ProductLookupUnavailable()
+  }
+  const product = offProduct(payload, code)
   await cacheValue(`product:${gtin}`, product ?? { missing: true }, product ? 7 * 86400000 : 5 * 60000)
   return product
 }

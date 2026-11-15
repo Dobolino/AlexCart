@@ -3,9 +3,10 @@ import type { CompletedTrip, PurchaseLogEntry, ProductPriceProfile } from '@/typ
 import type { PriceObservation } from '@/types/catalog'
 import { baseQuantity } from '@/utils/quantity'
 import { priceQuantityFromAmount } from '@/utils/amount'
-import { refreshPurchaseProfiles } from '@/utils/priceProfiles'
+import { refreshPurchaseProfiles, recordVariantPurchase, upsertPriceProfile } from '@/utils/priceProfiles'
 import { observationFromPurchase } from './catalogPurchase'
 import { dateKeyToTimestamp } from '@/utils/date'
+import { uid } from '@/utils/id'
 
 export function repriceReceiptItems(
   state: {
@@ -60,8 +61,37 @@ export function repriceReceiptItems(
       pricePerKg: entry.pricePerKg === undefined ? undefined : profilePrice,
     }
   })
+  // Preis-Korrekturen über den Bon-Abgleich betreffen oft Positionen, die ohne Preis abgehakt
+  // wurden (kein variantId) - refreshPurchaseProfiles aktualisiert nur bereits verknüpfte
+  // Varianten, legt aber nie eine neue an. Ohne diesen Schritt lernt das Preisprofil (und damit
+  // die Vorkalkulation der Einkaufsliste) den nachgetragenen Preis nie.
+  let priceProfiles = refreshPurchaseProfiles(state.priceProfiles, purchaseLog, affected)
+  const finalPurchaseLog = purchaseLog.map((entry) => {
+    if (!entry.id || !logChanges.has(entry.id) || entry.variantId || !((entry.price ?? 0) > 0)) return entry
+    const result = recordVariantPurchase(
+      priceProfiles,
+      entry.name,
+      entry.category,
+      {
+        price: entry.price!,
+        unitPrice: entry.profilePrice,
+        pricePerKg: entry.pricePerKg,
+        variantName: entry.variantName,
+        wasSale: entry.wasSale,
+      },
+      entry.date,
+      uid,
+      entry.currency ?? 'CHF'
+    )
+    priceProfiles = result.createdNewProfile
+      ? [...priceProfiles, result.profile]
+      : upsertPriceProfile(priceProfiles, result.profile)
+    return { ...entry, variantId: result.variantId, variantName: result.variantName }
+  })
   const updated = new Map(
-    purchaseLog.filter((entry) => entry.id && logChanges.has(entry.id)).map((entry) => [entry.id!, entry])
+    finalPurchaseLog
+      .filter((entry) => entry.id && logChanges.has(entry.id))
+      .map((entry) => [entry.id!, entry])
   )
   const observed = new Set<string>()
   const priceObservations = state.priceObservations.flatMap((observation) => {
@@ -80,9 +110,9 @@ export function repriceReceiptItems(
       if (next) priceObservations.push(next)
     }
   return {
-    purchaseLog,
+    purchaseLog: finalPurchaseLog,
     priceObservations,
-    priceProfiles: refreshPurchaseProfiles(state.priceProfiles, purchaseLog, affected),
+    priceProfiles,
     completedTrips: state.completedTrips.map((entry) =>
       entry.id !== tripId
         ? entry
