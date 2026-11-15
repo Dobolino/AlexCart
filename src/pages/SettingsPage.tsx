@@ -271,7 +271,7 @@ export function SettingsPage() {
                     <button
                       key={amount}
                       type="button"
-                      className="tap-scale rounded-full px-3 py-1.5 text-[12px] font-bold"
+                      className="tap-scale min-h-[40px] min-w-[56px] rounded-full px-4 text-[14px] font-bold"
                       style={{
                         background: weeklyBudget === amount ? 'var(--accent-soft)' : 'var(--chip-bg)',
                         color: weeklyBudget === amount ? 'var(--accent)' : 'var(--text)',

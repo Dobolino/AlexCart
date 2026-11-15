@@ -14,7 +14,9 @@ import { searchProducts } from '@/utils/search'
 import { buildLastPurchaseIndex, lastPurchasedHintForName } from '@/utils/purchaseFrequency'
 import { parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
-import { CATEGORIES } from '@/data/products'
+import { CATEGORIES, PRODUCTS } from '@/data/products'
+import { buildQuickPicks } from '@/utils/quickAdd'
+import { normalize } from '@/utils/text'
 import { parseRecipeText } from '@/utils/recipe'
 import { RecipeReviewSheet, type RecipeReviewItem } from '@/components/RecipeReviewSheet'
 import { uid } from '@/utils/id'
@@ -26,6 +28,19 @@ interface AddItemSheetProps {
   /** Öffnet den Kassenbon-Import (separates Sheet). */
   onOpenReceiptImport?: () => void
 }
+
+const STARTER_PICKS = [
+  'Milch',
+  'Brot',
+  'Eier',
+  'Butter',
+  'Bananen',
+  'Tomaten',
+  'Käse',
+  'Kaffee',
+  'Joghurt',
+  'Äpfel',
+]
 
 type Mode = 'search' | 'form' | 'import' | 'recipe'
 type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom'
@@ -50,6 +65,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const brands = useStore((s) => s.brands)
   const completedTrips = useStore((s) => s.completedTrips)
   const activeList = useStore((s) => s.activeList())
+  const lists = useStore((s) => s.lists)
 
   const [mode, setMode] = useState<Mode>('search')
   const [query, setQuery] = useState('')
@@ -73,6 +89,21 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
     () => searchProducts(query, customProducts, 12, catalog),
     [query, customProducts, catalog]
   )
+  // Leeres Suchfeld: Favoriten/zuletzt genutzte Artikel als Ein-Tipp-Auswahl,
+  // für neue Nutzer ergänzt um typische Grundartikel.
+  const quickPicks = useMemo(() => {
+    if (!activeList) return []
+    const picks = buildQuickPicks(activeList, lists, customProducts, 10)
+    const onList = new Set(activeList.items.filter((i) => !i.done).map((i) => normalize(i.name)))
+    const seen = new Set(picks.map((p) => normalize(p.name)))
+    for (const name of STARTER_PICKS) {
+      if (picks.length >= 10) break
+      const product = PRODUCTS.find((p) => p.name === name)
+      if (!product || onList.has(normalize(name)) || seen.has(normalize(name))) continue
+      picks.push({ key: `starter-${name}`, name, category: product.category, amount: '', kind: 'recent' })
+    }
+    return picks
+  }, [activeList, lists, customProducts])
   const lastPurchaseIndex = useMemo(() => buildLastPurchaseIndex(completedTrips), [completedTrips])
 
   function openConfirmFor(result: (typeof results)[number]) {
@@ -223,6 +254,39 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
             />
           </div>
           <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {!query.trim() && quickPicks.length > 0 && (
+              <div className="mt-2">
+                <div
+                  className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Schnellwahl
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {quickPicks.map((pick) => (
+                    <button
+                      key={pick.key}
+                      type="button"
+                      className="tap-scale min-h-[40px] rounded-full px-3.5 text-[14px] font-semibold"
+                      style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
+                      onClick={() => {
+                        addItemToActiveList({
+                          name: pick.name,
+                          category: pick.category,
+                          amount:
+                            pick.amount ||
+                            defaultListAmount(getIconKey(pick.name, pick.category), pick.category, pick.name),
+                          note: pick.note,
+                        })
+                        onImported(`„${pick.name}“ hinzugefügt`)
+                      }}
+                    >
+                      {pick.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {results.map((r) => {
               const iconKey = getIconKey(r.name, r.category)
               const color = getCategoryColor(r.category)

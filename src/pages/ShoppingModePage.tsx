@@ -541,9 +541,12 @@ export function ShoppingModePage() {
       {deletedItem && (
         <FloatingPortal>
           <div
-            className="glass fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full py-2.5 pl-4 pr-2 text-[13px] font-semibold"
+            className="fixed left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full border py-2.5 pl-4 pr-2 text-[13px] font-semibold"
             style={{
               color: 'var(--text)',
+              background: 'var(--surface)',
+              borderColor: 'var(--border)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
               bottom: 'calc(72px + var(--safe-bottom))',
             }}
           >

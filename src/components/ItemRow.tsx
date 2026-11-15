@@ -97,7 +97,7 @@ export function ItemRow({
       animate={{ opacity: swipe.deleteExiting ? 0 : 1, scale: 1, height: swipe.deleteExiting ? 0 : 'auto' }}
       exit={{ opacity: 0, x: -60, transition: { duration: 0.15 } }}
       transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-      className="relative mb-2 overflow-hidden rounded-[14px]"
+      className="relative mb-1.5 overflow-hidden rounded-[14px]"
       style={{
         zIndex: isDragging ? 50 : undefined,
         boxShadow: item.done ? 'none' : 'var(--shadow-card)',
@@ -121,7 +121,7 @@ export function ItemRow({
       {!isDragging && showDeleteAction && <SwipeDeleteAction onDelete={swipe.confirmDelete} />}
 
       <div
-        className="relative flex min-h-[76px] items-center gap-3 px-3.5 py-3.5"
+        className="relative flex min-h-[58px] items-center gap-2.5 px-3 py-2"
         style={{
           background: item.done ? 'var(--done-bg)' : 'var(--surface)',
           ...(isDragging && dragFixedPos
@@ -230,12 +230,11 @@ export function ItemRow({
             ) : display.detailLine ? (
               <span className="font-medium">{display.detailLine}</span>
             ) : null}
-            <span
-              className="font-bold"
-              style={{ color: hasPrice && !item.done ? 'var(--text)' : 'var(--text-muted)' }}
-            >
-              {hasPrice ? formatMoney(estimatedPrice!, currency) : '–'}
-            </span>
+            {hasPrice ? (
+              <span className="font-bold" style={{ color: item.done ? 'var(--text-muted)' : 'var(--text)' }}>
+                {formatMoney(estimatedPrice!, currency)}
+              </span>
+            ) : null}
             {item.note ? (
               <span className="min-w-0 basis-full break-words font-medium [overflow-wrap:anywhere]">
                 {item.note}
