@@ -6,7 +6,7 @@ import { Icon } from './Icon'
 import { ProductForm, type ProductFormValues } from './ProductForm'
 import { BrandSelect } from './BrandSelect'
 import { ICON_PATHS } from '@/constants/icons'
-import { DEFAULT_UNIT, getDefaultUnit } from '@/constants/units'
+import { DEFAULT_UNIT, defaultListAmount, getDefaultUnit } from '@/constants/units'
 import { getIconKey } from '@/utils/icon'
 import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { getCategoryColor } from '@/utils/categoryColor'
@@ -240,7 +240,8 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                       addItemToActiveList({
                         name: r.name,
                         category: r.category,
-                        amount: r.amount || `1 ${getDefaultUnit(getIconKey(r.name, r.category))}`,
+                        amount:
+                          r.amount || defaultListAmount(getIconKey(r.name, r.category), r.category, r.name),
                         note: r.note,
                         productId: r.productId,
                       })

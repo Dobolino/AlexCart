@@ -65,3 +65,9 @@ describe('searchProducts', () => {
 function normalize(s: string) {
   return s.toLowerCase()
 }
+
+describe('searchProducts exact match ranking', () => {
+  it('puts the exact name first, even when another name starts the same after umlaut folding', () => {
+    expect(searchProducts('Brot', [])[0]!.name).toBe('Brot')
+  })
+})

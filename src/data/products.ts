@@ -2068,5 +2068,65 @@ export const PRODUCTS: Product[] = [
     "name": "Fischfutter",
     "category": "Tierbedarf",
     "icon": "voegelfutter"
+  },
+  {
+    "name": "Brot",
+    "category": "Brot & Backwaren",
+    "icon": "brot"
+  },
+  {
+    "name": "Käse",
+    "category": "Milch & Käse",
+    "icon": "kaese"
+  },
+  {
+    "name": "Joghurt",
+    "category": "Milch & Käse",
+    "icon": "joghurt"
+  },
+  {
+    "name": "Rahm",
+    "category": "Milch & Käse",
+    "icon": "sahne"
+  },
+  {
+    "name": "Pasta",
+    "category": "Getreide & Beilagen",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Nudeln",
+    "category": "Getreide & Beilagen",
+    "icon": "nudeln"
+  },
+  {
+    "name": "Rüebli",
+    "category": "Früchte & Gemüse",
+    "icon": "karotte"
+  },
+  {
+    "name": "Gurke",
+    "category": "Früchte & Gemüse",
+    "icon": "gurke"
+  },
+  {
+    "name": "Wasser",
+    "category": "Getränke",
+    "icon": "wasser"
+  },
+  {
+    "name": "Wein",
+    "category": "Getränke",
+    "icon": "wein"
+  },
+  {
+    "name": "Müesli",
+    "category": "Getreide & Beilagen",
+    "icon": "mueesli"
+  },
+  {
+    "name": "Poulet",
+    "category": "Fleisch & Fisch",
+    "icon": "huhn"
   }
 ]

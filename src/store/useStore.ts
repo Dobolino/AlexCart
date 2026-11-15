@@ -119,11 +119,11 @@ function defaultSettings(): AppSettings {
 
 function defaultPantry(): PantryItem[] {
   return [
-    { id: uid(), name: 'Salz', category: 'Sonstiges' },
-    { id: uid(), name: 'Pfeffer', category: 'Sonstiges' },
-    { id: uid(), name: 'Olivenöl', category: 'Sonstiges' },
+    { id: uid(), name: 'Salz', category: 'Gewürze, Öl & Backen' },
+    { id: uid(), name: 'Pfeffer', category: 'Gewürze, Öl & Backen' },
+    { id: uid(), name: 'Olivenöl', category: 'Gewürze, Öl & Backen' },
     { id: uid(), name: 'Reis', category: 'Getreide & Beilagen' },
-    { id: uid(), name: 'Zucker', category: 'Sonstiges' },
+    { id: uid(), name: 'Zucker', category: 'Gewürze, Öl & Backen' },
     { id: uid(), name: 'Mehl', category: 'Getreide & Beilagen' },
   ]
 }

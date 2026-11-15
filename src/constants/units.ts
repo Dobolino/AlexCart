@@ -153,3 +153,18 @@ export function getDefaultUnitForCategory(category: string): string {
 export function getDefaultUnit(iconKey: string, category?: string): string {
   return DEFAULT_UNIT_BY_ICON[iconKey] ?? (category ? getDefaultUnitForCategory(category) : DEFAULT_UNIT)
 }
+
+/** Menge, mit der ein Artikel ohne eigene Mengenangabe auf der Liste landet.
+ *  Nie „1 g“ oder „1 ml“ – das ist keine reale Einkaufsmenge. Obst/Gemüse nach Gewicht
+ *  bleibt leer, damit die Liste direkt nach dem Gewicht fragt. */
+export function defaultListAmount(iconKey: string, category: string, name = ''): string {
+  let unit = DEFAULT_UNIT_BY_ICON[iconKey] ?? getDefaultUnitForCategory(category)
+  if (
+    !DEFAULT_UNIT_BY_ICON[iconKey] &&
+    unit === 'l' &&
+    !/milch|drink|saft|wasser|rahm|kefir|sirup/i.test(name)
+  )
+    unit = 'Packung' // z. B. Butter, Käse in „Milch & Käse“
+  if (unit === 'g' || unit === 'ml') return category === 'Früchte & Gemüse' ? '' : '1 Packung'
+  return `1 ${unit}`
+}

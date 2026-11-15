@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getDefaultUnit, DEFAULT_UNIT, getDefaultUnitForCategory } from './units'
+import { getDefaultUnit, DEFAULT_UNIT, getDefaultUnitForCategory, defaultListAmount } from './units'
 
 describe('getDefaultUnit', () => {
   it('returns a sensible unit for common product types', () => {
@@ -23,5 +23,15 @@ describe('getDefaultUnitForCategory', () => {
     expect(getDefaultUnitForCategory('Milch & Käse')).toBe('l')
     expect(getDefaultUnitForCategory('Tiefkühl')).toBe('Packung')
     expect(getDefaultUnitForCategory('Brot & Backwaren')).toBe('Stück')
+  })
+})
+
+describe('defaultListAmount', () => {
+  it('never puts a nonsensical "1 g" / "1 ml" / "1 l Butter" on the list', () => {
+    expect(defaultListAmount('unbekannt', 'Milch & Käse', 'Butter')).toBe('1 Packung')
+    expect(defaultListAmount('unbekannt', 'Milch & Käse', 'Milch')).toBe('1 l')
+    expect(defaultListAmount('unbekannt', 'Fleisch & Fisch', 'Hackfleisch')).toBe('1 Packung')
+    expect(defaultListAmount('unbekannt', 'Früchte & Gemüse', 'Tomaten')).toBe('1 Stück')
+    expect(defaultListAmount('ei', 'Milch & Käse', 'Eier')).toBe('1 Stück')
   })
 })

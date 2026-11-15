@@ -95,13 +95,6 @@ export function StatsPage() {
         <PromoSavingsHighlight amount={promoSavings} currency={currency} />
         <StoreComparisonSection stores={storeStats} currency={currency} />
         <CategorySpendSection categories={categorySpend} currency={currency} />
-        <PriceExportSection
-          purchaseLog={purchaseLog}
-          priceProfiles={priceProfiles}
-          brands={brands}
-          completedTrips={completedTrips}
-          currency={currency}
-        />
         <div className="mb-2.5 grid grid-cols-3 gap-2.5">
           <StatTile value={lists.length} label="Einkaufslisten" />
           <StatTile value={purchaseLog.length} label="Produkte gekauft" />
@@ -379,6 +372,15 @@ export function StatsPage() {
             </button>
           </>
         )}
+        <div className="mt-3">
+          <PriceExportSection
+            purchaseLog={purchaseLog}
+            priceProfiles={priceProfiles}
+            brands={brands}
+            completedTrips={completedTrips}
+            currency={currency}
+          />
+        </div>
       </main>
 
       {selectedTrip && (

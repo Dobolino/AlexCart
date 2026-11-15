@@ -32,7 +32,7 @@ function customToSearchable(p: CustomProduct): SearchableProduct {
 }
 
 /** Sucht zuerst in eigenen Produkten (Nutzer-Priorität), dann in der Standard-Datenbank.
- *  "startsWith"-Treffer werden vor reinen Teilstring-Treffern einsortiert. */
+ *  Exakte Treffer kommen zuerst („Brot“ vor „Brötchen“), dann "startsWith"-, dann Teilstring-Treffer. */
 export function searchProducts(
   query: string,
   customProducts: CustomProduct[],
@@ -53,6 +53,7 @@ export function searchProducts(
       amount: product.netQuantity ? quantityText(product.netQuantity) : undefined,
     })),
   ]
+  const exact: SearchableProduct[] = []
   const starts: SearchableProduct[] = []
   const contains: SearchableProduct[] = []
   const seen = new Set<string>()
@@ -66,7 +67,10 @@ export function searchProducts(
       : normalize(p.name)
     if (seen.has(key)) continue
     const searchable = normalize([p.brand, p.name].filter(Boolean).join(' '))
-    if (normalize(p.name).startsWith(q) || searchable.startsWith(q)) {
+    if (normalize(p.name) === q || searchable === q) {
+      exact.push(p)
+      seen.add(key)
+    } else if (normalize(p.name).startsWith(q) || searchable.startsWith(q)) {
       starts.push(p)
       seen.add(key)
     } else if (searchable.includes(q)) {
@@ -75,5 +79,5 @@ export function searchProducts(
     }
   }
 
-  return [...starts, ...contains].slice(0, limit)
+  return [...exact, ...starts, ...contains].slice(0, limit)
 }
