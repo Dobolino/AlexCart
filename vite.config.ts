@@ -49,6 +49,8 @@ export default defineConfig({
         background_color: THEME_COLORS.dark.bg,
         display: 'standalone',
         orientation: 'portrait',
+        // Stabile App-Identität (= bisherige start_url, ändert also nichts an bestehenden Installationen).
+        id: `/${REPO_NAME}/`,
         scope: `/${REPO_NAME}/`,
         start_url: `/${REPO_NAME}/`,
         icons: [

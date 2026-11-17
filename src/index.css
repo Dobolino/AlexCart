@@ -180,6 +180,16 @@ body,
   overscroll-behavior: none;
 }
 
+/* iOS zoomt beim Fokus in jedes Eingabefeld unter 16px hinein. Sicherheitsnetz für alle
+   Felder – auch künftige mit kleinerer Tailwind-Schriftgrösse. Nur auf iOS-WebKit aktiv. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
 html {
   background: var(--bg);
   -webkit-text-size-adjust: 100%;

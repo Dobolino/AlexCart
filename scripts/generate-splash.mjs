@@ -23,13 +23,17 @@ const svg = readFileSync(svgPath)
 // width/height in CSS px (portrait, matching Apple's documented device list),
 // dpr = -webkit-device-pixel-ratio. Covers current-generation iPhones.
 const devices = [
-  { name: 'iphone-16-pro-max', width: 440, height: 956, dpr: 3 },
+  { name: 'iphone-16-pro-max', width: 440, height: 956, dpr: 3 }, // auch 17 Pro Max
+  { name: 'iphone-air', width: 420, height: 912, dpr: 3 },
   { name: 'iphone-16-pro', width: 402, height: 874, dpr: 3 },
   { name: 'iphone-16-plus', width: 430, height: 932, dpr: 3 },
   { name: 'iphone-16', width: 393, height: 852, dpr: 3 },
-  { name: 'iphone-14-13-12', width: 390, height: 844, dpr: 3 },
+  { name: 'iphone-14-13-12', width: 390, height: 844, dpr: 3 }, // auch 16e
+  { name: 'iphone-14-plus-13-pro-max', width: 428, height: 926, dpr: 3 },
+  { name: 'iphone-13-mini-x-xs', width: 375, height: 812, dpr: 3 },
   { name: 'iphone-11-pro-max-xs-max', width: 414, height: 896, dpr: 3 },
   { name: 'iphone-11-xr', width: 414, height: 896, dpr: 2 },
+  { name: 'iphone-8-plus', width: 414, height: 736, dpr: 3 },
   { name: 'iphone-se', width: 375, height: 667, dpr: 2 },
 ]
 
