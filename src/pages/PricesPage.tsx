@@ -7,7 +7,13 @@ import { RETAILERS, retailSelection, retailCurrency } from '@/data/retailCatalog
 import { PriceExportSection } from '@/components/PriceExportSection'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
-import { compareProductPrices, compareBasket, minorMoney } from '@/utils/priceComparison'
+import {
+  compareProductPrices,
+  compareBasket,
+  minorMoney,
+  priceAdvantage,
+  convertMoney,
+} from '@/utils/priceComparison'
 import { baseQuantity, quantityText } from '@/utils/quantity'
 import { formatMoney, parseMoneyInput } from '@/utils/currency'
 import { todayKey } from '@/utils/date'
@@ -27,6 +33,7 @@ export function PricesPage() {
   const fx = useStore((s) => s.fxSnapshot)
   const list = useStore((s) => s.activeList())
   const [exportOpen, setExportOpen] = useState(false)
+  const [countryFilter, setCountryFilter] = useState<'ALL' | 'CH' | 'DE'>('ALL')
   const purchaseLog = useStore((s) => s.purchaseLog),
     profiles = useStore((s) => s.priceProfiles),
     brands = useStore((s) => s.brands),
@@ -51,9 +58,17 @@ export function PricesPage() {
   const [busy, setBusy] = useState(false)
   const product = products.find((p) => p.id === selected) ?? products[0]
   const rows = useMemo(
-    () => (product ? compareProductPrices(product, observations, currency, fx) : []),
-    [product, observations, currency, fx]
+    () =>
+      product
+        ? compareProductPrices(product, observations, currency, fx).filter(
+            (row) =>
+              countryFilter === 'ALL' ||
+              stores.find((store) => store.id === row.observation.storeId)?.country === countryFilter
+          )
+        : [],
+    [product, observations, currency, fx, countryFilter, stores]
   )
+  const advantage = priceAdvantage(rows)
   const baskets = useMemo(
     () => compareBasket(list?.items ?? [], products, observations, currency, fx),
     [list, products, observations, currency, fx]
@@ -115,6 +130,24 @@ export function PricesPage() {
         }
       />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+        <div className="country-tabs mb-4" role="tablist" aria-label="Länder im Preisvergleich">
+          {(
+            [
+              ['CH', 'Schweiz'],
+              ['DE', 'Deutschland'],
+              ['ALL', 'Beide'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={countryFilter === value}
+              onClick={() => setCountryFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="mb-3 flex gap-2">
           <button className="btn-primary min-h-12 flex-1" onClick={() => setCreating(true)}>
             Produkt erfassen
@@ -151,8 +184,10 @@ export function PricesPage() {
           </p>
         )}
         {!!baskets.length && (
-          <section className="card-surface mb-4 p-4">
-            <h2 className="mb-2 font-bold">Deine offene Einkaufsliste</h2>
+          <details className="card-surface mb-4 p-4">
+            <summary className="min-h-7 cursor-pointer text-sm font-bold">
+              Deine offene Einkaufsliste · Händlervergleich
+            </summary>
             <p className="mb-2 text-xs">
               Nur aktuelle Normalpreise ohne Kundenkarte. Fehlende Positionen werden nicht als kostenlos
               gewertet. Bei Packungsware werden ganze Packungen gerechnet.
@@ -166,7 +201,7 @@ export function PricesPage() {
                   : `${formatMoney(basket.total, currency)} für bekannte Positionen, kein Gesamtpreis`}
               </div>
             ))}
-          </section>
+          </details>
         )}
         {product && (
           <>
@@ -185,6 +220,7 @@ export function PricesPage() {
                   <option key={p.id} value={p.id}>
                     {p.name}
                     {p.brand ? ` · ${p.brand}` : ''}
+                    {p.netQuantity ? ` · ${quantityText(p.netQuantity)}` : ''}
                   </option>
                 ))}
               </select>
@@ -218,7 +254,25 @@ export function PricesPage() {
               </button>
             </div>
             <div className="card-surface mb-4 p-4">
-              <h2 className="mb-2 font-bold">Preise in {currency}</h2>
+              <h2 className="mb-1 text-xl font-extrabold">{product.name}</h2>
+              <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                {[
+                  product.brand,
+                  product.netQuantity ? quantityText(product.netQuantity) : 'Mengenbasis fehlt',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}{' '}
+                · Vergleich in {currency}
+              </p>
+              {advantage && (
+                <p className="price-advantage mb-3">
+                  {stores.find((store) => store.id === advantage.cheapest.storeId)?.name ??
+                    'Geschäft unbekannt'}{' '}
+                  {advantage.percent} % günstiger als{' '}
+                  {stores.find((store) => store.id === advantage.reference.storeId)?.name ??
+                    'Geschäft unbekannt'}
+                </p>
+              )}
               {!rows.length && (
                 <p className="text-sm">
                   Noch keine Preise für dieses Produkt. Erfasse deinen ersten Preis oder suche nach
@@ -238,6 +292,13 @@ export function PricesPage() {
                       ? `${formatMoney(normalized.amount, currency)} / ${normalized.unit === 'piece' ? 'Stück' : normalized.unit}`
                       : 'Grundpreis unbekannt · Inhalt oder Wechselkurs ergänzen'}
                   </p>
+                  {p.price.currency !== currency && (
+                    <p className="mb-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {convertMoney(p.price, currency, fx)
+                        ? `Umgerechnet ≈ ${formatMoney(convertMoney(p.price, currency, fx)!.toNumber(), currency)}`
+                        : 'Kein Wechselkurs verfügbar'}
+                    </p>
+                  )}
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     {p.observedAt.slice(0, 10)} ·{' '}
                     {p.source === 'manual'
@@ -248,6 +309,8 @@ export function PricesPage() {
                     {stale ? ' · älter als 14 Tage' : ''}
                     {p.loyaltyRequired ? ' · Kundenkarte erforderlich' : ''}
                     {p.discounted ? ' · Aktionspreis, Bedingungen prüfen' : ''}
+                    {p.minimumQuantity && p.minimumQuantity > 1 ? ` · Mindestmenge ${p.minimumQuantity}` : ''}
+                    {p.validUntil ? ` · gültig bis ${p.validUntil}` : ''}
                   </p>
                   {p.sourceUrl && (
                     <a
@@ -261,6 +324,16 @@ export function PricesPage() {
                   )}
                 </article>
               ))}
+              <p
+                className="mt-3 border-t pt-3 text-xs leading-relaxed"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+              >
+                {fx
+                  ? `Kurs ${fx.base} → ${fx.quote}: ${fx.quotePerBase} · Kursdatum ${fx.rateDate} · ${fx.source}. `
+                  : 'Kein Wechselkurs hinterlegt. '}
+                Aktions-, Kundenkarten- und Mindestmengenpreise zählen nicht zum normalen Vergleich. Preise
+                älter als 14 Tage dienen nur als Hinweis.
+              </p>
               <button
                 disabled={busy || !product.gtins.length}
                 className="btn-soft mt-3 min-h-11 w-full"

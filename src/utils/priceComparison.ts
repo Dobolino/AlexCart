@@ -80,7 +80,11 @@ export function normalizedPrice(
   if (product.id !== observation.productId) return null
   const amount = convertMoney(observation.price, currency, fx)
   if (!amount) return null
-  if (observation.basis !== 'package') return { amount: amount.toNumber(), unit: observation.basis }
+  if (observation.basis !== 'package') {
+    const expected = observation.basis === 'kg' ? 'g' : observation.basis === 'l' ? 'ml' : 'piece'
+    if (product.netQuantity && product.netQuantity.unit !== expected) return null
+    return { amount: amount.toNumber(), unit: observation.basis }
+  }
   const quantity = product.netQuantity
   if (!quantity || quantity.value <= 0) return null
   const scale = quantity.unit === 'piece' ? 1 : 1000
@@ -99,10 +103,17 @@ export function compareProductPrices(
   now = new Date()
 ) {
   const newest = new Map<string, PriceObservation>()
+  const today = now.toLocaleDateString('sv-SE')
   for (const p of observations) {
-    if (p.productId !== product.id || (p.validUntil && p.validUntil < now.toISOString().slice(0, 10)))
+    if (
+      p.productId !== product.id ||
+      p.price.minor <= 0 ||
+      !Number.isFinite(Date.parse(p.observedAt)) ||
+      new Date(p.observedAt).toLocaleDateString('sv-SE') > today ||
+      (p.validUntil && p.validUntil < today)
+    )
       continue
-    const key = `${p.storeId}:${p.price.currency}:${p.basis}:${!!p.loyaltyRequired}:${p.minimumQuantity ?? 1}`
+    const key = `${p.storeId}:${p.price.currency}:${p.basis}:${!!p.loyaltyRequired}:${!!p.discounted}:${p.minimumQuantity ?? 1}`
     if (!newest.has(key) || newest.get(key)!.observedAt < p.observedAt) newest.set(key, p)
   }
   return [...newest.values()]
@@ -112,9 +123,37 @@ export function compareProductPrices(
       stale: now.getTime() - Date.parse(observation.observedAt) > 14 * 86400000,
     }))
     .sort((a, b) => {
+      const condition = Number(isConditionalPrice(a.observation)) - Number(isConditionalPrice(b.observation))
+      if (condition) return condition
       if (!a.normalized) return 1
       if (!b.normalized) return -1
       if (a.normalized.unit !== b.normalized.unit) return a.normalized.unit.localeCompare(b.normalized.unit)
       return a.normalized.amount - b.normalized.amount
     })
+}
+
+export function isConditionalPrice(price: PriceObservation): boolean {
+  return !!(price.discounted || price.loyaltyRequired || (price.minimumQuantity && price.minimumQuantity > 1))
+}
+
+/** A percentage always names both stores and only uses current, unconditional, matching bases. */
+export function priceAdvantage(rows: ReturnType<typeof compareProductPrices>) {
+  const eligible = rows.filter((row) => row.normalized && !row.stale && !isConditionalPrice(row.observation))
+  const cheapest = eligible[0]
+  if (!cheapest?.normalized) return null
+  const reference = eligible
+    .filter(
+      (row) =>
+        row.normalized?.unit === cheapest.normalized!.unit &&
+        row.observation.storeId !== cheapest.observation.storeId
+    )
+    .slice(-1)[0]
+  if (!reference?.normalized || reference.normalized.amount <= cheapest.normalized.amount) return null
+  const percent = new Decimal(reference.normalized.amount)
+    .minus(cheapest.normalized.amount)
+    .div(reference.normalized.amount)
+    .mul(100)
+    .toDecimalPlaces(0)
+    .toNumber()
+  return percent > 0 ? { cheapest: cheapest.observation, reference: reference.observation, percent } : null
 }

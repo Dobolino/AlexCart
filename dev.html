@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
     <!-- Löst das Theme synchron auf, bevor irgendetwas gemalt wird – verhindert einen
          weißen "Flash" beim App-Start, wenn der Nutzer Dunkelmodus bevorzugt/gespeichert hat. -->
     <script>
-      (function () {
+      ;(function () {
         try {
           var raw = localStorage.getItem('alexshop-store')
           var pref = 'system'
@@ -21,7 +21,7 @@
               : pref
           document.documentElement.dataset.theme = resolved
           var meta = document.querySelector('meta[name="theme-color"]')
-          if (meta) meta.setAttribute('content', resolved === 'dark' ? '#000000' : '#f2f2f7')
+          if (meta) meta.setAttribute('content', resolved === 'dark' ? '#17181c' : '#f5f4f0')
         } catch (e) {
           document.documentElement.dataset.theme = 'light'
         }
@@ -106,12 +106,9 @@
       href="/AlexCart/splash/iphone-se.png"
       media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
     />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="format-detection" content="telephone=no" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#17181c" />
     <link rel="icon" type="image/png" href="/AlexCart/icons/icon-192.png" />
     <link rel="manifest" href="/AlexCart/manifest.webmanifest" />
     <title>AlexShop</title>
@@ -119,10 +116,10 @@
       /* Kritisches Minimal-CSS für den Moment vor dem React-Mount (Theme ist durch das
          obige Script bereits korrekt gesetzt, sodass hier nie Weiß aufblitzt). */
       html[data-theme='light'] {
-        background: #f2f2f7;
+        background: #f5f4f0;
       }
       html[data-theme='dark'] {
-        background: #000000;
+        background: #17181c;
       }
       #boot-skeleton {
         position: fixed;
@@ -132,10 +129,10 @@
         justify-content: center;
       }
       html[data-theme='dark'] #boot-skeleton {
-        background: #000000;
+        background: #17181c;
       }
       html[data-theme='light'] #boot-skeleton {
-        background: #f2f2f7;
+        background: #f5f4f0;
       }
       #boot-skeleton svg {
         width: 48px;
@@ -202,8 +199,16 @@
   <body>
     <div id="root">
       <div id="boot-skeleton">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
         </svg>
       </div>

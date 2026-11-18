@@ -33,6 +33,7 @@ import { PriceExportSection } from '@/components/PriceExportSection'
 import { TripCalendarSection } from '@/components/TripCalendarSection'
 import { timestampToDateKey } from '@/utils/date'
 import { ICON_PATHS } from '@/constants/icons'
+import { currentWeekSpend } from '@/utils/budget'
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
   return (
@@ -53,6 +54,7 @@ export function StatsPage() {
   const stats = useStore((s) => s.stats)
   const lists = useStore((s) => s.lists)
   const currency = useStore((s) => s.settings.currency)
+  const weeklyBudget = useStore((s) => s.settings.weeklyBudget)
   const resetStats = useStore((s) => s.resetStats)
   const updateCompletedTripItemPrice = useStore((s) => s.updateCompletedTripItemPrice)
   const updateCompletedTripDate = useStore((s) => s.updateCompletedTripDate)
@@ -92,12 +94,23 @@ export function StatsPage() {
     <>
       <PageHeader title="Statistik" subtitle="Deine Einkaufsgewohnheiten" />
       <main className="scroll-behind-nav min-h-0 flex-1 overflow-y-auto px-3 pt-3">
+        <section className="card-surface mb-4 p-4" aria-label="Bestätigte Wochenausgaben">
+          <h2 className="eyebrow">Diese Kalenderwoche · {currency}</h2>
+          <p className="mt-1 text-[32px] font-extrabold tabular-nums">
+            {formatMoney(currentWeekSpend(purchaseLog, undefined, currency), currency)}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Bestätigte Käufe seit Montag
+            {weeklyBudget > 0 ? ` · Budget ${formatMoney(weeklyBudget, currency)}` : ''}. Fehlende Preise und
+            Rechnernotizen sind nicht enthalten.
+          </p>
+        </section>
         <PromoSavingsHighlight amount={promoSavings} currency={currency} />
         <StoreComparisonSection stores={storeStats} currency={currency} />
         <CategorySpendSection categories={categorySpend} currency={currency} />
         <div className="mb-2.5 grid grid-cols-3 gap-2.5">
           <StatTile value={lists.length} label="Einkaufslisten" />
-          <StatTile value={purchaseLog.length} label="Produkte gekauft" />
+          <StatTile value={currencyLog.length} label="Produkte gekauft" />
           <StatTile value={`${completionRate}%`} label="Erledigungsquote" />
         </div>
         <p className="mb-2.5 px-1.5 text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>

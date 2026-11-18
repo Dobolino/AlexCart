@@ -14,6 +14,38 @@ npm run test      # Vitest
 npm run lint      # ESLint
 ```
 
+## Oberfläche und Beträge
+
+Die Navigation führt zu Liste, Einkauf, Preisen, Stats und **Mehr**. Unter Mehr bleiben Vorrat,
+Rechner und Optionen einschließlich Bonpreis-Archiv, Sicherungen und Serverkonfiguration erreichbar.
+Die Oberfläche unterstützt Hell- und Dunkelmodus; Inter wird lokal mitgeliefert und offline gecacht
+(Lizenz unter `public/fonts/OFL.txt`). Bestehende Speicherformate und Benutzerdaten bleiben erhalten.
+
+Auf der Liste stehen bestätigte Kalenderwochen-Ausgaben und die Schätzung **offener** Artikel
+getrennt. Fehlende Richtpreise werden gezählt. Das geplante Restbudget berücksichtigt nur bekannte
+offene Preise; manuelle Rechnernotizen sind keine bestätigten Käufe und werden nicht nochmals zu
+Wochenausgaben oder Statistik addiert. CHF und EUR bleiben getrennt.
+
+Im Einkaufsmodus öffnet der Artikelname die Preiseingabe; der Kreis markiert einen Kauf ohne Preis.
+Historische Preise werden erst über **Wie zuletzt übernehmen** vorgefüllt und erst mit **Speichern**
+als bezahlt bestätigt. Abbrechen verwirft Mengen- und Ladenänderungen im Dialog. Unter **Im Wagen**
+und im Abschluss lassen sich fehlende Preise nachtragen. Die Einkaufssumme bleibt auch über
+Mitternacht erhalten und hängt nicht von ausgeblendeten Rechnerzeilen ab.
+
+Beim Abschluss lassen sich offene Artikel einzeln auf die nächste Liste übernehmen oder entfernen.
+Abgeschlossene Einkäufe, Kaufprotokolle und Vorrat bleiben erhalten; wiederholte Abschlussaufrufe
+speichern keinen zweiten Bon. Ein exakter Suchtreffer bietet eine eigene Variante im bestehenden
+Preisprofil an, ohne ein identisches Katalogprodukt oder einen künstlichen Kauf anzulegen.
+
+Der Preisvergleich filtert Schweiz, Deutschland oder beide Länder. Er zeigt Originalpreise,
+Mengenbasis, Quelle, Erfassungsdatum und Bedingungen; umgerechnete Beträge und Kursdatum werden
+gesondert bezeichnet. Prozentvergleiche nennen beide Geschäfte und verwenden nur aktuelle,
+vergleichbare Normalpreise. Aktions-, Kundenkarten- und Mindestmengenpreise bleiben gesondert
+sichtbar. Marktkauf bleibt als eigenes Geschäft erhalten.
+
+Die App registriert keine Schüttelgeste. Die native iPhone-Einstellung „Zum Widerrufen schütteln“
+ist eine iOS-Funktion und wird von der Web-App nicht verändert.
+
 ## Deployment
 
 Push auf `main` baut die App via GitHub Actions und deployed sie automatisch auf GitHub Pages.

@@ -41,6 +41,49 @@ function shop() {
   actions.toggleItemDone('b')
 }
 describe('confirming the end of a shopping session', () => {
+  it('carries only selected open rows and discards only explicitly selected removals', () => {
+    shop()
+    const actions = useStore.getState()
+    actions.addItemToActiveList({ name: 'Brot', amount: '1 Stück', category: 'Brot & Backwaren' })
+    const discarded = useStore
+      .getState()
+      .activeList()!
+      .items.find((item) => item.name === 'Brot')!
+    const before = useStore.getState()
+    const result = actions.finishShopping('l', {
+      createNewList: true,
+      carryOpenIds: ['c'],
+      discardOpenIds: [discarded.id],
+    })
+    const state = useStore.getState()
+    expect(result.ok).toBe(true)
+    expect(state.activeList()!.items).toHaveLength(1)
+    expect(state.activeList()!.items[0]).toMatchObject({ name: 'Milch', done: false })
+    expect(state.activeList()!.items[0]!.id).not.toBe('c')
+    expect(state.lists.find((list) => list.id === 'l')!.items).toEqual([])
+    expect(state.purchaseLog).toEqual(before.purchaseLog)
+    expect(state.completedTrips[0]!.items).toHaveLength(2)
+    expect(actions.finishShopping('l', { createNewList: true }).ok).toBe(false)
+  })
+  it('creates and deduplicates an unpriced variant without creating a product or purchase', () => {
+    const actions = useStore.getState()
+    const before = useStore.getState()
+    const id = actions.ensureItemVariant('Milch', 'Milch & Käse', 'Bio 1 l')
+    expect(actions.ensureItemVariant('Milch', 'Milch & Käse', 'Bio 1 l')).toBe(id)
+    const state = useStore.getState()
+    expect(state.priceProfiles[0]!.variants).toHaveLength(1)
+    expect(state.priceProfiles[0]!.variants[0]).toMatchObject({ id, name: 'Bio 1 l', purchaseCount: 0 })
+    expect(state.priceProfiles[0]!.variants[0]!.lastPrice).toBeUndefined()
+    for (const key of [
+      'purchaseLog',
+      'completedTrips',
+      'catalog',
+      'customProducts',
+      'lists',
+      'pantry',
+    ] as const)
+      expect(state[key]).toEqual(before[key])
+  })
   it('archives only this session once and starts a genuinely empty new list without changing purchases or inventory', () => {
     shop()
     const before = useStore.getState()

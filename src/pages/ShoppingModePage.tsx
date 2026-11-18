@@ -1,18 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
-import { locationForList } from '@/store/shoppingLocation'
+import { locationForList, sessionPurchaseIds } from '@/store/shoppingLocation'
 import { groupByCategory } from '@/utils/group'
 import { formatMoney } from '@/utils/currency'
-import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
+import { budgetProgress, currentWeekSpend } from '@/utils/budget'
 import { ShoppingLocationButton } from '@/components/ShoppingLocationButton'
 import { hapticSuccess } from '@/utils/haptics'
 import { useWakeLock } from '@/hooks/useWakeLock'
-import { todayPricedTotalForList } from '@/utils/purchaseLog'
 import { adjustAmount } from '@/utils/amount'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { nextOpenCategory } from '@/utils/shoppingProgress'
-import { todayKey } from '@/utils/date'
 import { Icon } from '@/components/Icon'
 import { ICON_PATHS } from '@/constants/icons'
 import { FloatingPortal } from '@/components/FloatingPortal'
@@ -25,7 +23,8 @@ const StoreLayoutSheet = lazy(() =>
 const CheckoffPriceSheet = lazy(() =>
   import('@/components/CheckoffPriceSheet').then((m) => ({ default: m.CheckoffPriceSheet }))
 )
-import { ShoppingQuickAddSheet } from '@/components/ShoppingQuickAddSheet'
+import { AddItemSheet } from '@/components/AddItemSheet'
+import { ReceiptImportSheet } from '@/components/ReceiptImportSheet'
 import { ShoppingClock } from '@/components/ShoppingClock'
 import { EditItemSheet } from '@/components/EditItemSheet'
 import { ItemActionSheet } from '@/components/ItemActionSheet'
@@ -50,14 +49,13 @@ export function ShoppingModePage() {
   const restoreItem = useStore((s) => s.restoreItem)
   const brands = useStore((s) => s.brands)
   const purchaseLog = useStore((s) => s.purchaseLog)
+  const completedTrips = useStore((s) => s.completedTrips)
   const priceProfiles = useStore((s) => s.priceProfiles)
   const catalog = useStore((s) => s.catalog)
   const observations = useStore((s) => s.priceObservations)
   const stores = useStore((s) => s.retailStores)
   const settings = useStore((s) => s.settings)
-  const excludedIds = useStore((s) => s.calculatorExcludedPurchaseIds)
   const calculatorEntries = useStore((s) => s.calculatorEntries)
-  const clearTodayCheckoffsForActiveList = useStore((s) => s.clearTodayCheckoffsForActiveList)
   const shoppingSession = useStore((s) => s.shoppingSession)
   const startShoppingSession = useStore((s) => s.startShoppingSession)
   const pauseShopping = useStore((s) => s.pauseShopping)
@@ -80,6 +78,7 @@ export function ShoppingModePage() {
   const [finishOpen, setFinishOpen] = useState(false)
   const storeLayouts = useStore((s) => s.storeLayouts)
   const [addOpen, setAddOpen] = useState(false)
+  const [receiptOpen, setReceiptOpen] = useState(false)
   const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null)
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null)
   const [deletedItem, setDeletedItem] = useState<ShoppingItem | null>(null)
@@ -105,10 +104,21 @@ export function ShoppingModePage() {
     if (listId && !finishOpen) startShoppingSession(listId)
   }, [listId, startShoppingSession, finishOpen])
 
-  const tripTotal = useMemo(() => {
-    if (!list) return 0
-    return todayPricedTotalForList(purchaseLog, list.items, todayKey(), new Set(excludedIds), currency)
-  }, [purchaseLog, list, excludedIds, currency])
+  const sessionEntries = useMemo(() => {
+    const ids = sessionPurchaseIds(sessionForList, list ?? undefined, purchaseLog, completedTrips)
+    return purchaseLog.filter((entry) => entry.id && ids.has(entry.id))
+  }, [sessionForList, list, purchaseLog, completedTrips])
+  const tripTotal =
+    Math.round(
+      sessionEntries
+        .filter((entry) => (entry.currency ?? 'CHF') === currency)
+        .reduce((sum, entry) => sum + (entry.price ?? 0), 0) * 100
+    ) / 100
+  const cartItems =
+    list?.items.filter((item) => item.done && sessionForList?.checkedItemIds.includes(item.id)) ?? []
+  const missingPrices = cartItems.filter(
+    (item) => !sessionEntries.some((entry) => entry.id === item.purchaseLogId && entry.price !== undefined)
+  )
 
   const openItems = useMemo(() => list?.items.filter((i) => !i.done) ?? [], [list])
 
@@ -190,10 +200,9 @@ export function ShoppingModePage() {
   const calculatorTotal = calculatorEntries
     .filter((e) => (e.currency ?? 'CHF') === currency)
     .reduce((sum, e) => sum + e.amount, 0)
-  const budgetSpend = totalBudgetSpend(currentWeekSpend(purchaseLog, undefined, currency), calculatorTotal)
+  const budgetSpend = currentWeekSpend(purchaseLog, undefined, currency)
   const budget = weeklyBudget > 0 ? budgetProgress(budgetSpend, weeklyBudget) : null
   const showTripTotal = tripTotal > 0
-  const showProjectedTotal = projectedTotal > 0 && (tripTotal > 0 || openEstimate.pricedItemCount > 0)
 
   function armUndo(next: { id: string; price?: number }) {
     setLastChecked(next)
@@ -217,6 +226,7 @@ export function ShoppingModePage() {
 
   function handlePriceSave(data: CheckoffPriceData) {
     if (!priceSheetItem) return
+    updateItemInActiveList(priceSheetItem.id, { amount: priceSheetItem.amount })
     hapticSuccess()
     if (priceSheetItem.done) updatePurchaseLogPrice(priceSheetItem, data)
     else toggleItemDone(priceSheetItem.id, data)
@@ -227,7 +237,10 @@ export function ShoppingModePage() {
   function handlePriceSkip() {
     if (!priceSheetItem) return
     hapticSuccess()
-    if (!priceSheetItem.done) toggleItemDone(priceSheetItem.id)
+    if (!priceSheetItem.done) {
+      updateItemInActiveList(priceSheetItem.id, { amount: priceSheetItem.amount })
+      toggleItemDone(priceSheetItem.id)
+    }
     armUndo({ id: priceSheetItem.id })
     setPriceSheetItem(null)
   }
@@ -237,10 +250,6 @@ export function ShoppingModePage() {
     toggleItemDone(lastChecked.id)
     setLastChecked(null)
     if (undoTimer.current) clearTimeout(undoTimer.current)
-  }
-
-  function handleResetTrip() {
-    clearTodayCheckoffsForActiveList()
   }
 
   function handleExitShopping() {
@@ -305,10 +314,6 @@ export function ShoppingModePage() {
                 · <ShoppingClock session={sessionForList} />
               </>
             )}
-            {showProjectedTotal
-              ? ` · ${tripTotal > 0 ? formatMoney(tripTotal, currency) + ' / ' : ''}${formatMoney(projectedTotal, currency)} geschätzt`
-              : ''}
-            {budget ? ` · Budget ${formatMoney(budgetSpend, currency)}` : ''}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -332,15 +337,6 @@ export function ShoppingModePage() {
             >
               <Icon path={ICON_PATHS.undo} size={14} />
             </button>
-          ) : showTripTotal ? (
-            <button
-              className="tap-scale flex h-11 items-center justify-center rounded-full px-3 text-[11px] font-bold"
-              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-              onClick={handleResetTrip}
-              aria-label="Einkaufssumme zurücksetzen"
-            >
-              Leeren
-            </button>
           ) : (
             <div
               className="flex h-11 w-11 items-center justify-center"
@@ -359,48 +355,59 @@ export function ShoppingModePage() {
       <div className="mx-3 mt-2">
         <ShoppingLocationButton onClick={() => setLayoutOpen(true)} showRoute />
       </div>
-      {(showTripTotal || showProjectedTotal) && (
-        <div
-          className="mx-4 mb-2 flex items-center justify-between rounded-2xl px-4 py-3"
-          style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
-        >
-          <div className="min-w-0">
-            <div className="text-[13px] font-semibold opacity-90">
-              {tripTotal > 0 ? 'Aktueller Einkauf' : 'Geschätzte Summe'}
-            </div>
-            {showProjectedTotal && tripTotal > 0 && openEstimate.pricedItemCount > 0 && (
-              <div className="text-[11px] opacity-80">
-                inkl. {openEstimate.pricedItemCount} offene Artikel geschätzt
-              </div>
-            )}
-            {showProjectedTotal && (
-              <div className="mt-1 text-[11px] opacity-80">
-                {openEstimate.pricedItemCount} von {openEstimate.openItemCount} offenen Artikeln mit Preis
-                {!!openEstimate.referenceItemCount && ` · ${openEstimate.referenceItemCount} aus Bonpreisen`}
-                {!!openEstimate.oldPriceItemCount && ` · ${openEstimate.oldPriceItemCount} älter als 90 Tage`}
-              </div>
-            )}
+      <section className="shop-summary mx-4 my-2" aria-label="Aktueller Einkauf">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="eyebrow">Bezahlt (bestätigt)</h2>
+            <p className="mt-1 text-[36px] font-extrabold leading-tight tracking-tight tabular-nums">
+              {formatMoney(tripTotal, currency)}
+            </p>
           </div>
-          <span className="text-[22px] font-extrabold tabular-nums">
-            {formatMoney(showProjectedTotal ? projectedTotal : tripTotal, currency)}
+          <span
+            className="text-xs font-semibold"
+            style={{ color: missingPrices.length ? 'var(--accent)' : 'var(--text-muted)' }}
+          >
+            {missingPrices.length} Preise fehlen
           </span>
         </div>
-      )}
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Offene Artikel ≈ {formatMoney(openEstimate.total, currency)} ·{' '}
+          {openEstimate.openItemCount - openEstimate.pricedItemCount} ohne Preisschätzung
+        </p>
+        {!!openEstimate.referenceItemCount && (
+          <p className="mt-1 text-xs">
+            {openEstimate.referenceItemCount} aus Bonpreisen
+            {openEstimate.oldPriceItemCount ? ` · ${openEstimate.oldPriceItemCount} älter als 90 Tage` : ''}
+          </p>
+        )}
+        <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Bekannte Einkaufssumme inkl. Schätzung ≈ {formatMoney(projectedTotal, currency)}
+        </p>
+        {budget && (
+          <p className="mt-1 text-xs">
+            Diese Woche {formatMoney(budgetSpend, currency)} ausgegeben ·{' '}
+            {formatMoney(budget.remaining, currency)} Budget übrig
+          </p>
+        )}
+        {calculatorTotal > 0 && (
+          <p className="mt-1 text-xs">
+            Rechnernotizen {formatMoney(calculatorTotal, currency)} · nicht als Kauf bestätigt
+          </p>
+        )}
+      </section>
 
       {totalCount > 0 && (
-        <ShoppingProgressBar
-          doneCount={doneCount}
-          totalCount={totalCount}
-          budget={budget}
-          currency={currency}
-        />
+        <ShoppingProgressBar doneCount={doneCount} totalCount={totalCount} currency={currency} />
       )}
 
       <main className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-40">
+        <p className="mb-3 px-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Name antippen: Preis erfassen · Kreis: gekauft, Preis später.
+        </p>
         {!openItems.length ? (
           <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
             <div className="mb-3 text-5xl">🎉</div>
-            <h2 className="mb-2 text-[22px] font-extrabold">Einkauf abgeschlossen!</h2>
+            <h2 className="mb-2 text-[22px] font-extrabold">Alles im Wagen</h2>
             <p className="mb-6 text-[15px]" style={{ color: 'var(--text-muted)' }}>
               {doneCount > 0 ? `${doneCount} Artikel erledigt.` : 'Keine offenen Artikel mehr.'}
               {showTripTotal ? ` Summe: ${formatMoney(tripTotal, currency)}.` : ''}
@@ -414,15 +421,6 @@ export function ShoppingModePage() {
               >
                 Noch etwas hinzufügen
               </button>
-              {showTripTotal && (
-                <button
-                  className="w-full rounded-2xl py-3.5 text-[15px] font-bold"
-                  style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-                  onClick={handleResetTrip}
-                >
-                  Rechner zurücksetzen
-                </button>
-              )}
               <button
                 className="btn-primary tap-scale rounded-full px-8 py-3.5 text-[15px]"
                 onClick={handleFinishShopping}
@@ -475,11 +473,63 @@ export function ShoppingModePage() {
                 expanded={!autoCollapse || expandedCategory === group.category}
                 onToggle={autoCollapse ? () => handleToggleCategory(group.category) : undefined}
                 onCheck={handleCheck}
+                onMarkBought={(item) => {
+                  toggleItemDone(item.id)
+                  armUndo({ id: item.id })
+                }}
+                priceProfiles={priceProfiles}
+                currency={currency}
+                estimateContext={{
+                  catalog,
+                  observations,
+                  purchaseLog,
+                  stores,
+                  storeId: sessionForList?.storeId,
+                  storeName: sessionForList?.store,
+                }}
                 onOpenMenu={setMenuItem}
                 onAdjustAmount={handleAdjustAmount}
               />
             ))}
           </>
+        )}
+        {cartItems.length > 0 && (
+          <section className="cart-items mt-4" aria-label="Im Wagen">
+            <h2 className="eyebrow mb-2 px-1">Im Wagen · {cartItems.length}</h2>
+            <div className="card-surface">
+              {cartItems.map((item) => {
+                const entry = sessionEntries.find((entry) => entry.id === item.purchaseLogId)
+                return (
+                  <div key={item.id} className="cart-row">
+                    <span className="min-w-0 flex-1 break-words">
+                      <strong>{item.name}</strong>
+                      <small>{item.amount}</small>
+                    </span>
+                    <button
+                      className="min-h-11 shrink-0 rounded-full px-3 text-sm font-bold"
+                      style={{
+                        background: entry?.price === undefined ? 'var(--accent-soft)' : 'var(--chip-bg)',
+                        color: entry?.price === undefined ? 'var(--accent)' : 'var(--text)',
+                      }}
+                      onClick={() => setPriceSheetItem(item)}
+                      aria-label={`Preis für ${item.name} nachtragen`}
+                    >
+                      {entry?.price === undefined
+                        ? 'Preis fehlt'
+                        : formatMoney(entry.price, entry.currency ?? currency)}
+                    </button>
+                    <button
+                      className="flex h-11 w-11 shrink-0 items-center justify-center"
+                      aria-label={`${item.name} rückgängig`}
+                      onClick={() => toggleItemDone(item.id)}
+                    >
+                      <Icon path={ICON_PATHS.undo} size={18} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
         )}
         {openItems.some((i) => i.unavailable) && (
           <section className="mt-4 rounded-2xl p-3" style={{ background: 'var(--surface)' }}>
@@ -532,6 +582,16 @@ export function ShoppingModePage() {
           <button className="btn-soft" onClick={() => setScannerOpen(true)}>
             Scannen
           </button>
+          <button
+            className="btn-soft"
+            onClick={() => {
+              pauseShopping()
+              navigate('/calculator')
+            }}
+            aria-label="Rechner öffnen"
+          >
+            <Icon path={ICON_PATHS.calculator} size={20} />
+          </button>
           <button className="btn-soft" onClick={handleFinishShopping}>
             Abschließen
           </button>
@@ -582,7 +642,13 @@ export function ShoppingModePage() {
           <StoreLayoutSheet onClose={() => setLayoutOpen(false)} />
         </Suspense>
       )}
-      {addOpen && <ShoppingQuickAddSheet onClose={() => setAddOpen(false)} onAdded={() => hapticSuccess()} />}
+      {addOpen && (
+        <AddItemSheet
+          onClose={() => setAddOpen(false)}
+          onImported={() => hapticSuccess()}
+          onOpenReceiptImport={() => setReceiptOpen(true)}
+        />
+      )}
 
       {menuItem && (
         <ItemActionSheet
@@ -624,7 +690,6 @@ export function ShoppingModePage() {
             onSave={handlePriceSave}
             onSkip={handlePriceSkip}
             onAmountChange={(amount) => {
-              updateItemInActiveList(priceSheetItem.id, { amount })
               setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
             }}
             highlightOptions
@@ -632,6 +697,9 @@ export function ShoppingModePage() {
         </Suspense>
       )}
 
+      {receiptOpen && (
+        <ReceiptImportSheet onClose={() => setReceiptOpen(false)} onDone={() => setReceiptOpen(false)} />
+      )}
       {isPaused && <ShoppingPausedOverlay onResume={resumeShopping} onExit={handleExitShopping} />}
     </div>
   )

@@ -65,6 +65,9 @@ import {
   setPricesForCurrency,
   upsertPriceProfile,
   refreshPurchaseProfiles,
+  findPriceProfile,
+  createPriceProfile,
+  createEmptyVariant,
 } from '@/utils/priceProfiles'
 import { commitItemPurchase, parseCheckoffInput, undoTodayCheckoff } from '@/store/purchaseCommit'
 import { normalizeCategory } from '@/utils/icon'
@@ -352,6 +355,7 @@ interface AppState {
   /** Findet/legt eine markengebundene Variante für ein Produkt an (ohne Kaufhistorie) - für
    *  die Markenauswahl beim Anlegen/Bearbeiten eines Artikels. Gibt die variantId zurück. */
   ensureBrandVariant: (itemName: string, category: string, brandId: string) => string
+  ensureItemVariant: (itemName: string, category: string, variantName: string, brandId?: string) => string
   updateBrand: (id: string, name: string) => void
   removeBrand: (id: string) => void
   updatePriceProfileVariant: (
@@ -422,7 +426,14 @@ interface AppState {
   clearShoppingSession: () => void
   finishShopping: (
     listId: string,
-    options: { createNewList: boolean; carryOpen?: boolean; name?: string; expectedStartedAt?: number }
+    options: {
+      createNewList: boolean
+      carryOpen?: boolean
+      carryOpenIds?: string[]
+      discardOpenIds?: string[]
+      name?: string
+      expectedStartedAt?: number
+    }
   ) => { ok: boolean; error?: string; tripId?: string; nextListId?: string }
 }
 
@@ -1507,6 +1518,26 @@ export const useStore = create<AppState>()(
         set((state) => ({
           brands: mergeHouseBrandPresets(state.brands, uid, names),
         })),
+      ensureItemVariant: (itemName, category, variantName, brandId) => {
+        if (!itemName.trim() || !variantName.trim()) return ''
+        const profiles = get().priceProfiles
+        const profile =
+          findPriceProfile(profiles, itemName, category) ??
+          createPriceProfile(itemName, category, uid(), Date.now())
+        const existing = profile.variants.find(
+          (variant) => normalize(variant.name) === normalize(variantName) && variant.brandId === brandId
+        )
+        if (existing) return existing.id
+        const variant = { ...createEmptyVariant(variantName.trim(), uid()), brandId }
+        set({
+          priceProfiles: upsertPriceProfile(profiles, {
+            ...profile,
+            variants: [...profile.variants, variant],
+            updatedAt: Date.now(),
+          }),
+        })
+        return variant.id
+      },
       ensureBrandVariant: (itemName, category, brandId) => {
         const brand = get().brands.find((b) => b.id === brandId)
         if (!itemName.trim() || !brand) return ''
@@ -1838,15 +1869,21 @@ export const useStore = create<AppState>()(
             : null
           const open = list.items.filter((item) => !item.done)
           const next = options.createNewList ? newList(options.name?.trim() || list.name) : null
-          if (next && options.carryOpen)
-            next.items = open.map((item) => ({
-              ...item,
-              id: uid(),
-              done: false,
-              purchaseLogId: undefined,
-              unavailable: false,
-              addedAt: now,
-            }))
+          const carried = new Set(
+            options.carryOpenIds ?? (options.carryOpen ? open.map((item) => item.id) : [])
+          )
+          const discarded = new Set(options.discardOpenIds ?? [])
+          if (next)
+            next.items = open
+              .filter((item) => carried.has(item.id))
+              .map((item) => ({
+                ...item,
+                id: uid(),
+                done: false,
+                purchaseLogId: undefined,
+                unavailable: false,
+                addedAt: now,
+              }))
           const remembered = store ?? locationForList(state.settings, state.retailStores, list)
           if (next) nextCurrency = remembered.currency
           result = { ok: true, tripId: trip?.id, nextListId: next?.id }
@@ -1857,7 +1894,14 @@ export const useStore = create<AppState>()(
             // Bought rows leave the working list; prices and inventory remain historical facts.
             lists: [
               ...state.lists.map((entry) =>
-                entry.id !== listId ? entry : { ...entry, items: next && options.carryOpen ? [] : open }
+                entry.id !== listId
+                  ? entry
+                  : {
+                      ...entry,
+                      items: open.filter(
+                        (item) => !discarded.has(item.id) && !(next && carried.has(item.id))
+                      ),
+                    }
               ),
               ...(next ? [next] : []),
             ],

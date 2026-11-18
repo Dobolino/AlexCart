@@ -59,7 +59,7 @@ export function CalculatorPage() {
     <>
       <PageHeader
         title="Rechner"
-        subtitle="Deine Einkaufssumme im Blick"
+        subtitle="Bestätigte Preise und manuelle Notizen"
         right={
           hasAnything ? (
             <button
@@ -78,7 +78,7 @@ export function CalculatorPage() {
           style={{ borderTop: '3px solid var(--accent)' }}
         >
           <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-            Summe heute
+            Rechner heute · {currency}
           </span>
           <span className="text-[28px] font-extrabold tabular-nums">{formatMoney(total, currency)}</span>
         </div>
@@ -97,7 +97,10 @@ export function CalculatorPage() {
           </button>
         </section>
         <p className="mb-4 px-1.5 text-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Erfasste Artikelpreise werden automatisch mitgezählt.
+          Bestätigte Artikelpreise: {formatMoney(checkoffTotal, currency)} · manuelle Notizen:{' '}
+          {formatMoney(manualTotal, currency)}. Nur bestätigte Artikelpreise zählen zu Wochenausgaben und
+          Statistik. Manuelle Notizen können denselben Einkauf betreffen und werden dort nicht nochmals
+          addiert.
         </p>
 
         {checkoffEntries.length > 0 && (

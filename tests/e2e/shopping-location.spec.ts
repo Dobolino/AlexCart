@@ -223,7 +223,9 @@ test('finishing confirms a partial trip, saves one receipt and starts an empty l
   expect((await stored(page)).shoppingSession.checkedItemIds).toHaveLength(13)
   await page.getByRole('button', { name: 'Einkauf abschließen', exact: true }).tap()
   confirmation = page.getByRole('dialog', { name: 'Einkauf abschließen?', exact: true })
-  await expect(confirmation.getByRole('checkbox')).not.toBeChecked()
+  await expect(
+    confirmation.getByRole('checkbox', { name: '2 offene Artikel in die neue Liste übernehmen', exact: true })
+  ).not.toBeChecked()
   await confirmation.getByRole('button', { name: 'Abschließen & neue Liste', exact: true }).tap()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('status')).toContainText('Einkauf abgeschlossen')

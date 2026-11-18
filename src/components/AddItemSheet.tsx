@@ -12,7 +12,7 @@ import { ProductIconSlot } from '@/components/ProductIconSlot'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { searchProducts } from '@/utils/search'
 import { buildLastPurchaseIndex, lastPurchasedHintForName } from '@/utils/purchaseFrequency'
-import { parseAmount, joinAmount } from '@/utils/amount'
+import { adjustAmount, parseAmount, joinAmount } from '@/utils/amount'
 import { useStore } from '@/store/useStore'
 import { CATEGORIES, PRODUCTS } from '@/data/products'
 import { buildQuickPicks } from '@/utils/quickAdd'
@@ -43,7 +43,7 @@ const STARTER_PICKS = [
 ]
 
 type Mode = 'search' | 'form' | 'import' | 'recipe'
-type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom'
+type FormMode = 'new' | 'confirm-builtin' | 'confirm-custom' | 'variant'
 
 const EMPTY_FORM: ProductFormValues = {
   name: '',
@@ -61,6 +61,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const updateCustomProduct = useStore((s) => s.updateCustomProduct)
   const importRecipeItemsToActiveList = useStore((s) => s.importRecipeItemsToActiveList)
   const ensureBrandVariant = useStore((s) => s.ensureBrandVariant)
+  const ensureItemVariant = useStore((s) => s.ensureItemVariant)
   const ensureBrand = useStore((s) => s.ensureBrand)
   const brands = useStore((s) => s.brands)
   const completedTrips = useStore((s) => s.completedTrips)
@@ -69,6 +70,8 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
 
   const [mode, setMode] = useState<Mode>('search')
   const [query, setQuery] = useState('')
+  const [searchAmount, setSearchAmount] = useState('')
+  const [variantName, setVariantName] = useState('')
   const [addedCount, setAddedCount] = useState(0)
 
   const [formMode, setFormMode] = useState<FormMode>('new')
@@ -89,6 +92,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
     () => searchProducts(query, customProducts, 12, catalog),
     [query, customProducts, catalog]
   )
+  const exact = results.find((result) => normalize(result.name) === normalize(query))
   // Leeres Suchfeld: Favoriten/zuletzt genutzte Artikel als Ein-Tipp-Auswahl,
   // für neue Nutzer ergänzt um typische Grundartikel.
   const quickPicks = useMemo(() => {
@@ -107,7 +111,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
   const lastPurchaseIndex = useMemo(() => buildLastPurchaseIndex(completedTrips), [completedTrips])
 
   function openConfirmFor(result: (typeof results)[number]) {
-    const parsed = parseAmount(result.amount)
+    const parsed = parseAmount((result === results[0] ? searchAmount : '') || result.amount)
     setForm({
       name: result.name,
       category: result.category,
@@ -147,9 +151,13 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
       })
     }
 
-    const variantId = selectedBrandId
-      ? ensureBrandVariant(form.name, form.category, selectedBrandId)
-      : undefined
+    if (formMode === 'variant' && !variantName.trim()) return
+    const variantId =
+      formMode === 'variant'
+        ? ensureItemVariant(form.name, form.category, variantName, selectedBrandId || undefined)
+        : selectedBrandId
+          ? ensureBrandVariant(form.name, form.category, selectedBrandId)
+          : undefined
     const selectedProduct = catalog.find((product) => product.id === selectedProductId)
     const productId =
       !selectedBrandId && selectedProduct?.name === form.name.trim() ? selectedProduct.id : undefined
@@ -247,7 +255,10 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
             <h2 className="mb-3 text-lg font-bold">Artikel hinzufügen</h2>
             <SearchField
               value={query}
-              onChange={setQuery}
+              onChange={(value) => {
+                setQuery(value)
+                setSearchAmount('')
+              }}
               label="Artikelsuche"
               placeholder="z.B. Tomaten"
               autoFocus
@@ -267,7 +278,7 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                     <button
                       key={pick.key}
                       type="button"
-                      className="tap-scale min-h-[40px] rounded-full px-3.5 text-[14px] font-semibold"
+                      className="tap-scale flex min-h-11 items-center gap-2 rounded-full px-3.5 text-[14px] font-semibold"
                       style={{ background: 'var(--chip-bg)', color: 'var(--text)' }}
                       onClick={() => {
                         addItemToActiveList({
@@ -281,22 +292,29 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                         onImported(`„${pick.name}“ hinzugefügt`)
                       }}
                     >
+                      <span
+                        className="category-dot"
+                        style={{ background: getCategoryColor(pick.category).fg }}
+                      />
                       {pick.name}
                     </button>
                   ))}
                 </div>
               </div>
             )}
-            {results.map((r) => {
+            {results.map((r, index) => {
               const iconKey = getIconKey(r.name, r.category)
               const color = getCategoryColor(r.category)
               const frequencyHint = lastPurchasedHintForName(r.name, lastPurchaseIndex)
               return (
                 <div
                   key={r.productId || r.customId || r.name}
-                  className="flex items-center border-b"
-                  style={{ borderColor: 'var(--border)' }}
+                  className={
+                    index === 0 ? 'best-match mb-3 flex flex-wrap items-center' : 'flex items-center border-b'
+                  }
+                  style={{ borderColor: index === 0 ? color.fg : 'var(--border)' }}
                 >
+                  {index === 0 && <h3 className="eyebrow w-full px-3 pt-3">Bester Treffer</h3>}
                   <button
                     className="tap-scale flex min-w-0 flex-1 items-center gap-3 border-b px-1 py-3 text-left"
                     style={{ borderColor: 'var(--border)' }}
@@ -305,7 +323,9 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                         name: r.name,
                         category: r.category,
                         amount:
-                          r.amount || defaultListAmount(getIconKey(r.name, r.category), r.category, r.name),
+                          (index === 0 ? searchAmount : '') ||
+                          r.amount ||
+                          defaultListAmount(getIconKey(r.name, r.category), r.category, r.name),
                         note: r.note,
                         productId: r.productId,
                       })
@@ -345,10 +365,67 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
                   >
                     <Icon path={ICON_PATHS.edit} size={18} />
                   </button>
+                  {index === 0 && (
+                    <div className="flex w-full items-center justify-between gap-2 px-3 pb-3">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Menge
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn-soft h-11 w-11"
+                          aria-label="Suchmenge verringern"
+                          onClick={() =>
+                            setSearchAmount(
+                              adjustAmount(
+                                searchAmount || r.amount || defaultListAmount(iconKey, r.category, r.name),
+                                -1
+                              )
+                            )
+                          }
+                        >
+                          −
+                        </button>
+                        <span className="min-w-12 text-center text-sm font-semibold">
+                          {searchAmount || r.amount || defaultListAmount(iconKey, r.category, r.name)}
+                        </span>
+                        <button
+                          className="btn-soft h-11 w-11"
+                          aria-label="Suchmenge erhöhen"
+                          onClick={() =>
+                            setSearchAmount(
+                              adjustAmount(
+                                searchAmount || r.amount || defaultListAmount(iconKey, r.category, r.name),
+                                1
+                              )
+                            )
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
-            {query.trim() && (
+            {exact && (
+              <button
+                className="min-h-12 w-full px-1 py-2 text-left text-sm font-semibold"
+                style={{ color: 'var(--accent)' }}
+                onClick={() => {
+                  openConfirmFor(exact)
+                  setSelectedProductId(undefined)
+                  setVariantName('')
+                  setFormMode('variant')
+                }}
+              >
+                Eigene Variante von „{exact.name}“ anlegen
+                <small className="mt-1 block" style={{ color: 'var(--text-muted)' }}>
+                  Andere Marke oder Größe · das Original bleibt erhalten.
+                </small>
+              </button>
+            )}
+            {query.trim() && !exact && (
               <button
                 className="tap-scale mt-1 flex w-full items-center gap-3 px-1 py-3 text-left"
                 onClick={openCreateForm}
@@ -376,14 +453,31 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
       {mode === 'form' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <h2 className="mb-3 text-lg font-bold">
-            {formMode === 'new' ? 'Neues Produkt' : 'Zur Liste hinzufügen'}
+            {formMode === 'new'
+              ? 'Neues Produkt'
+              : formMode === 'variant'
+                ? `Variante von „${form.name}“`
+                : 'Zur Liste hinzufügen'}
           </h2>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <ProductForm
-              values={form}
-              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-              autoFocusName={formMode === 'new'}
-            />
+            {formMode === 'variant' ? (
+              <label className="block text-sm font-semibold">
+                Name der Variante
+                <input
+                  className="input mt-2"
+                  autoFocus
+                  value={variantName}
+                  onChange={(event) => setVariantName(event.target.value)}
+                  placeholder="z. B. Bio · 500 g"
+                />
+              </label>
+            ) : (
+              <ProductForm
+                values={form}
+                onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+                autoFocusName={formMode === 'new'}
+              />
+            )}
             <div className="mt-3">
               <BrandSelect
                 brands={brands}
@@ -398,7 +492,11 @@ export function AddItemSheet({ onClose, onImported, onOpenReceiptImport }: AddIt
               Zurück
             </button>
             <button className="btn-primary flex-1 py-3.5 text-[15px]" onClick={handleFormSubmit}>
-              {formMode === 'new' ? 'Anlegen & hinzufügen' : 'Hinzufügen'}
+              {formMode === 'new'
+                ? 'Anlegen & hinzufügen'
+                : formMode === 'variant'
+                  ? 'Variante hinzufügen'
+                  : 'Hinzufügen'}
             </button>
           </div>
         </div>

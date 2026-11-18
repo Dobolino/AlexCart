@@ -5,7 +5,9 @@ import { AmountBadge } from './AmountBadge'
 import { ICON_PATHS } from '@/constants/icons'
 import { shouldUseExactProduceWeight } from '@/utils/producePrice'
 import { getCategoryColor } from '@/utils/categoryColor'
-import type { ShoppingItem } from '@/types'
+import { estimateItemPrice, type PriceEstimateContext } from '@/utils/priceProfiles'
+import { formatMoney } from '@/utils/currency'
+import type { Currency, ProductPriceProfile, ShoppingItem } from '@/types'
 
 interface ShoppingCategoryBlockProps {
   category: string
@@ -14,13 +16,29 @@ interface ShoppingCategoryBlockProps {
   /** Fehlt, wenn alle Kategorien dauerhaft offen sind (kein Ein-/Ausklappen). */
   onToggle?: () => void
   onCheck: (item: ShoppingItem) => void
+  onMarkBought: (item: ShoppingItem) => void
+  priceProfiles: ProductPriceProfile[]
+  currency: Currency
+  estimateContext: PriceEstimateContext
   onOpenMenu: (item: ShoppingItem) => void
   onAdjustAmount: (item: ShoppingItem, direction: 1 | -1) => void
 }
 
 export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategoryBlockProps>(
   function ShoppingCategoryBlock(
-    { category, items, expanded, onToggle, onCheck, onOpenMenu, onAdjustAmount },
+    {
+      category,
+      items,
+      expanded,
+      onToggle,
+      onCheck,
+      onMarkBought,
+      priceProfiles,
+      currency,
+      estimateContext,
+      onOpenMenu,
+      onAdjustAmount,
+    },
     ref
   ) {
     const openLabel = items.length === 1 ? '1 offen' : `${items.length} offen`
@@ -84,17 +102,24 @@ export const ShoppingCategoryBlock = forwardRef<HTMLDivElement, ShoppingCategory
                     type="button"
                     className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full border-2"
                     style={{ borderColor: colors.fg, background: colors.bg, color: colors.fg }}
-                    onClick={() => onCheck(item)}
-                    aria-label={`${item.name} abhaken`}
-                  >
-                    <Icon path={ICON_PATHS.check} size={22} />
-                  </button>
+                    onClick={() => onMarkBought(item)}
+                    aria-label={`${item.name} ohne Preis kaufen`}
+                  />
                   <button
                     type="button"
                     className="tap-scale min-w-0 flex-1 text-left"
                     onClick={() => onCheck(item)}
+                    aria-label={`${item.name} abhaken`}
                   >
                     <span className="block break-words text-[18px] font-bold leading-tight">{item.name}</span>
+                    <span className="mt-1 block text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                      {(() => {
+                        const price = estimateItemPrice(priceProfiles, item, currency, estimateContext)
+                        return price == null
+                          ? 'Preis noch offen'
+                          : `Richtpreis ≈ ${formatMoney(price, currency)}`
+                      })()}
+                    </span>
                     {item.note && (
                       <span
                         className="mt-0.5 block break-words text-[13px] [overflow-wrap:anywhere]"

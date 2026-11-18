@@ -112,7 +112,10 @@ export function CheckoffPriceSheet({
             (activeList ? locationForList(settings, stores, activeList).name : undefined)
         )
   )
-  const currency = recorded?.currency ?? activeSession?.currency ?? retailCurrency(market.country)
+  const currency =
+    recorded?.currency ??
+    (activeSession?.checkedItemIds.length ? activeSession.currency : undefined) ??
+    retailCurrency(market.country)
   const lockCountry = !!activeSession?.checkedItemIds.length || !!recorded
   function chooseMarket(next: RetailSelection) {
     if (recorded) return
@@ -127,16 +130,20 @@ export function CheckoffPriceSheet({
       setVariantName('')
     }
     setMarket(next)
-    const retailer = RETAILERS.find((r) => r.id === next.retailerId)
+  }
+  // Market and amount changes are drafts until a purchase is explicitly confirmed.
+  function commitMarket() {
+    if (recorded) return
+    const retailer = RETAILERS.find((r) => r.id === market.retailerId)
     if (activeList && retailer) {
       const currentStore = activeSession?.store ?? locationForList(settings, stores, activeList).name
-      const currentRetailer = findRetailer(currentStore, next.country)
+      const currentRetailer = findRetailer(currentStore, market.country)
       useStore
         .getState()
         .setListShoppingStore(
           activeList.id,
-          currentRetailer?.id === next.retailerId ? currentStore : retailer.name,
-          next.country
+          currentRetailer?.id === market.retailerId ? currentStore : retailer.name,
+          market.country
         )
     }
   }
@@ -203,28 +210,23 @@ export function CheckoffPriceSheet({
   const showNewVariantName = selection === NEW_VARIANT
   const sizePresets = getVariantSizePresets(item.name, item.category, item.amount)
 
-  // Preis-/Marken-Vorbelegung bei Variantenwahl oder Aktion/Normalpreis-Wechsel neu anwenden -
-  // während des Renderns statt in einem Effect (React-Muster "Zustand beim Ändern eines Werts
-  // anpassen"). appliedPrefillKey startet bei null, damit die erste Vorbelegung auch beim
-  // initialen Mount greift (bisher übernahm das der erste Effect-Lauf).
-  const prefillKey = `${selectedVariant?.id ?? ''}|${wasSale}|${currency}`
-  const [appliedPrefillKey, setAppliedPrefillKey] = useState<string | null>(null)
-  if (selectedVariant && selectedPrices && prefillKey !== appliedPrefillKey) {
+  // Selecting a variant never silently turns its historical price into a paid price.
+  const prefillKey = selectedVariant?.id ?? ''
+  const [appliedPrefillKey, setAppliedPrefillKey] = useState(prefillKey)
+  if (prefillKey !== appliedPrefillKey) {
     setAppliedPrefillKey(prefillKey)
-    setBrandId(selectedVariant.brandId || '')
-    if (wasSale) {
-      if (selectedPrices.lastSalePrice && selectedPrices.lastSalePrice > 0) {
-        setCents(amountToCents(selectedPrices.lastSalePrice))
-      }
-    } else {
-      const prefilled = priceByWeight
-        ? (selectedPrices.pricePerKg ?? selectedPrices.lastPrice)
-        : selectedPrices.lastPrice
-      if (prefilled && prefilled > 0) {
-        setCents(amountToCents(prefilled))
-      }
-    }
+    setBrandId(selectedVariant?.brandId || '')
+    setCents(0)
   }
+  const historicalPrice = priceByWeight
+    ? selectedPrices?.pricePerKg && weightGrams
+      ? (selectedPrices.pricePerKg * weightGrams) / 1000
+      : undefined
+    : wasSale
+      ? selectedPrices?.lastSalePrice
+      : selectedPrices?.lastPrice
+  const previousAmount =
+    historicalPrice && !priceByWeight && priceMode === 'total' ? historicalPrice * quantity : historicalPrice
 
   // Stückpreis-Anzeige auf "Pro Stück" umschalten, wenn die Menge (z. B. per Stepper) auf >1
   // wechselt - initialer Wert kommt schon aus useState oben, hier nur Folgeänderungen.
@@ -302,7 +304,6 @@ export function CheckoffPriceSheet({
   }
 
   function handleSave() {
-    if (!recorded) chooseMarket(market)
     const price = centsToAmount(cents)
     if (price === null) {
       setError('Bitte einen gültigen Preis eingeben.')
@@ -337,6 +338,7 @@ export function CheckoffPriceSheet({
 
     if (showNewVariantName) {
       const name = variantName.trim() || 'Standard'
+      commitMarket()
       onSave({ ...payload, variantName: name })
       return
     }
@@ -346,6 +348,7 @@ export function CheckoffPriceSheet({
       return
     }
 
+    commitMarket()
     onSave({ ...payload, variantId: selectedVariant.id })
   }
 
@@ -583,6 +586,18 @@ export function CheckoffPriceSheet({
             )}
           </details>
           <section className="price-keypad">
+            {previousAmount != null && previousAmount > 0 && (
+              <button
+                type="button"
+                className="btn-soft mb-3 min-h-11 w-full px-3 text-sm"
+                onClick={() => setCents(amountToCents(previousAmount))}
+              >
+                Wie zuletzt übernehmen · {formatMoney(previousAmount, currency)}
+              </button>
+            )}
+            <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Erst „Speichern“ bestätigt den bezahlten Preis.
+            </p>
             <MoneyNumpad
               cents={cents}
               onChange={(value) => {
@@ -649,7 +664,7 @@ export function CheckoffPriceSheet({
             <button
               className="btn-soft flex-1 py-3 text-[14px]"
               onClick={() => {
-                if (!recorded) chooseMarket(market)
+                if (!item.done) commitMarket()
                 onSkip()
               }}
             >

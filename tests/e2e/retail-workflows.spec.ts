@@ -175,6 +175,7 @@ test('brand favorites and hidden entries persist and common brands remain indepe
   page,
 }) => {
   await open(page)
+  await page.getByRole('link', { name: 'Mehr', exact: true }).click()
   await page.getByRole('link', { name: 'Optionen', exact: true }).click()
   await page.getByRole('button', { name: 'Preise & Marken', exact: true }).click()
   await page.getByRole('button', { name: 'Markenkatalog verwalten', exact: true }).click()

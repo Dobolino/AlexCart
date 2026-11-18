@@ -13,7 +13,7 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
   const Title = onTitleClick ? 'button' : 'div'
   return (
     <header
-      className="glass relative z-20 flex flex-none items-center justify-between border-b px-4"
+      className="page-header relative z-20 flex flex-none items-start justify-between gap-2 px-4"
       style={{
         paddingTop: 'calc(12px + var(--safe-top))',
         paddingBottom: '12px',
@@ -24,9 +24,14 @@ export function PageHeader({ title, subtitle, onTitleClick, right }: PageHeaderP
       <Title className="tap-scale min-w-0 flex-1 text-left" onClick={onTitleClick}>
         <h1
           className="font-display flex items-center gap-1.5 text-[28px] font-extrabold leading-tight tracking-tight"
-          style={{ color: 'var(--text)' }}
+          style={{
+            color: 'var(--text)',
+            fontSize: onTitleClick && title.length > 12 ? 23 : title.length > 32 ? 24 : undefined,
+          }}
         >
-          <span className="truncate">{title}</span>
+          <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]" title={title}>
+            {title}
+          </span>
           {onTitleClick && (
             <span className="mt-1 inline-flex shrink-0 rotate-90" style={{ color: 'var(--text-muted)' }}>
               <Icon path={ICON_PATHS.chevron} size={18} />

@@ -4,6 +4,7 @@ import { ItemRow } from './ItemRow'
 import { ItemTile } from './ItemTile'
 import { useDragReorder } from '@/hooks/useDragReorder'
 import { estimateItemPrice, type PriceEstimateContext } from '@/utils/priceProfiles'
+import { getCategoryColor } from '@/utils/categoryColor'
 import type { Currency, ListViewMode, ProductPriceProfile, ShoppingItem } from '@/types'
 
 interface CategorySectionProps {
@@ -53,12 +54,19 @@ export function CategorySection({
 
   if (viewMode === 'tiles') {
     return (
-      <div className="mb-5">
+      <div
+        className="product-group mb-4"
+        style={{ '--group-color': getCategoryColor(category).fg } as React.CSSProperties}
+      >
         <div
           className="category-heading flex items-center justify-between gap-2 px-1.5 pb-2 text-[17px] font-extrabold"
           style={{ color: 'var(--text)' }}
         >
-          <span>{category}</span>
+          <span className="flex items-center gap-2">
+            <i className="category-dot" />
+            {category}
+          </span>
+          <span className="ml-auto text-xs">{items.length}</span>
           {sorting && (
             <button
               className="min-h-11 text-[13px] font-bold"
@@ -81,6 +89,8 @@ export function CategorySection({
                 key={item.id}
                 item={item}
                 category={category}
+                estimatedPrice={estimateItemPrice(priceProfiles, item, currency, estimateContext)}
+                currency={currency}
                 onToggle={onToggle}
                 onDelete={onDelete}
                 onEdit={onEdit}

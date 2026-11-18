@@ -20,6 +20,7 @@ const CalculatorPage = lazy(() =>
 )
 const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const MorePage = lazy(() => import('./pages/MorePage').then((m) => ({ default: m.MorePage })))
 const ShoppingModePage = lazy(() =>
   import('./pages/ShoppingModePage').then((m) => ({ default: m.ShoppingModePage }))
 )
@@ -57,6 +58,7 @@ function AnimatedRoutes() {
             <Route path="/calculator" element={<CalculatorPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/more" element={<MorePage />} />
           </Routes>
         </Suspense>
       </motion.div>

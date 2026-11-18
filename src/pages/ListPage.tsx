@@ -50,7 +50,7 @@ const ReceiptCheckSheet = lazy(() =>
 import { BudgetBar } from '@/components/BudgetBar'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { formatMoney } from '@/utils/currency'
-import { budgetProgress, currentWeekSpend, totalBudgetSpend } from '@/utils/budget'
+import { budgetProgress, currentWeekSpend } from '@/utils/budget'
 import { findPriceProfile, estimateOpenListCost } from '@/utils/priceProfiles'
 import type { CheckoffPriceData, ShoppingItem } from '@/types'
 
@@ -93,6 +93,7 @@ export function ListPage() {
   const catalog = useStore((s) => s.catalog)
   const observations = useStore((s) => s.priceObservations)
   const session = useStore((s) => s.shoppingSession)
+  const finishedTrip = useStore((s) => s.completedTrips.find((trip) => trip.id === finishedTripId))
   const [locationOpen, setLocationOpen] = useState(false)
 
   const [shareOpen, setShareOpen] = useState(false)
@@ -132,9 +133,8 @@ export function ListPage() {
     .filter((e) => (e.currency ?? 'CHF') === currency)
     .reduce((sum, e) => sum + e.amount, 0)
   const weekSpend = currentWeekSpend(purchaseLog, undefined, currency)
-  const budgetSpend = totalBudgetSpend(weekSpend, calculatorTotal)
   const hasWeeklyBudget = weeklyBudget > 0
-  const budget = hasWeeklyBudget ? budgetProgress(budgetSpend, weeklyBudget) : null
+  const budget = hasWeeklyBudget ? budgetProgress(weekSpend, weeklyBudget) : null
 
   const shoppingLocation = locationForList(settings, stores, list)
   const estimateContext = {
@@ -173,7 +173,12 @@ export function ListPage() {
 
   function openPriceSheetLater(item: ShoppingItem) {
     setPriceSheetMode('add-later')
-    setPriceSheetItem(item)
+    setPriceSheetItem(
+      useStore
+        .getState()
+        .activeList()
+        ?.items.find((current) => current.id === item.id) ?? item
+    )
   }
 
   function handleToggle(itemId: string) {
@@ -191,6 +196,7 @@ export function ListPage() {
 
   function handlePriceSave(data: CheckoffPriceData) {
     if (!priceSheetItem) return
+    updateItemInActiveList(priceSheetItem.id, { amount: priceSheetItem.amount })
     if (priceSheetMode === 'on-checkoff') {
       toggleItemDone(priceSheetItem.id, data)
       showDoneToast(priceSheetItem, data.price)
@@ -204,6 +210,7 @@ export function ListPage() {
   function handlePriceSkip() {
     if (!priceSheetItem) return
     if (priceSheetMode === 'on-checkoff') {
+      updateItemInActiveList(priceSheetItem.id, { amount: priceSheetItem.amount })
       toggleItemDone(priceSheetItem.id)
       showDoneToast(priceSheetItem)
     }
@@ -248,21 +255,14 @@ export function ListPage() {
           <div className="flex items-center gap-1">
             {activeItems.length > 0 && (
               <button
-                className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full shadow-sm"
+                className="tap-scale flex h-11 flex-none items-center justify-center gap-1.5 rounded-full px-4 font-bold"
                 style={{ color: 'var(--accent-fg)', background: 'var(--accent)' }}
                 onClick={() => navigate('/shop')}
                 aria-label="Einkaufsmodus starten"
               >
-                <Icon path={ICON_PATHS.shopping} size={18} />
+                <Icon path={ICON_PATHS.shopping} size={18} /> Los
               </button>
             )}
-            <button
-              className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
-              onClick={() => setListViewMode(listViewMode === 'list' ? 'tiles' : 'list')}
-              aria-label={listViewMode === 'list' ? 'Kachel-Ansicht' : 'Listen-Ansicht'}
-            >
-              <Icon path={listViewMode === 'list' ? ICON_PATHS.grid : ICON_PATHS.list} size={18} />
-            </button>
             <button
               className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
               style={{ color: 'var(--text-muted)' }}
@@ -288,7 +288,19 @@ export function ListPage() {
             className="card-surface mb-3 flex items-center justify-between gap-2 px-3 py-2 text-sm"
           >
             <span>
-              Einkauf abgeschlossen. Deine bisherigen Preise bleiben im Verlauf.
+              <strong className="block text-lg">Einkauf abgeschlossen</strong>
+              {finishedTrip && (
+                <span className="my-2 block text-[28px] font-extrabold tabular-nums">
+                  {formatMoney(
+                    finishedTrip.items.reduce((sum, item) => sum + (item.price ?? 0), 0),
+                    finishedTrip.currency ?? currency
+                  )}
+                </span>
+              )}
+              Deine bisherigen Preise bleiben im Verlauf.
+              <button className="mt-1 block min-h-11 font-bold underline" onClick={() => navigate('/stats')}>
+                Statistik ansehen
+              </button>
               {finishedTripId && (
                 <button
                   className="mt-1 block min-h-11 font-bold underline"
@@ -307,9 +319,27 @@ export function ListPage() {
             </button>
           </div>
         )}
-        <ShoppingLocationButton onClick={() => setLocationOpen(true)} />
+        <BudgetBar
+          progress={budget}
+          spent={weekSpend}
+          estimate={listEstimate}
+          currency={currency}
+          calculatorTotal={calculatorTotal}
+        />
+        <div className="mb-3 flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <ShoppingLocationButton onClick={() => setLocationOpen(true)} />
+          </div>
+          <button
+            className="btn-soft flex h-11 w-11 shrink-0 items-center justify-center"
+            onClick={() => setListViewMode(listViewMode === 'list' ? 'tiles' : 'list')}
+            aria-label={listViewMode === 'list' ? 'Kachel-Ansicht' : 'Listen-Ansicht'}
+          >
+            <Icon path={listViewMode === 'list' ? ICON_PATHS.grid : ICON_PATHS.list} size={18} />
+          </button>
+        </div>
         {session?.listId === list.id && (
-          <section className="card-surface mb-3 flex items-center justify-between gap-2 p-3">
+          <section className="mb-2 flex items-center justify-between gap-2 px-1">
             <div className="text-xs">
               <p className="font-bold">Einkauf {session.pausedAt != null ? 'pausiert' : 'läuft'}</p>
               <p style={{ color: 'var(--text-muted)' }}>
@@ -321,7 +351,6 @@ export function ListPage() {
             </button>
           </section>
         )}
-        {budget && <BudgetBar progress={budget} currency={currency} />}
         {filteredItems.length > 0 && (
           <div
             className="glass-card mb-3.5 flex shrink-0 items-center justify-between gap-2.5 px-3.5 text-[12px]"
@@ -337,15 +366,6 @@ export function ListPage() {
             </button>
           </div>
         )}
-
-        <details className="suggestions-panel shrink-0" open={activeItems.length === 0 || undefined}>
-          <summary>Vorschläge für deinen Einkauf</summary>
-          <div className="px-3 pb-1">
-            <LowStockSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
-            <RecurringSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
-            <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
-          </div>
-        </details>
 
         {!activeItems.length && !doneItems.length ? (
           <div className="flex flex-1 items-center justify-center">
@@ -384,27 +404,6 @@ export function ListPage() {
                 onProduceWeightChange={handleProduceWeight}
               />
             ))}
-
-            {listEstimate.pricedItemCount > 0 && (
-              <div
-                className="mb-3 flex items-center justify-between rounded-[14px] px-4 py-3.5"
-                style={{ background: 'var(--surface)', boxShadow: 'var(--shadow-card)' }}
-              >
-                <div className="min-w-0 pr-3" style={{ color: 'var(--text-muted)' }}>
-                  <div className="text-[15px] font-bold">Ungefähres Total</div>
-                  <div className="mt-1 text-xs">
-                    {listEstimate.pricedItemCount} von {listEstimate.openItemCount} Artikeln mit Preis
-                    {!!listEstimate.referenceItemCount &&
-                      ` · ${listEstimate.referenceItemCount} aus Bonpreisen`}
-                    {!!listEstimate.oldPriceItemCount &&
-                      ` · ${listEstimate.oldPriceItemCount} älter als 90 Tage`}
-                  </div>
-                </div>
-                <span className="text-[18px] font-extrabold tabular-nums">
-                  {formatMoney(listEstimate.total, currency)}
-                </span>
-              </div>
-            )}
 
             {doneItems.length > 0 && (
               <>
@@ -456,6 +455,14 @@ export function ListPage() {
             )}
           </>
         )}
+        <details className="suggestions-panel shrink-0" open={activeItems.length === 0 || undefined}>
+          <summary>Vorschläge für deinen Einkauf</summary>
+          <div className="px-3 pb-1">
+            <LowStockSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
+            <RecurringSection onAdded={(name) => showToast(`„${name}“ zur Liste hinzugefügt`)} />
+            <QuickAddSection onAdded={(name) => showToast(`„${name}“ hinzugefügt`)} />
+          </div>
+        </details>
       </main>
 
       <div
@@ -464,15 +471,15 @@ export function ListPage() {
         aria-label="Artikel verwalten"
         style={{ flexDirection: handedness === 'left' ? 'row-reverse' : 'row' }}
       >
-        <button className="btn-soft tap-scale" onClick={() => setScannerOpen(true)}>
-          Scannen
-        </button>
         <button
-          className="btn-primary tap-scale flex-1"
+          className="btn-soft tap-scale flex-1"
           onClick={() => setAddOpen(true)}
           aria-label="Artikel hinzufügen"
         >
-          <Icon path={ICON_PATHS.plus} size={20} /> Hinzufügen
+          <Icon path={ICON_PATHS.plus} size={20} /> Artikel hinzufügen …
+        </button>
+        <button className="scan-action tap-scale" aria-label="Scannen" onClick={() => setScannerOpen(true)}>
+          <Icon path={ICON_PATHS.barcode} size={22} />
         </button>
       </div>
       <Suspense fallback={null}>
@@ -590,7 +597,6 @@ export function ListPage() {
             onSkip={handlePriceSkip}
             skipLabel={priceSheetMode === 'add-later' ? 'Ohne Änderung zurück' : undefined}
             onAmountChange={(amount) => {
-              updateItemInActiveList(priceSheetItem.id, { amount })
               setPriceSheetItem((prev) => (prev ? { ...prev, amount } : prev))
             }}
           />

@@ -107,7 +107,7 @@ test('previews and edits historic prices before importing without creating purch
     expect(after[key]).toEqual(before[key])
 
   await page.getByRole('link', { name: 'Liste', exact: true }).click()
-  const estimate = page.getByText('Ungefähres Total', { exact: true }).locator('../..')
+  const estimate = page.getByRole('region', { name: 'Kosten und Wochenbudget', exact: true })
   await expect(estimate).toContainText('CHF 2.00')
   await expect(estimate).toContainText('1 aus Bonpreisen')
   await page.getByRole('button', { name: 'Artikel hinzufügen', exact: true }).click()

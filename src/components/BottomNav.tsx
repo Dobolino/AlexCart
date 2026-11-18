@@ -4,11 +4,10 @@ import { ICON_PATHS } from '@/constants/icons'
 
 const TABS = [
   { to: '/', label: 'Liste', icon: 'cart' },
-  { to: '/pantry', label: 'Vorrat', icon: 'pantry' },
+  { to: '/shop', label: 'Einkauf', icon: 'shopping' },
   { to: '/prices', label: 'Preise', icon: 'sort' },
-  { to: '/calculator', label: 'Rechner', icon: 'calculator' },
   { to: '/stats', label: 'Stats', icon: 'chart' },
-  { to: '/settings', label: 'Optionen', icon: 'settings' },
+  { to: '/more', label: 'Mehr', icon: 'more' },
 ]
 
 /** A reserved navigation area keeps product controls clear of the tabs on iOS. */

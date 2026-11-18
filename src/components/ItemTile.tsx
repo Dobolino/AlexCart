@@ -13,11 +13,14 @@ import { productDisplayName } from '@/utils/listItemDisplay'
 import { hapticSuccess } from '@/utils/haptics'
 import { useItemSwipe } from '@/hooks/useItemSwipe'
 import type { DragFixedPosition } from '@/hooks/useDragReorder'
-import type { ShoppingItem } from '@/types'
+import type { Currency, ShoppingItem } from '@/types'
+import { formatMoney } from '@/utils/currency'
 
 interface ItemTileProps {
   item: ShoppingItem
   category: string
+  estimatedPrice?: number | null
+  currency: Currency
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onEdit: (item: ShoppingItem) => void
@@ -40,6 +43,8 @@ interface ItemTileProps {
 export function ItemTile({
   item,
   category,
+  estimatedPrice,
+  currency,
   onToggle,
   onDelete,
   onEdit,
@@ -238,6 +243,14 @@ export function ItemTile({
             />
           )}
         </div>
+        {!item.done && (
+          <span
+            className="item-estimate text-right text-xs font-semibold tabular-nums"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {estimatedPrice != null ? `≈ ${formatMoney(estimatedPrice, currency)}` : 'Preis?'}
+          </span>
+        )}
         <button
           className="tap-scale flex h-11 w-11 flex-none items-center justify-center rounded-full"
           style={{ color: 'var(--text-muted)' }}

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { compareProductPrices, convertMoney, minorMoney, normalizedPrice } from './priceComparison'
+import {
+  compareProductPrices,
+  convertMoney,
+  minorMoney,
+  normalizedPrice,
+  priceAdvantage,
+} from './priceComparison'
 import { normalizeGtin, expandUpce } from './barcode'
 import type { CatalogProduct, FxSnapshot, PriceObservation } from '@/types/catalog'
 
@@ -32,6 +38,58 @@ const price: PriceObservation = {
 }
 
 describe('price comparison', () => {
+  it('accepts a price recorded for today before the date-only noon timestamp', () => {
+    const morning = new Date(2026, 9, 24, 8)
+    const noon = new Date(2026, 9, 24, 12).toISOString()
+    expect(
+      compareProductPrices(product, [{ ...price, observedAt: noon }], 'EUR', null, morning)
+    ).toHaveLength(1)
+    const tomorrow = new Date(2026, 9, 25, 12).toISOString()
+    expect(
+      compareProductPrices(product, [{ ...price, observedAt: tomorrow }], 'EUR', null, morning)
+    ).toHaveLength(0)
+  })
+  it('keeps normal and conditional prices separate and never ranks future or mismatched prices', () => {
+    const now = new Date('2026-10-26T12:00:00Z')
+    const normal = {
+      ...price,
+      id: 'normal',
+      storeId: 'migros',
+      price: { minor: 250, currency: 'CHF' as const },
+    }
+    const cheaper = {
+      ...normal,
+      id: 'cheaper',
+      storeId: 'marktkauf',
+      price: { minor: 200, currency: 'CHF' as const },
+    }
+    const sale = {
+      ...normal,
+      id: 'sale',
+      discounted: true,
+      price: { minor: 50, currency: 'CHF' as const },
+      observedAt: '2026-10-25T12:00:00Z',
+    }
+    const loyalty = {
+      ...cheaper,
+      id: 'loyalty',
+      loyaltyRequired: true,
+      price: { minor: 1, currency: 'CHF' as const },
+    }
+    const future = { ...cheaper, id: 'future', observedAt: '2027-01-01T12:00:00Z' }
+    const rows = compareProductPrices(product, [normal, cheaper, sale, loyalty, future], 'CHF', fx, now)
+    expect(rows.map((row) => row.observation.id)).toEqual(['cheaper', 'normal', 'loyalty', 'sale'])
+    expect(priceAdvantage(rows)).toMatchObject({
+      cheapest: { id: 'cheaper' },
+      reference: { id: 'normal' },
+      percent: 20,
+    })
+    expect(
+      priceAdvantage(rows.filter((row) => row.observation.discounted || row.observation.loyaltyRequired))
+    ).toBeNull()
+    expect(normalizedPrice(product, { ...normal, basis: 'kg' }, 'CHF', fx)).toBeNull()
+    expect(compareProductPrices(product, [future], 'CHF', fx, now)).toEqual([])
+  })
   it('converts both directions using decimal arithmetic and retains original cents', () => {
     expect(convertMoney(price.price, 'CHF', fx)?.toString()).toBe('1.7005')
     expect(convertMoney({ minor: 95, currency: 'CHF' }, 'EUR', fx)?.toString()).toBe('1')
